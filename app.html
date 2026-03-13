@@ -355,6 +355,21 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       <input type="text" id="welcomeDisplayName" placeholder="Optional" style="margin-bottom:0;">
     </div>
 
+    <div id="welcomeAuthSection" style="margin-top:12px; padding-top:12px; border-top:1px solid #E5E0D8;">
+      <div id="welcomeAuthStatus" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">
+        <button onclick="doLogin()" style="display:flex;align-items:center;gap:8px;padding:9px 20px;background:#24292e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:Arial;font-weight:500;">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          Sign in with GitHub
+        </button>
+        <span style="font-size:10px;color:#A0929B;">sync your settings</span>
+      </div>
+      <div id="welcomeAuthLoggedIn" style="display:none;text-align:center;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;background:#d4edda;border-radius:6px;font-size:12px;color:#155724;">
+          <span>Signed in as</span><b id="welcomeAuthName"></b>
+        </div>
+      </div>
+    </div>
+
     <button class="wb-start-btn" onclick="finishWelcome()">Start Creating</button>
     <div class="wb-skip" onclick="skipWelcome()">Skip &mdash; configure later in Settings</div>
   </div>
@@ -811,6 +826,7 @@ function saveSettings() {
   }
 
   saveConfig();
+  syncConfigToCloud(); // sync to Supabase if logged in
   closeSettings();
   addMessage(`✓ Settings saved (${settingsProvider})`,'system');
 }
@@ -898,7 +914,38 @@ function finishWelcome() {
   }
 
   saveConfig();
+  syncConfigToCloud(); // save to Supabase if logged in
   document.getElementById('welcomeOverlay').classList.add('hidden');
+}
+
+// Sync LLM config to Supabase user metadata (encrypted-ish: base64)
+async function syncConfigToCloud(){
+  if(!supabaseClient||!currentUser)return;
+  try{
+    const payload={
+      provider:llmConfig.provider,
+      url:llmConfig.url,
+      model:llmConfig.model,
+      router:llmConfig.router,
+      apiKey:llmConfig.apiKey?btoa(llmConfig.apiKey):'', // light obfuscation
+      displayName:llmConfig.displayName
+    };
+    await supabaseClient.auth.updateUser({data:{sloth_config:payload}});
+  }catch(e){console.warn('Config sync failed:',e);}
+}
+
+// Restore config from Supabase user metadata
+function restoreConfigFromCloud(user){
+  const cfg=user.user_metadata?.sloth_config;
+  if(!cfg||!cfg.provider)return false;
+  llmConfig.provider=cfg.provider;
+  llmConfig.url=cfg.url||'';
+  llmConfig.model=cfg.model||'';
+  llmConfig.router=cfg.router||'';
+  llmConfig.apiKey=cfg.apiKey?atob(cfg.apiKey):'';
+  llmConfig.displayName=cfg.displayName||'';
+  saveConfig(); // persist to localStorage too
+  return true;
 }
 
 function skipWelcome() {
@@ -1114,6 +1161,26 @@ function setAuthUser(user){
     llmConfig.displayName=name;
     saveConfig();
   }
+  // Update welcome page auth section if visible
+  const wStatus=document.getElementById('welcomeAuthStatus');
+  const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
+  const wName=document.getElementById('welcomeAuthName');
+  if(wStatus&&wLoggedIn){
+    wStatus.style.display='none';
+    wLoggedIn.style.display='block';
+    if(wName)wName.textContent=name;
+  }
+  // Auto-fill welcome name field
+  const nameInput=document.getElementById('welcomeDisplayName');
+  if(nameInput&&!nameInput.value)nameInput.value=name;
+  // Try to restore LLM config from cloud (if user has saved settings before)
+  if(!isConfigured()){
+    const restored=restoreConfigFromCloud(user);
+    if(restored&&isConfigured()){
+      // Config restored — hide welcome screen
+      document.getElementById('welcomeOverlay').classList.add('hidden');
+    }
+  }
 }
 
 function clearAuthUser(){
@@ -1124,56 +1191,25 @@ function clearAuthUser(){
 
 async function doLogin(){
   if(!supabaseClient){
-    // If auth not configured, open settings instead
     openSettings();
     return;
   }
-  // Show provider chooser
-  const provider=await showAuthPicker();
-  if(!provider)return;
+  // Directly use GitHub — no picker needed
   try{
+    // Build redirect URL — must be http(s), not file://
+    let redirect=window.location.href.split('#')[0].split('?')[0];
+    if(redirect.startsWith('file:')){
+      addMessage('OAuth login requires http/https. Deploy to GitHub Pages or run a local server first.','system');
+      return;
+    }
     const{error}=await supabaseClient.auth.signInWithOAuth({
-      provider,
-      options:{redirectTo:window.location.origin+window.location.pathname}
+      provider:'github',
+      options:{redirectTo:redirect}
     });
     if(error)addMessage('Login error: '+error.message,'system');
   }catch(e){
     addMessage('Login error: '+e.message,'system');
   }
-}
-
-function showAuthPicker(){
-  return new Promise(resolve=>{
-    // Simple inline picker
-    const overlay=document.createElement('div');
-    overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:700;display:flex;align-items:center;justify-content:center;';
-    const box=document.createElement('div');
-    box.style.cssText='background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:24px 28px;text-align:center;min-width:280px;';
-    box.innerHTML=`
-      <div style="font-size:14px;color:#e0e0e0;margin-bottom:16px;font-weight:600;">Sign in to Sloth Space</div>
-      <button onclick="this.closest('div[style]').dataset.choice='github'" style="width:100%;padding:10px;margin-bottom:8px;background:#24292e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:Arial;">Continue with GitHub</button>
-      <button onclick="this.closest('div[style]').dataset.choice='google'" style="width:100%;padding:10px;margin-bottom:8px;background:#4285f4;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:Arial;">Continue with Google</button>
-      <button onclick="this.closest('div[style]').dataset.choice='apple'" style="width:100%;padding:10px;margin-bottom:8px;background:#000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:Arial;">Continue with Apple</button>
-      <div onclick="this.closest('div[style]').dataset.choice='cancel'" style="font-size:11px;color:#666;margin-top:10px;cursor:pointer;">Cancel</div>
-    `;
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    // Listen for clicks
-    overlay.addEventListener('click',function handler(e){
-      const choice=box.dataset.choice;
-      if(choice){
-        overlay.removeEventListener('click',handler);
-        document.body.removeChild(overlay);
-        resolve(choice==='cancel'?null:choice);
-      }
-      if(e.target===overlay){
-        overlay.removeEventListener('click',handler);
-        document.body.removeChild(overlay);
-        resolve(null);
-      }
-    });
-  });
 }
 
 async function doLogout(){
