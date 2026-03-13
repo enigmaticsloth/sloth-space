@@ -327,17 +327,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     </div>
 
     <div id="welcomeOllamaFields" style="display:none;">
-      <div class="ollama-guide">
-        <div class="og-steps">
-          <div class="og-step"><div class="og-label">1. Install</div><div class="og-cmd"><span id="ogCmd1">curl -fsSL https://ollama.com/install.sh | sh</span><button class="og-copy" onclick="copyCmd('ogCmd1')">Copy</button></div></div>
-          <div class="og-step"><div class="og-label">2. Pull</div><div class="og-cmd"><span id="ogCmd2">ollama pull llama3.1:8b</span><button class="og-copy" onclick="copyCmd('ogCmd2')">Copy</button></div></div>
-          <div class="og-step"><div class="og-label">3. Serve</div><div class="og-cmd"><span id="ogCmd3">OLLAMA_ORIGINS="*" ollama serve</span><button class="og-copy" onclick="copyCmd('ogCmd3')">Copy</button></div></div>
-        </div>
-        <div class="og-bottom">
-          <button class="og-detect-btn" onclick="detectOllama()">Detect Ollama</button>
-          <div id="ollamaDetectStatus" class="og-status" style="display:none;"></div>
-          <span class="og-note">or download at ollama.com</span>
-        </div>
+      <div class="ollama-guide" id="ollamaGuide">
+        <!-- Content filled by initOllamaGuide() based on OS -->
       </div>
       <div class="wb-inline-row" style="margin-top:10px;">
         <div class="wb-input-group">
@@ -915,14 +906,71 @@ function checkWelcomeScreen() {
 }
 
 // ═══════════════════════════════════════════
-// OLLAMA DETECTION
+// OLLAMA SETUP (OS-aware)
 // ═══════════════════════════════════════════
+function getOS(){
+  const ua=navigator.userAgent;
+  if(ua.includes('Mac'))return 'mac';
+  if(ua.includes('Win'))return 'win';
+  return 'linux';
+}
+
+function initOllamaGuide(){
+  const os=getOS();
+  const guide=document.getElementById('ollamaGuide');
+  if(!guide)return;
+
+  const steps={
+    mac:{
+      install:{label:'1. Install', html:'<a href="https://ollama.com/download/mac" target="_blank" style="color:#7886A5;font-weight:600;font-size:11px;">Download Ollama for Mac</a> <span style="font-size:9px;color:#A0929B;">→ open .dmg → drag to Applications</span>'},
+      pull:{label:'2. Pull', cmd:'ollama pull llama3.1:8b'},
+      serve:{label:'3. Enable', cmd:'launchctl setenv OLLAMA_ORIGINS "*"', note:'then restart Ollama app'}
+    },
+    win:{
+      install:{label:'1. Install', html:'<a href="https://ollama.com/download/windows" target="_blank" style="color:#7886A5;font-weight:600;font-size:11px;">Download Ollama for Windows</a> <span style="font-size:9px;color:#A0929B;">→ run installer</span>'},
+      pull:{label:'2. Pull', cmd:'ollama pull llama3.1:8b'},
+      serve:{label:'3. Enable', cmd:'set OLLAMA_ORIGINS=* && ollama serve'}
+    },
+    linux:{
+      install:{label:'1. Install', cmd:'curl -fsSL https://ollama.com/install.sh | sh'},
+      pull:{label:'2. Pull', cmd:'ollama pull llama3.1:8b'},
+      serve:{label:'3. Serve', cmd:'OLLAMA_ORIGINS="*" ollama serve'}
+    }
+  };
+
+  const s=steps[os];
+  let html='<div class="og-steps">';
+
+  // Step 1: Install (link or command depending on OS)
+  html+=`<div class="og-step"><div class="og-label">${s.install.label}</div>`;
+  if(s.install.cmd){
+    html+=`<div class="og-cmd"><span id="ogCmd1">${s.install.cmd}</span><button class="og-copy" onclick="copyCmd('ogCmd1')">Copy</button></div>`;
+  }else{
+    html+=`<div style="flex:1;padding:4px 0;">${s.install.html}</div>`;
+  }
+  html+='</div>';
+
+  // Step 2: Pull model
+  html+=`<div class="og-step"><div class="og-label">${s.pull.label}</div><div class="og-cmd"><span id="ogCmd2">${s.pull.cmd}</span><button class="og-copy" onclick="copyCmd('ogCmd2')">Copy</button></div></div>`;
+
+  // Step 3: Serve/Enable
+  html+=`<div class="og-step"><div class="og-label">${s.serve.label}</div><div class="og-cmd"><span id="ogCmd3">${s.serve.cmd}</span><button class="og-copy" onclick="copyCmd('ogCmd3')">Copy</button></div></div>`;
+  if(s.serve.note){
+    html+=`<div style="font-size:9px;color:#A0929B;margin-left:64px;margin-top:-2px;">${s.serve.note}</div>`;
+  }
+
+  html+='</div>';
+  html+=`<div class="og-bottom"><button class="og-detect-btn" onclick="detectOllama()">Detect Ollama</button><div id="ollamaDetectStatus" class="og-status" style="display:none;"></div></div>`;
+
+  guide.innerHTML=html;
+}
+
 function copyCmd(id){
-  const text=document.getElementById(id).textContent;
-  navigator.clipboard.writeText(text).then(()=>{
-    const btn=document.getElementById(id).parentElement.querySelector('.og-copy');
-    btn.textContent='Copied!';
-    setTimeout(()=>{btn.textContent='Copy';},1500);
+  const el=document.getElementById(id);
+  if(!el)return;
+  navigator.clipboard.writeText(el.textContent).then(()=>{
+    const btn=el.parentElement.querySelector('.og-copy');
+    if(btn){btn.textContent='Copied!';setTimeout(()=>{btn.textContent='Copy';},1500);}
   });
 }
 
@@ -930,12 +978,11 @@ async function detectOllama(){
   const statusEl=document.getElementById('ollamaDetectStatus');
   statusEl.style.display='block';
   statusEl.className='og-status checking';
-  statusEl.textContent='Checking...';
+  statusEl.textContent='Detecting...';
 
-  const url=document.getElementById('welcomeOllamaUrl').value.trim()||'http://localhost:11434';
+  const url=(document.getElementById('welcomeOllamaUrl')?.value||'http://localhost:11434').trim();
 
   try{
-    // First check if Ollama is running
     const res=await fetch(url+'/api/tags',{signal:AbortSignal.timeout(3000)});
     if(!res.ok)throw new Error('Not reachable');
     const data=await res.json();
@@ -943,24 +990,24 @@ async function detectOllama(){
 
     if(models.length===0){
       statusEl.className='og-status err';
-      statusEl.innerHTML='Ollama is running but no models found. Run: <code>ollama pull llama3.1:8b</code>';
+      statusEl.textContent='Ollama running but no models. Run step 2 first.';
     }else{
       statusEl.className='og-status ok';
-      statusEl.textContent='Connected! Models: '+models.join(', ');
-      // Auto-fill the first model
+      statusEl.textContent='Connected! Found: '+models.slice(0,3).join(', ');
       const modelInput=document.getElementById('welcomeOllamaModel');
-      if(!modelInput.value||modelInput.value==='llama3.1:8b'){
+      if(modelInput&&(!modelInput.value||modelInput.value==='llama3.1:8b')){
         modelInput.value=models[0];
       }
     }
   }catch(e){
     statusEl.className='og-status err';
-    if(e.name==='TimeoutError'||e.message.includes('timeout')){
-      statusEl.textContent='Ollama not detected at '+url+'. Is it running? (ollama serve)';
+    const os=getOS();
+    if(os==='mac'){
+      statusEl.textContent='Not detected. Open Ollama app from Applications first.';
     }else if(e.message.includes('Failed to fetch')||e.message.includes('NetworkError')){
-      statusEl.innerHTML='Cannot reach Ollama. Make sure it\'s running with:<br><code>OLLAMA_ORIGINS="*" ollama serve</code>';
+      statusEl.textContent='Cannot reach '+url+'. Run step 3 first.';
     }else{
-      statusEl.textContent='Error: '+e.message;
+      statusEl.textContent='Not detected at '+url;
     }
   }
 }
@@ -2068,6 +2115,7 @@ document.querySelectorAll('.popup').forEach(p=>{
   p.addEventListener('click',e=>e.stopPropagation());
 });
 checkWelcomeScreen(); // Show welcome if not configured
+initOllamaGuide(); // Render OS-specific Ollama instructions
 initAuth(); // Initialize Supabase auth if configured
 autoLoad(); // Restore previous session from localStorage
 renderApp();
