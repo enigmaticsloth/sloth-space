@@ -897,6 +897,29 @@ function setWelcomeProvider(p) {
 }
 
 function finishWelcome() {
+  // Validate: require API key for Groq, require Ollama detection for Ollama
+  if (welcomeProvider === 'groq') {
+    const key = document.getElementById('welcomeApiKey').value.trim();
+    if (!key) {
+      const input = document.getElementById('welcomeApiKey');
+      input.style.border = '2px solid #e74c3c';
+      input.placeholder = 'API Key is required — get one free at console.groq.com';
+      input.focus();
+      input.addEventListener('input', () => { input.style.border = ''; }, { once: true });
+      return;
+    }
+  } else if (welcomeProvider === 'ollama') {
+    const statusEl = document.getElementById('ollamaDetectStatus');
+    if (!statusEl || !statusEl.classList.contains('ok')) {
+      // Ollama not yet detected — prompt user
+      const guide = document.getElementById('ollamaGuide');
+      if (guide) guide.style.border = '2px solid #e74c3c';
+      setTimeout(() => { if (guide) guide.style.border = ''; }, 3000);
+      detectOllama(); // trigger detection attempt
+      return;
+    }
+  }
+
   const defaults = LLM_DEFAULTS[welcomeProvider];
   llmConfig.provider = welcomeProvider;
   llmConfig.displayName = document.getElementById('welcomeDisplayName').value.trim();
