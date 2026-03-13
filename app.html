@@ -120,7 +120,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   background-size:400% 400%; animation:monet-shift 12s ease infinite; }
 @keyframes monet-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
 .welcome-overlay.hidden { display:none; }
-.welcome-box { text-align:center; max-width:560px; padding:32px 36px; background:rgba(255,255,255,0.85); backdrop-filter:blur(16px); border-radius:16px; box-shadow:0 8px 40px rgba(120,134,165,0.2); }
+.welcome-box { text-align:center; width:92%; max-width:740px; max-height:92vh; overflow-y:auto; padding:28px 32px; background:rgba(255,255,255,0.85); backdrop-filter:blur(16px); border-radius:16px; box-shadow:0 8px 40px rgba(120,134,165,0.2); }
+.welcome-box::-webkit-scrollbar { width:5px; } .welcome-box::-webkit-scrollbar-thumb { background:#C9B8D4; border-radius:4px; }
 .welcome-box .wb-logo { font-size:44px; font-weight:700; color:#2C2C3A; margin-bottom:2px; letter-spacing:-1px; }
 .welcome-box .wb-tagline { font-size:13px; color:#7886A5; margin-bottom:18px; font-style:italic; }
 .welcome-box .wb-subtitle { font-size:11px; color:#7B7B8E; margin-bottom:10px; font-weight:500; }
@@ -146,19 +147,26 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .wb-product-name { font-size:11px; color:#2C2C3A; font-weight:600; }
 .wb-product-status { font-size:9px; color:#A0929B; }
 
-/* ─── Ollama setup guide (compact rows) ─── */
-.ollama-guide { background:#F6F3EE; border:1.5px solid #D5D0C7; border-radius:8px; padding:10px 12px; text-align:left; }
-.ollama-guide .og-steps { display:flex; flex-direction:column; gap:5px; }
-.ollama-guide .og-step { display:flex; align-items:center; gap:8px; min-width:0; }
-.ollama-guide .og-label { font-size:10px; color:#2C2C3A; font-weight:600; width:56px; flex-shrink:0; }
-.ollama-guide .og-cmd { flex:1; min-width:0; display:flex; align-items:center; background:#2C2C3A; border-radius:4px; padding:4px 8px; font-family:'Courier New',monospace; font-size:10px; color:#D8DCEA; }
+/* ─── Ollama setup guide (step cards) ─── */
+.ollama-guide { background:#F6F3EE; border:1.5px solid #D5D0C7; border-radius:8px; padding:14px 16px; text-align:left; width:100%; box-sizing:border-box; }
+.ollama-guide .og-os-badge { display:inline-block; background:#7886A5; color:#fff; font-size:9px; font-weight:700; padding:2px 8px; border-radius:10px; margin-bottom:8px; letter-spacing:0.5px; }
+.ollama-guide .og-steps { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+@media(max-width:600px){ .ollama-guide .og-steps { grid-template-columns:1fr; } }
+.ollama-guide .og-card { background:#fff; border:1px solid #E5E0D8; border-radius:6px; padding:8px 10px; }
+.ollama-guide .og-card-head { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.ollama-guide .og-num { background:#7886A5; color:#fff; font-size:9px; font-weight:700; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ollama-guide .og-title { font-size:11px; color:#2C2C3A; font-weight:600; }
+.ollama-guide .og-desc { font-size:9px; color:#8B8598; margin-bottom:4px; line-height:1.4; }
+.ollama-guide .og-cmd { display:flex; align-items:center; background:#2C2C3A; border-radius:4px; padding:5px 8px; font-family:'Courier New',monospace; font-size:10px; color:#D8DCEA; }
 .ollama-guide .og-cmd span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ollama-guide .og-copy { background:transparent; border:1px solid #555; color:#999; padding:1px 6px; border-radius:2px; cursor:pointer; font-size:8px; flex-shrink:0; margin-left:6px; }
 .ollama-guide .og-copy:hover { color:#fff; border-color:#888; }
-.ollama-guide .og-bottom { display:flex; align-items:center; gap:8px; margin-top:6px; }
-.ollama-guide .og-detect-btn { background:#7886A5; color:#fff; border:none; padding:4px 12px; border-radius:4px; font-size:10px; cursor:pointer; font-family:Arial; flex-shrink:0; }
+.ollama-guide .og-link-btn { display:inline-block; background:#7886A5; color:#fff; text-decoration:none; font-size:10px; font-weight:600; padding:4px 12px; border-radius:4px; }
+.ollama-guide .og-link-btn:hover { background:#6775A0; }
+.ollama-guide .og-warn { background:#FFF8E7; border:1px solid #E8D8A0; border-radius:4px; padding:5px 8px; font-size:9px; color:#7B6B2E; line-height:1.4; margin-top:3px; }
+.ollama-guide .og-bottom { display:flex; align-items:center; gap:8px; margin-top:8px; }
+.ollama-guide .og-detect-btn { background:#7886A5; color:#fff; border:none; padding:5px 14px; border-radius:4px; font-size:10px; cursor:pointer; font-family:Arial; flex-shrink:0; }
 .ollama-guide .og-detect-btn:hover { background:#6775A0; }
-.ollama-guide .og-note { font-size:8px; color:#A0929B; }
 .ollama-guide .og-status { font-size:9px; padding:4px 8px; border-radius:3px; flex:1; }
 .ollama-guide .og-status.checking { background:#EDE8DF; color:#7B7B8E; }
 .ollama-guide .og-status.ok { background:#d4edda; color:#155724; }
@@ -920,46 +928,83 @@ function initOllamaGuide(){
   const guide=document.getElementById('ollamaGuide');
   if(!guide)return;
 
-  const steps={
-    mac:{
-      install:{label:'1. Install', html:'<a href="https://ollama.com/download/mac" target="_blank" style="color:#7886A5;font-weight:600;font-size:11px;">Download Ollama for Mac</a> <span style="font-size:9px;color:#A0929B;">→ open .dmg → drag to Applications</span>'},
-      pull:{label:'2. Pull', cmd:'ollama pull llama3.1:8b'},
-      serve:{label:'3. Enable', cmd:'launchctl setenv OLLAMA_ORIGINS "*"', note:'then restart Ollama app'}
-    },
-    win:{
-      install:{label:'1. Install', html:'<a href="https://ollama.com/download/windows" target="_blank" style="color:#7886A5;font-weight:600;font-size:11px;">Download Ollama for Windows</a> <span style="font-size:9px;color:#A0929B;">→ run installer</span>'},
-      pull:{label:'2. Pull', cmd:'ollama pull llama3.1:8b'},
-      serve:{label:'3. Enable', cmd:'set OLLAMA_ORIGINS=* && ollama serve'}
-    },
-    linux:{
-      install:{label:'1. Install', cmd:'curl -fsSL https://ollama.com/install.sh | sh'},
-      pull:{label:'2. Pull', cmd:'ollama pull llama3.1:8b'},
-      serve:{label:'3. Serve', cmd:'OLLAMA_ORIGINS="*" ollama serve'}
-    }
-  };
+  const osNames={mac:'macOS',win:'Windows',linux:'Linux'};
+  let html=`<span class="og-os-badge">${osNames[os]} detected</span>`;
+  html+='<div class="og-steps">';
 
-  const s=steps[os];
-  let html='<div class="og-steps">';
+  if(os==='mac'){
+    // ── macOS ──
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">1</span><span class="og-title">Download &amp; Install Ollama</span></div>
+      <div class="og-desc">Click below to download the <b>.dmg</b> file. Open it and drag Ollama into Applications. <br><b>Do NOT use <code>brew install</code> or <code>curl</code></b> — those versions have known bugs on Mac.</div>
+      <a href="https://ollama.com/download/mac" target="_blank" class="og-link-btn">Download Ollama for Mac</a>
+    </div>`;
 
-  // Step 1: Install (link or command depending on OS)
-  html+=`<div class="og-step"><div class="og-label">${s.install.label}</div>`;
-  if(s.install.cmd){
-    html+=`<div class="og-cmd"><span id="ogCmd1">${s.install.cmd}</span><button class="og-copy" onclick="copyCmd('ogCmd1')">Copy</button></div>`;
-  }else{
-    html+=`<div style="flex:1;padding:4px 0;">${s.install.html}</div>`;
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">2</span><span class="og-title">Open Ollama App</span></div>
+      <div class="og-desc">Open <b>Ollama</b> from Applications (or Spotlight search "Ollama"). You'll see a llama icon appear in your menu bar — that means it's running.</div>
+    </div>`;
+
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">3</span><span class="og-title">Download a Model</span></div>
+      <div class="og-desc">Open <b>Terminal</b> (Spotlight → "Terminal") and paste this command. It will download ~4.7GB:</div>
+      <div class="og-cmd"><span id="ogCmd1">ollama pull llama3.1:8b</span><button class="og-copy" onclick="copyCmd('ogCmd1')">Copy</button></div>
+      <div class="og-warn">If you see "failed to load MLX" — this is safe to ignore, it's a known warning that doesn't affect text models.</div>
+    </div>`;
+
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">4</span><span class="og-title">Allow Browser Access (CORS)</span></div>
+      <div class="og-desc">Paste this in Terminal so our web app can talk to Ollama, then <b>quit and reopen Ollama app</b>:</div>
+      <div class="og-cmd"><span id="ogCmd2">launchctl setenv OLLAMA_ORIGINS "*"</span><button class="og-copy" onclick="copyCmd('ogCmd2')">Copy</button></div>
+      <div class="og-warn">After running this, right-click the llama icon in menu bar → Quit, then reopen Ollama from Applications.</div>
+    </div>`;
+
+  } else if(os==='win'){
+    // ── Windows ──
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">1</span><span class="og-title">Download &amp; Install Ollama</span></div>
+      <div class="og-desc">Click below to download the installer. Run it and follow the prompts — it takes about 1 minute.</div>
+      <a href="https://ollama.com/download/windows" target="_blank" class="og-link-btn">Download Ollama for Windows</a>
+    </div>`;
+
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">2</span><span class="og-title">Download a Model</span></div>
+      <div class="og-desc">Open <b>Command Prompt</b> (Win+R → type "cmd" → Enter) and paste this. It will download ~4.7GB:</div>
+      <div class="og-cmd"><span id="ogCmd1">ollama pull llama3.1:8b</span><button class="og-copy" onclick="copyCmd('ogCmd1')">Copy</button></div>
+    </div>`;
+
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">3</span><span class="og-title">Allow Browser Access &amp; Start</span></div>
+      <div class="og-desc">In the same Command Prompt, paste this to start Ollama with browser access enabled:</div>
+      <div class="og-cmd"><span id="ogCmd2">set OLLAMA_ORIGINS=* && ollama serve</span><button class="og-copy" onclick="copyCmd('ogCmd2')">Copy</button></div>
+      <div class="og-warn">Keep this window open while using Sloth Space. If you see "listening on 127.0.0.1:11434" — it's working!</div>
+    </div>`;
+
+  } else {
+    // ── Linux ──
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">1</span><span class="og-title">Install Ollama</span></div>
+      <div class="og-desc">Open a terminal and paste this one-liner:</div>
+      <div class="og-cmd"><span id="ogCmd1">curl -fsSL https://ollama.com/install.sh | sh</span><button class="og-copy" onclick="copyCmd('ogCmd1')">Copy</button></div>
+    </div>`;
+
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">2</span><span class="og-title">Download a Model</span></div>
+      <div class="og-desc">This downloads ~4.7GB to your machine:</div>
+      <div class="og-cmd"><span id="ogCmd2">ollama pull llama3.1:8b</span><button class="og-copy" onclick="copyCmd('ogCmd2')">Copy</button></div>
+    </div>`;
+
+    html+=`<div class="og-card">
+      <div class="og-card-head"><span class="og-num">3</span><span class="og-title">Start with Browser Access</span></div>
+      <div class="og-desc">Run Ollama with CORS enabled so our web app can connect:</div>
+      <div class="og-cmd"><span id="ogCmd3">OLLAMA_ORIGINS="*" ollama serve</span><button class="og-copy" onclick="copyCmd('ogCmd3')">Copy</button></div>
+      <div class="og-warn">Keep this terminal open while using Sloth Space. If you see "listening on 127.0.0.1:11434" — it's working!</div>
+    </div>`;
   }
-  html+='</div>';
 
-  // Step 2: Pull model
-  html+=`<div class="og-step"><div class="og-label">${s.pull.label}</div><div class="og-cmd"><span id="ogCmd2">${s.pull.cmd}</span><button class="og-copy" onclick="copyCmd('ogCmd2')">Copy</button></div></div>`;
+  html+='</div>'; // close og-steps
 
-  // Step 3: Serve/Enable
-  html+=`<div class="og-step"><div class="og-label">${s.serve.label}</div><div class="og-cmd"><span id="ogCmd3">${s.serve.cmd}</span><button class="og-copy" onclick="copyCmd('ogCmd3')">Copy</button></div></div>`;
-  if(s.serve.note){
-    html+=`<div style="font-size:9px;color:#A0929B;margin-left:64px;margin-top:-2px;">${s.serve.note}</div>`;
-  }
-
-  html+='</div>';
+  // Detect button
   html+=`<div class="og-bottom"><button class="og-detect-btn" onclick="detectOllama()">Detect Ollama</button><div id="ollamaDetectStatus" class="og-status" style="display:none;"></div></div>`;
 
   guide.innerHTML=html;
@@ -990,7 +1035,8 @@ async function detectOllama(){
 
     if(models.length===0){
       statusEl.className='og-status err';
-      statusEl.textContent='Ollama running but no models. Run step 2 first.';
+      const pullStep=getOS()==='mac'?'step 3':'step 2';
+      statusEl.innerHTML=`Ollama is running but no models found. Run <b>${pullStep}</b> above to download a model.`;
     }else{
       statusEl.className='og-status ok';
       statusEl.textContent='Connected! Found: '+models.slice(0,3).join(', ');
@@ -1003,11 +1049,13 @@ async function detectOllama(){
     statusEl.className='og-status err';
     const os=getOS();
     if(os==='mac'){
-      statusEl.textContent='Not detected. Open Ollama app from Applications first.';
+      statusEl.innerHTML='Not detected. Make sure Ollama app is <b>open</b> (look for llama icon in menu bar). If you just ran the CORS command, quit and reopen Ollama.';
+    }else if(os==='win'){
+      statusEl.innerHTML='Not detected. Open Command Prompt and run: <code>set OLLAMA_ORIGINS=* && ollama serve</code>';
     }else if(e.message.includes('Failed to fetch')||e.message.includes('NetworkError')){
-      statusEl.textContent='Cannot reach '+url+'. Run step 3 first.';
+      statusEl.innerHTML='Cannot reach Ollama. Make sure <code>ollama serve</code> is running in a terminal with CORS enabled.';
     }else{
-      statusEl.textContent='Not detected at '+url;
+      statusEl.textContent='Not detected at '+url+'. Is Ollama installed and running?';
     }
   }
 }
