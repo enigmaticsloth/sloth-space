@@ -15,6 +15,44 @@
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
+/* ─── File Nav Sidebar ─── */
+.file-nav-toggle { background:none; border:none; color:var(--text2); font-size:18px; cursor:pointer; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+.file-nav-toggle:hover { color:var(--text); background:var(--surface2); }
+.file-nav-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+.file-nav-overlay.open { opacity:1; pointer-events:auto; }
+.file-nav { position:fixed; top:0; left:-320px; width:320px; height:100%; background:var(--surface); border-right:1px solid var(--border); z-index:501; transition:left 0.25s ease; display:flex; flex-direction:column; }
+.file-nav.open { left:0; }
+.fn-header { display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); gap:10px; }
+.fn-header h3 { flex:1; font-size:14px; color:var(--text); font-weight:600; margin:0; }
+.fn-close { background:none; border:none; color:var(--text2); font-size:18px; cursor:pointer; padding:2px 6px; }
+.fn-close:hover { color:var(--text); }
+.fn-tabs { display:flex; border-bottom:1px solid var(--border); }
+.fn-tab { flex:1; padding:8px; background:none; border:none; color:var(--text2); font-size:11px; cursor:pointer; font-family:Arial; border-bottom:2px solid transparent; }
+.fn-tab:hover { color:var(--text); }
+.fn-tab.active { color:var(--text); border-bottom-color:#7886A5; }
+.fn-list { flex:1; overflow-y:auto; padding:8px; }
+.fn-list::-webkit-scrollbar { width:4px; } .fn-list::-webkit-scrollbar-thumb { background:#333; border-radius:4px; }
+.fn-empty { text-align:center; padding:30px 16px; color:var(--text2); font-size:12px; }
+.fn-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:6px; cursor:pointer; transition:background 0.15s; border:1px solid transparent; }
+.fn-item:hover { background:var(--surface2); }
+.fn-item.active { background:var(--surface2); border-color:var(--border); }
+.fn-item-icon { font-size:22px; flex-shrink:0; }
+.fn-item-info { flex:1; min-width:0; }
+.fn-item-title { font-size:12px; color:var(--text); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fn-item-meta { font-size:9px; color:var(--text2); margin-top:2px; }
+.fn-item-actions { display:flex; gap:4px; flex-shrink:0; opacity:0; transition:opacity 0.15s; }
+.fn-item:hover .fn-item-actions { opacity:1; }
+.fn-item-btn { background:none; border:1px solid var(--border); color:var(--text2); padding:2px 6px; border-radius:3px; cursor:pointer; font-size:9px; }
+.fn-item-btn:hover { color:var(--text); border-color:#555; }
+.fn-item-btn.danger:hover { color:#e74c3c; border-color:#e74c3c; }
+.fn-actions { padding:10px 12px; border-top:1px solid var(--border); display:flex; gap:6px; }
+.fn-action-btn { flex:1; padding:7px; background:var(--surface2); color:var(--text2); border:1px solid var(--border); border-radius:5px; cursor:pointer; font-size:10px; font-family:Arial; text-align:center; }
+.fn-action-btn:hover { color:var(--text); border-color:#555; }
+.fn-action-btn.primary { background:#7886A5; color:#fff; border-color:#7886A5; }
+.fn-action-btn.primary:hover { background:#6775A0; }
+.fn-cloud-badge { font-size:8px; background:#7886A5; color:#fff; padding:1px 4px; border-radius:3px; margin-left:4px; }
+.fn-local-badge { font-size:8px; background:#555; color:#ccc; padding:1px 4px; border-radius:3px; margin-left:4px; }
+
 /* ─── Top bar ─── */
 .topbar { display:flex; align-items:center; padding:8px 20px; background:var(--surface); border-bottom:1px solid var(--border); gap:16px; flex-shrink:0; }
 .topbar .logo { font-size:28px; font-weight:700; color:var(--text); white-space:nowrap; letter-spacing:-0.5px; }
@@ -31,6 +69,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 /* Slide panel (left) */
 .slide-panel { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px 6px 2px; overflow:hidden; background:var(--bg); min-height:0; }
+.deck-name-bar { width:100%; padding:4px 12px 2px; flex-shrink:0; }
+.deck-name-input { width:100%; background:transparent; border:none; border-bottom:1px solid transparent; color:var(--text); font-size:14px; font-weight:600; font-family:Arial; padding:4px 2px; outline:none; letter-spacing:-0.3px; }
+.deck-name-input::placeholder { color:var(--text2); font-weight:400; }
+.deck-name-input:hover { border-bottom-color:var(--border); }
+.deck-name-input:focus { border-bottom-color:#7886A5; }
 .slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; }
 .slide-bar { display:flex; align-items:center; gap:6px; margin-top:6px; width:100%; justify-content:center; }
 .slide-nav { display:flex; gap:3px; flex-wrap:wrap; }
@@ -208,17 +251,35 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   <div style="font-size:11px;color:#333;margin-top:8px;">Switch back to Slides to keep working.</div>
 </div>
 
+<!-- File Navigation Sidebar -->
+<div class="file-nav-overlay" id="fileNavOverlay" onclick="closeFileNav()"></div>
+<div class="file-nav" id="fileNav">
+  <div class="fn-header">
+    <h3>My Files</h3>
+    <button class="fn-close" onclick="closeFileNav()">&times;</button>
+  </div>
+  <div class="fn-tabs">
+    <button class="fn-tab active" data-tab="all" onclick="setFileTab('all')">All</button>
+    <button class="fn-tab" data-tab="local" onclick="setFileTab('local')">Local</button>
+    <button class="fn-tab" data-tab="cloud" onclick="setFileTab('cloud')">Cloud</button>
+  </div>
+  <div class="fn-list" id="fileNavList"></div>
+  <div class="fn-actions">
+    <button class="fn-action-btn" onclick="newDeck();closeFileNav();">+ New</button>
+    <button class="fn-action-btn" onclick="loadDeck();closeFileNav();">Import File</button>
+    <button class="fn-action-btn primary" id="fnSaveBtn" onclick="saveCurrentToCloud()">Save to Cloud</button>
+  </div>
+</div>
+
 <!-- Top bar -->
 <!-- # Goodbye Google. You will never scam me or mess with me again. — Enigmaticsloth -->
 <div class="topbar slides-ui">
+  <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
   <div class="logo">Sloth Space</div>
   <div class="tagline">Type what you want. Sloth will design it.</div>
   <div class="preset-pills" id="presetPills"></div>
-  <button class="export-btn" onclick="newDeck()">New</button>
-  <button class="export-btn" onclick="loadDeck()">Open</button>
   <button class="export-btn" onclick="saveSloth()">Save .sloth</button>
   <button class="export-btn" onclick="exportPPTX()">Export .pptx</button>
-  <button class="export-btn" onclick="exportJSON()" style="opacity:0.5;">JSON</button>
   <button class="export-btn" onclick="openSettings()" title="Settings">&#9881;</button>
   <div class="auth-bar" id="authBar">
     <button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>
@@ -378,6 +439,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 <!-- Middle: slide left + conversation right -->
 <div class="middle slides-ui">
   <div class="slide-panel">
+    <div class="deck-name-bar">
+      <input type="text" id="deckNameInput" class="deck-name-input" placeholder="Untitled Presentation" spellcheck="false">
+    </div>
     <div class="slide-frame" id="slideCanvas"></div>
     <div class="slide-bar">
       <div class="slide-nav" id="slideNav"></div>
@@ -620,6 +684,12 @@ function renderSlide(slide,idx,p,total){
 function renderApp(){
   // Auto-save on every render (deck changes trigger render)
   autoSave();
+
+  // Sync deck name input
+  const deckNameEl=document.getElementById('deckNameInput');
+  if(deckNameEl&&document.activeElement!==deckNameEl){
+    deckNameEl.value=currentDeck?.title||'';
+  }
 
   document.getElementById('presetPills').innerHTML=Object.values(PRESETS).map(pr=>
     `<button class="${pr.id===currentPreset?'active':''}" onclick="setPreset('${pr.id}')">${pr.name}</button>`
@@ -1825,7 +1895,13 @@ function autoSave(){
       preset:currentPreset,
       slide:currentSlide
     }));
-    localStorage.setItem(STORAGE_HISTORY_KEY,JSON.stringify(chatHistory.slice(-20))); // keep last 20 messages
+    localStorage.setItem(STORAGE_HISTORY_KEY,JSON.stringify(chatHistory.slice(-20)));
+    // Also save to the named saves list for file nav
+    const name=currentDeck.title||'Untitled';
+    const saveKey=name.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
+    const saves=JSON.parse(localStorage.getItem('sloth_space_saves')||'{}');
+    saves[saveKey]=JSON.stringify({deck:currentDeck,preset:currentPreset});
+    localStorage.setItem('sloth_space_saves',JSON.stringify(saves));
   }catch(e){console.warn('Auto-save failed:',e);}
 }
 
@@ -2199,6 +2275,247 @@ function switchProduct(product){
 }
 
 // ═══════════════════════════════════════════
+// FILE NAV + CLOUD STORAGE
+// ═══════════════════════════════════════════
+let fileNavTab='all';
+const CLOUD_BUCKET='decks'; // Supabase Storage bucket name
+
+function openFileNav(){
+  document.getElementById('fileNav').classList.add('open');
+  document.getElementById('fileNavOverlay').classList.add('open');
+  refreshFileList();
+}
+function closeFileNav(){
+  document.getElementById('fileNav').classList.remove('open');
+  document.getElementById('fileNavOverlay').classList.remove('open');
+}
+function setFileTab(tab){
+  fileNavTab=tab;
+  document.querySelectorAll('.fn-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  refreshFileList();
+}
+
+function getLocalFiles(){
+  try{
+    const saves=JSON.parse(localStorage.getItem('sloth_space_saves')||'{}');
+    return Object.entries(saves).map(([key,val])=>{
+      try{
+        const data=JSON.parse(val);
+        const deck=data.deck||{};
+        return {
+          id:'local_'+key,
+          title:deck.title||key.replace(/_/g,' '),
+          slides:deck.slides?.length||0,
+          preset:data.preset||'clean-white',
+          source:'local',
+          key:key,
+          updated:data.savedAt?new Date(data.savedAt).getTime():(parseInt(key.split('_').pop())||Date.now()),
+          data:data
+        };
+      }catch(e){return null;}
+    }).filter(Boolean).sort((a,b)=>b.updated-a.updated);
+  }catch(e){return [];}
+}
+
+async function getCloudFiles(){
+  if(!supabaseClient||!currentUser)return [];
+  try{
+    const userId=currentUser.id;
+    const{data,error}=await supabaseClient.storage.from(CLOUD_BUCKET).list(userId,{limit:50,sortBy:{column:'updated_at',order:'desc'}});
+    if(error)throw error;
+    return (data||[]).filter(f=>f.name.endsWith('.json')).map(f=>({
+      id:'cloud_'+f.name,
+      title:f.name.replace('.json','').replace(/_/g,' '),
+      source:'cloud',
+      path:userId+'/'+f.name,
+      updated:new Date(f.updated_at||f.created_at).getTime(),
+      size:f.metadata?.size||0
+    }));
+  }catch(e){
+    console.warn('Cloud list error:',e);
+    return [];
+  }
+}
+
+async function refreshFileList(){
+  const list=document.getElementById('fileNavList');
+  list.innerHTML='<div class="fn-empty">Loading...</div>';
+
+  let files=[];
+  if(fileNavTab==='local'||fileNavTab==='all'){
+    files.push(...getLocalFiles());
+  }
+  if(fileNavTab==='cloud'||fileNavTab==='all'){
+    const cloud=await getCloudFiles();
+    files.push(...cloud);
+  }
+
+  // Sort by updated descending
+  files.sort((a,b)=>b.updated-a.updated);
+
+  // Also add current unsaved deck if any
+  if(currentDeck&&files.length===0){
+    // no files at all — show current
+  }
+
+  if(files.length===0){
+    list.innerHTML='<div class="fn-empty">No saved files yet.<br>Create a deck and save it!</div>';
+    return;
+  }
+
+  list.innerHTML=files.map(f=>{
+    const badge=f.source==='cloud'?'<span class="fn-cloud-badge">cloud</span>':'<span class="fn-local-badge">local</span>';
+    const date=new Date(f.updated);
+    const timeStr=date.toLocaleDateString()+' '+date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    const slidesInfo=f.slides?` · ${f.slides} slides`:'';
+    return `<div class="fn-item" onclick="loadFileFromNav('${f.id}')" title="${f.title}">
+      <div class="fn-item-icon">${f.source==='cloud'?'&#9729;':'&#128196;'}</div>
+      <div class="fn-item-info">
+        <div class="fn-item-title">${f.title}${badge}</div>
+        <div class="fn-item-meta">${timeStr}${slidesInfo}</div>
+      </div>
+      <div class="fn-item-actions">
+        ${f.source==='cloud'?`<button class="fn-item-btn" onclick="event.stopPropagation();shareFile('${f.path}')">Share</button>`:''}
+        <button class="fn-item-btn danger" onclick="event.stopPropagation();deleteFileFromNav('${f.id}','${f.source}','${f.key||f.path||''}')">Del</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadFileFromNav(id){
+  if(id.startsWith('local_')){
+    const key=id.replace('local_','');
+    try{
+      const saves=JSON.parse(localStorage.getItem('sloth_space_saves')||'{}');
+      const data=JSON.parse(saves[key]);
+      if(data.deck){
+        currentDeck=data.deck;
+        currentPreset=data.preset||'clean-white';
+        currentSlide=0;
+        chatHistory=[];
+        document.getElementById('chatMessages').innerHTML='';
+        addMessage(`✓ Loaded "${currentDeck.title||'Untitled'}" (${currentDeck.slides.length} slides)`,'system');
+        autoSave();
+        renderApp();
+        closeFileNav();
+      }
+    }catch(e){addMessage('Failed to load: '+e.message,'system');}
+  }else if(id.startsWith('cloud_')){
+    loadFromCloud(id.replace('cloud_',''));
+  }
+}
+
+async function loadFromCloud(filename){
+  if(!supabaseClient||!currentUser){addMessage('Sign in to load cloud files.','system');return;}
+  try{
+    const path=currentUser.id+'/'+filename;
+    const{data,error}=await supabaseClient.storage.from(CLOUD_BUCKET).download(path);
+    if(error)throw error;
+    const text=await data.text();
+    const parsed=JSON.parse(text);
+    if(parsed.deck){
+      currentDeck=parsed.deck;
+      currentPreset=parsed.preset||'clean-white';
+      currentSlide=0;
+      chatHistory=parsed.chat||[];
+      document.getElementById('chatMessages').innerHTML='';
+      if(chatHistory.length){
+        chatHistory.forEach(m=>addMessage(m.text||m.content||'',m.role||'system'));
+      }
+      addMessage(`✓ Loaded from cloud: "${currentDeck.title||'Untitled'}"`,'system');
+      autoSave();
+      renderApp();
+      closeFileNav();
+    }
+  }catch(e){addMessage('Cloud load error: '+e.message,'system');}
+}
+
+async function saveCurrentToCloud(){
+  if(!currentDeck){addMessage('Nothing to save yet.','system');return;}
+  if(!supabaseClient||!currentUser){
+    addMessage('Sign in to save to cloud.','system');
+    doLogin();
+    return;
+  }
+  try{
+    const fname=(currentDeck.title||'Untitled').replace(/[^a-zA-Z0-9\u4e00-\u9fff\s-]/g,'').replace(/\s+/g,'_')+'.json';
+    const path=currentUser.id+'/'+fname;
+    const payload=JSON.stringify({
+      deck:currentDeck,
+      preset:currentPreset,
+      chat:chatHistory.slice(-20),
+      savedAt:new Date().toISOString()
+    });
+    const blob=new Blob([payload],{type:'application/json'});
+    const{error}=await supabaseClient.storage.from(CLOUD_BUCKET).upload(path,blob,{upsert:true});
+    if(error)throw error;
+    addMessage(`✓ Saved to cloud: "${currentDeck.title||'Untitled'}"`,'system');
+    refreshFileList();
+  }catch(e){addMessage('Cloud save error: '+e.message,'system');}
+}
+
+async function deleteFileFromNav(id,source,keyOrPath){
+  const name=id.replace('local_','').replace('cloud_','').replace(/_\d+$/,'').replace(/_/g,' ');
+  if(!confirm(`Delete "${name}"?`))return;
+
+  if(source==='local'){
+    try{
+      const saves=JSON.parse(localStorage.getItem('sloth_space_saves')||'{}');
+      delete saves[keyOrPath];
+      localStorage.setItem('sloth_space_saves',JSON.stringify(saves));
+    }catch(e){}
+  }else if(source==='cloud'){
+    if(!supabaseClient||!currentUser)return;
+    try{
+      const{error}=await supabaseClient.storage.from(CLOUD_BUCKET).remove([keyOrPath]);
+      if(error)throw error;
+    }catch(e){addMessage('Delete error: '+e.message,'system');return;}
+  }
+  refreshFileList();
+}
+
+async function shareFile(path){
+  if(!supabaseClient)return;
+  try{
+    // Create a signed URL that lasts 7 days
+    const{data,error}=await supabaseClient.storage.from(CLOUD_BUCKET).createSignedUrl(path,7*24*60*60);
+    if(error)throw error;
+    // Create a share URL that includes the signed download URL
+    const shareUrl=window.location.href.split('?')[0].split('#')[0]+'?load='+encodeURIComponent(data.signedUrl);
+    await navigator.clipboard.writeText(shareUrl);
+    addMessage('✓ Share link copied! Valid for 7 days.','system');
+  }catch(e){addMessage('Share error: '+e.message,'system');}
+}
+
+// On page load, check for ?load= param
+function checkShareLink(){
+  const params=new URLSearchParams(window.location.search);
+  const loadUrl=params.get('load');
+  if(!loadUrl)return;
+  // Clean the URL
+  window.history.replaceState({},'',window.location.pathname);
+  // Fetch and load
+  fetch(loadUrl).then(r=>{
+    if(!r.ok)throw new Error('Link expired or invalid');
+    return r.json();
+  }).then(parsed=>{
+    if(parsed.deck){
+      currentDeck=parsed.deck;
+      currentPreset=parsed.preset||'clean-white';
+      currentSlide=0;
+      chatHistory=[];
+      document.getElementById('chatMessages').innerHTML='';
+      addMessage(`✓ Loaded shared deck: "${currentDeck.title||'Untitled'}" (${currentDeck.slides.length} slides)`,'system');
+      // Hide welcome if showing
+      document.getElementById('welcomeOverlay').classList.add('hidden');
+      renderApp();
+    }
+  }).catch(e=>{
+    console.warn('Share link load failed:',e);
+  });
+}
+
+// ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
 const chatInput=document.getElementById('chatInput');
@@ -2218,6 +2535,13 @@ document.addEventListener('keydown',e=>{
 });
 window.addEventListener('resize',renderApp);
 initToolbar();
+// Deck name input — update title on change
+document.getElementById('deckNameInput').addEventListener('input',function(){
+  if(currentDeck){
+    currentDeck.title=this.value.trim()||'Untitled';
+    autoSave();
+  }
+});
 document.querySelectorAll('.popup').forEach(p=>{
   p.addEventListener('click',e=>e.stopPropagation());
 });
@@ -2225,6 +2549,7 @@ checkWelcomeScreen(); // Show welcome if not configured
 initOllamaGuide(); // Render OS-specific Ollama instructions
 initAuth(); // Initialize Supabase auth if configured
 autoLoad(); // Restore previous session from localStorage
+checkShareLink(); // Check for ?load= share link
 renderApp();
 </script>
 </body>
