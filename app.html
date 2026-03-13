@@ -68,14 +68,19 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .middle { display:flex; flex:1; min-height:0; overflow:hidden; }
 
 /* Slide panel (left) */
-.slide-panel { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px 6px 2px; overflow:hidden; background:var(--bg); min-height:0; }
-.deck-name-bar { width:100%; padding:4px 12px 2px; flex-shrink:0; }
-.deck-name-input { width:100%; background:transparent; border:none; border-bottom:1px solid transparent; color:var(--text); font-size:14px; font-weight:600; font-family:Arial; padding:4px 2px; outline:none; letter-spacing:-0.3px; }
+.slide-panel { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px 6px 6px; overflow:hidden; background:var(--bg); min-height:0; }
+.deck-name-bar { width:100%; padding:4px 12px 2px; flex-shrink:0; display:flex; align-items:center; gap:8px; }
+.deck-name-input { flex:1; background:transparent; border:none; border-bottom:1px solid transparent; color:var(--text); font-size:14px; font-weight:600; font-family:Arial; padding:4px 2px; outline:none; letter-spacing:-0.3px; min-width:0; }
 .deck-name-input::placeholder { color:var(--text2); font-weight:400; }
 .deck-name-input:hover { border-bottom-color:var(--border); }
 .deck-name-input:focus { border-bottom-color:#7886A5; }
+.deck-actions { display:flex; gap:5px; flex-shrink:0; }
+.deck-action-btn { background:var(--surface2); color:var(--text2); border:1px solid var(--border); padding:4px 10px; border-radius:4px; cursor:pointer; font-size:10px; font-family:Arial; white-space:nowrap; transition:all 0.15s; }
+.deck-action-btn:hover { color:var(--text); border-color:#555; }
+.deck-action-btn.primary { background:#7886A5; color:#fff; border-color:#7886A5; font-weight:600; }
+.deck-action-btn.primary:hover { background:#6775A0; }
 .slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; }
-.slide-bar { display:flex; align-items:center; gap:6px; margin-top:6px; width:100%; justify-content:center; }
+.slide-bar { display:flex; align-items:center; gap:6px; margin-top:8px; padding-bottom:4px; width:100%; justify-content:center; flex-shrink:0; }
 .slide-nav { display:flex; gap:3px; flex-wrap:wrap; }
 .slide-nav button { background:transparent; color:var(--text2); border:1px solid transparent; width:26px; height:26px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
 .slide-nav button.active { color:#ccc; border-color:var(--border); background:var(--surface2); }
@@ -233,6 +238,83 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .product-tab[data-product="slides"] .pt-dot { background:#7886A5; }
 .product-tab[data-product="docs"] .pt-dot { background:#8B9E8B; }
 .product-tab[data-product="sheets"] .pt-dot { background:#C67A3C; }
+
+/* ═══════════════════════════════════════════ */
+/* MOBILE RWD                                 */
+/* ═══════════════════════════════════════════ */
+
+/* Tablet: stack chat below slide */
+@media(max-width:900px){
+  .middle { flex-direction:column; }
+  .chat-panel { width:100%; height:200px; border-left:none; border-top:1px solid var(--border); }
+  .slide-panel { padding:4px 4px 4px; }
+  .topbar .logo { font-size:22px; }
+  .topbar .tagline { display:none; }
+  .preset-pills { display:none; }
+  .deck-actions { gap:3px; }
+  .deck-action-btn { padding:3px 7px; font-size:9px; }
+}
+
+/* Phone */
+@media(max-width:600px){
+  /* Product bar */
+  .product-bar { padding:2px 0; }
+  .product-tab { padding:4px 12px; font-size:10px; }
+
+  /* Topbar: compact */
+  .topbar { padding:6px 10px; gap:8px; flex-wrap:wrap; }
+  .topbar .logo { font-size:18px; }
+  .export-btn { padding:3px 6px; font-size:9px; margin-left:3px; }
+
+  /* Middle: full-width stacked */
+  .middle { flex-direction:column; }
+  .slide-panel { padding:2px 2px 4px; }
+  .chat-panel { width:100%; height:180px; border-left:none; border-top:1px solid var(--border); }
+
+  /* Deck name bar */
+  .deck-name-bar { padding:2px 6px 0; gap:4px; flex-wrap:wrap; }
+  .deck-name-input { font-size:12px; }
+  .deck-actions { width:100%; justify-content:flex-end; }
+  .deck-action-btn { padding:3px 8px; font-size:9px; }
+
+  /* Bottom panel */
+  .input-area { padding:4px 8px 6px; }
+  .input-area textarea { height:80px; font-size:12px; padding:8px 10px; }
+  .send-btn { padding:0 12px; font-size:10px; height:30px; }
+
+  /* Toolbar: scroll horizontal */
+  .toolbar { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .tool-btn { padding:4px 10px; font-size:10px; }
+
+  /* Slide bar */
+  .slide-nav button { width:22px; height:22px; font-size:9px; }
+  .slide-info { font-size:9px; }
+
+  /* File nav sidebar */
+  .file-nav { width:85vw; max-width:320px; }
+
+  /* Settings panel */
+  .settings-panel { width:92vw; padding:20px 18px; }
+
+  /* Welcome box */
+  .welcome-box { width:96%; padding:20px 16px; }
+  .welcome-box .wb-logo { font-size:32px; }
+  .wb-provider-row { flex-direction:column; gap:8px; }
+  .wb-products { gap:12px; }
+  .wb-product-icon { width:38px; height:38px; }
+
+  /* Selection bar */
+  .selection-bar { padding:2px 8px; font-size:9px; }
+}
+
+/* Very small phones */
+@media(max-width:380px){
+  .topbar .logo { font-size:16px; }
+  .export-btn { display:none; }
+  .deck-action-btn.primary { font-size:8px; padding:2px 6px; }
+  .chat-panel { height:150px; }
+  .input-area textarea { height:60px; }
+}
 </style>
 </head>
 <body>
@@ -264,11 +346,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     <button class="fn-tab" data-tab="cloud" onclick="setFileTab('cloud')">Cloud</button>
   </div>
   <div class="fn-list" id="fileNavList"></div>
-  <div class="fn-actions">
-    <button class="fn-action-btn" onclick="newDeck();closeFileNav();">+ New</button>
-    <button class="fn-action-btn" onclick="loadDeck();closeFileNav();">Import File</button>
-    <button class="fn-action-btn primary" id="fnSaveBtn" onclick="saveCurrentToCloud()">Save to Cloud</button>
-  </div>
 </div>
 
 <!-- Top bar -->
@@ -441,6 +518,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   <div class="slide-panel">
     <div class="deck-name-bar">
       <input type="text" id="deckNameInput" class="deck-name-input" placeholder="Untitled Presentation" spellcheck="false">
+      <div class="deck-actions">
+        <button class="deck-action-btn" onclick="newDeck()">+ New</button>
+        <button class="deck-action-btn" onclick="loadDeck()">Import</button>
+        <button class="deck-action-btn primary" onclick="saveCurrentToCloud()">Save to Cloud</button>
+      </div>
     </div>
     <div class="slide-frame" id="slideCanvas"></div>
     <div class="slide-bar">
@@ -697,7 +779,7 @@ function renderApp(){
 
   const panel=document.querySelector('.slide-panel');
   const panelW=panel.clientWidth-12;
-  const panelH=panel.clientHeight-40;
+  const panelH=panel.clientHeight-70; // account for deck-name-bar + slide-bar + padding
 
   if(!currentDeck){
     document.getElementById('slideCanvas').innerHTML=`<div style="width:${panelW}px;height:${panelH}px;background:#131313;display:flex;align-items:center;justify-content:center;color:#555;font-size:15px;font-family:Arial;">Type what you want. Sloth will design it.</div>`;
