@@ -1,0 +1,33 @@
+{
+  "id": "monet",
+  "name": "Monet",
+  "description": "Soft impressionist palette inspired by Monet's water lilies — lavender, misty blue, sage green, warm cream. Dreamy and refined.",
+  "colors": {
+    "background": "#F6F3EE",
+    "surface": "#EDE8DF",
+    "primary": "#2C2C3A",
+    "secondary": "#7B7B8E",
+    "accent": "#7886A5",
+    "on_accent": "#FFFFFF",
+    "border": "#D5D0C7",
+    "table_header_bg": "#D8DCEA",
+    "table_header_text": "#2C2C3A",
+    "table_row_alt": "#EFECEA"
+  },
+  "typography": {
+    "heading": { "family": "Arial", "weight": 700, "letterSpacing": -0.3 },
+    "body": { "family": "Arial", "weight": 400, "lineHeight": 1.6 },
+    "caption": { "family": "Arial", "weight": 400, "transform": "none" },
+    "scale": [44, 32, 24, 18, 14, 12]
+  },
+  "spacing": {
+    "margin": { "top": 60, "right": 72, "bottom": 52, "left": 72 },
+    "gap": 24,
+    "paragraph": 14
+  },
+  "slide": { "width": 1280, "height": 720 },
+  "decorations": {
+    "accentBar": { "enabled": false },
+    "pageNumber": { "show": true, "position": "bottom-right", "format": "number" }
+  }
+}

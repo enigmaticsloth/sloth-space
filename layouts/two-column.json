@@ -1,0 +1,53 @@
+{
+  "id": "two-column",
+  "name": "Two Column",
+  "category": "content",
+  "description": "Split slide into two equal columns with a shared heading. Use for comparisons, before/after, pros/cons, or two parallel topics.",
+  "regions": [
+    {
+      "id": "heading",
+      "role": "heading",
+      "bounds": { "x": 0, "y": 0, "w": 1136, "h": 50 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "h1",
+      "maxLines": 2
+    },
+    {
+      "id": "divider",
+      "role": "decoration",
+      "bounds": { "x": 0, "y": 62, "w": 60, "h": 4 }
+    },
+    {
+      "id": "left_label",
+      "role": "caption",
+      "bounds": { "x": 0, "y": 88, "w": 540, "h": 28 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "caption",
+      "maxLines": 1,
+      "optional": true
+    },
+    {
+      "id": "left",
+      "role": "body",
+      "bounds": { "x": 0, "y": 124, "w": 540, "h": 440 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "body"
+    },
+    {
+      "id": "right_label",
+      "role": "caption",
+      "bounds": { "x": 596, "y": 88, "w": 540, "h": 28 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "caption",
+      "maxLines": 1,
+      "optional": true
+    },
+    {
+      "id": "right",
+      "role": "body",
+      "bounds": { "x": 596, "y": 124, "w": 540, "h": 440 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "body"
+    }
+  ]
+}

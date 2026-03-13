@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://slothspace.dev/schema/manifest.json",
+  "title": "Sloth Space Manifest",
+  "description": "Metadata for a .sloth slide deck",
+  "type": "object",
+  "required": ["sloth_version", "type", "title", "preset", "slides"],
+  "properties": {
+    "sloth_version": {
+      "type": "string",
+      "description": "Spec version (semver)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": ["0.1.0"]
+    },
+    "type": {
+      "type": "string",
+      "enum": ["slides"],
+      "description": "Document type. Phase 1 = slides only."
+    },
+    "title": {
+      "type": "string",
+      "description": "Deck title",
+      "maxLength": 200
+    },
+    "author": {
+      "type": "string",
+      "description": "Author name"
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "modified": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "locale": {
+      "type": "string",
+      "description": "BCP 47 language tag",
+      "default": "en",
+      "examples": ["en", "zh-TW", "ja"]
+    },
+    "preset": {
+      "type": "string",
+      "description": "Style preset ID to use for this deck",
+      "examples": ["minimal-dark", "corporate-blue"]
+    },
+    "preset_overrides": {
+      "$ref": "#/$defs/PresetOverrides",
+      "description": "Optional partial overrides to the chosen preset"
+    },
+    "slides": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Slide" },
+      "minItems": 1,
+      "maxItems": 100
+    }
+  },
+  "$defs": {
+    "Slide": {
+      "type": "object",
+      "required": ["layout", "content"],
+      "properties": {
+        "layout": {
+          "type": "string",
+          "description": "Layout template ID",
+          "examples": ["title", "content", "two-column", "image-left", "quote"]
+        },
+        "content": {
+          "type": "object",
+          "description": "Key-value pairs mapping region IDs to content. Keys must match the layout's region IDs.",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/$defs/RichContent" },
+              { "$ref": "#/$defs/TableContent" },
+              { "$ref": "#/$defs/ListContent" },
+              { "$ref": "#/$defs/ImageContent" }
+            ]
+          }
+        },
+        "notes": {
+          "type": "string",
+          "description": "Speaker notes for this slide"
+        },
+        "style_overrides": {
+          "type": "object",
+          "description": "Per-slide style overrides (e.g., different background color)",
+          "properties": {
+            "background": { "type": "string" },
+            "accent": { "type": "string" }
+          }
+        }
+      }
+    },
+    "RichContent": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "enum": ["rich"] },
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["text"],
+            "properties": {
+              "text": { "type": "string" },
+              "bold": { "type": "boolean" },
+              "italic": { "type": "boolean" },
+              "color": { "type": "string" },
+              "size": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "ListContent": {
+      "type": "object",
+      "required": ["type", "items"],
+      "properties": {
+        "type": { "enum": ["list"] },
+        "ordered": { "type": "boolean", "default": false },
+        "items": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "TableContent": {
+      "type": "object",
+      "required": ["type", "headers", "rows"],
+      "properties": {
+        "type": { "enum": ["table"] },
+        "headers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "ImageContent": {
+      "type": "object",
+      "required": ["type", "src"],
+      "properties": {
+        "type": { "enum": ["image"] },
+        "src": {
+          "type": "string",
+          "description": "Path relative to assets/ or URL"
+        },
+        "alt": { "type": "string" },
+        "fit": {
+          "enum": ["contain", "cover", "fill"],
+          "default": "contain"
+        }
+      }
+    },
+    "PresetOverrides": {
+      "type": "object",
+      "description": "Partial overrides to any preset field",
+      "properties": {
+        "colors": { "type": "object" },
+        "typography": { "type": "object" },
+        "spacing": { "type": "object" }
+      }
+    }
+  }
+}

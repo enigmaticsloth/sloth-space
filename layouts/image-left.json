@@ -1,0 +1,29 @@
+{
+  "id": "image-left",
+  "name": "Image Left",
+  "category": "content",
+  "description": "Full-width heading at top, then image on the left and body text on the right below. Use for product showcases, case studies, visual storytelling.",
+  "regions": [
+    {
+      "id": "heading",
+      "role": "heading",
+      "bounds": { "x": 0, "y": 0, "w": 1136, "h": 40 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "h1"
+    },
+    {
+      "id": "image",
+      "role": "image",
+      "bounds": { "x": 0, "y": 60, "w": 520, "h": 520 },
+      "align": { "horizontal": "center", "vertical": "middle" },
+      "optional": true
+    },
+    {
+      "id": "body",
+      "role": "body",
+      "bounds": { "x": 568, "y": 60, "w": 568, "h": 520 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "body"
+    }
+  ]
+}

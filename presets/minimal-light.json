@@ -1,0 +1,46 @@
+{
+  "id": "minimal-light",
+  "name": "Minimal Light",
+  "description": "Clean white background, plenty of whitespace, modern sans-serif. Best for: professional reports, academic presentations, startup updates.",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F8F9FA",
+    "primary": "#111111",
+    "secondary": "#6B7280",
+    "accent": "#2563EB",
+    "on_accent": "#FFFFFF",
+    "border": "#E5E7EB"
+  },
+  "typography": {
+    "heading": {
+      "family": "Inter",
+      "weight": 700,
+      "letterSpacing": -0.5
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400,
+      "lineHeight": 1.6
+    },
+    "caption": {
+      "family": "Inter",
+      "weight": 500,
+      "transform": "uppercase"
+    },
+    "scale": [48, 36, 26, 19, 15, 13]
+  },
+  "spacing": {
+    "margin": { "top": 64, "right": 72, "bottom": 56, "left": 72 },
+    "gap": 24,
+    "paragraph": 14
+  },
+  "slide": {
+    "width": 1280,
+    "height": 720
+  },
+  "decorations": {
+    "divider": { "style": "solid", "thickness": 1 },
+    "accentBar": { "enabled": false },
+    "pageNumber": { "show": true, "position": "bottom-right", "format": "fraction" }
+  }
+}

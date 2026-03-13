@@ -1,0 +1,46 @@
+{
+  "id": "elegant-serif",
+  "name": "Elegant Serif",
+  "description": "Classic serif headings with modern body text, warm palette. Best for: thought leadership, conference keynotes, editorial presentations, luxury/premium branding.",
+  "colors": {
+    "background": "#FAF8F5",
+    "surface": "#F0EDE8",
+    "primary": "#1C1917",
+    "secondary": "#78716C",
+    "accent": "#B45309",
+    "on_accent": "#FFFFFF",
+    "border": "#D6D3D1"
+  },
+  "typography": {
+    "heading": {
+      "family": "Playfair Display",
+      "weight": 700,
+      "letterSpacing": -0.5
+    },
+    "body": {
+      "family": "Source Sans Pro",
+      "weight": 400,
+      "lineHeight": 1.65
+    },
+    "caption": {
+      "family": "Source Sans Pro",
+      "weight": 600,
+      "transform": "uppercase"
+    },
+    "scale": [46, 34, 26, 19, 15, 13]
+  },
+  "spacing": {
+    "margin": { "top": 68, "right": 80, "bottom": 60, "left": 80 },
+    "gap": 24,
+    "paragraph": 14
+  },
+  "slide": {
+    "width": 1280,
+    "height": 720
+  },
+  "decorations": {
+    "divider": { "style": "solid", "thickness": 1 },
+    "accentBar": { "enabled": false },
+    "pageNumber": { "show": true, "position": "bottom-center", "format": "fraction" }
+  }
+}

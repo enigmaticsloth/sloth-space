@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://slothspace.dev/schema/preset.json",
+  "title": "Sloth Space Style Preset",
+  "description": "Defines the complete visual identity for a slide deck: colors, typography, spacing.",
+  "type": "object",
+  "required": ["id", "name", "colors", "typography", "spacing", "slide"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Unique kebab-case identifier",
+      "examples": ["minimal-dark", "corporate-blue"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable display name",
+      "examples": ["Minimal Dark", "Corporate Blue"]
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line description of the visual style"
+    },
+    "colors": {
+      "type": "object",
+      "required": ["background", "surface", "primary", "secondary", "accent", "on_accent"],
+      "properties": {
+        "background": {
+          "type": "string",
+          "description": "Main slide background color",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "surface": {
+          "type": "string",
+          "description": "Card/box background (slightly different from background)"
+        },
+        "primary": {
+          "type": "string",
+          "description": "Main text color (headings, body)"
+        },
+        "secondary": {
+          "type": "string",
+          "description": "Muted text (subtitles, captions, metadata)"
+        },
+        "accent": {
+          "type": "string",
+          "description": "Highlight color (key numbers, links, decorative elements)"
+        },
+        "on_accent": {
+          "type": "string",
+          "description": "Text color used ON accent backgrounds (must contrast with accent)"
+        },
+        "border": {
+          "type": "string",
+          "description": "Line/border color (dividers, table borders)"
+        },
+        "gradient": {
+          "type": "object",
+          "description": "Optional gradient for title slides or backgrounds",
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" },
+            "angle": { "type": "number", "default": 135 }
+          }
+        }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "required": ["heading", "body"],
+      "properties": {
+        "heading": {
+          "type": "object",
+          "required": ["family", "weight"],
+          "properties": {
+            "family": { "type": "string", "examples": ["Inter", "Playfair Display"] },
+            "weight": { "type": "integer", "examples": [700, 800] },
+            "letterSpacing": { "type": "number", "default": 0, "description": "In px, negative for tighter" },
+            "transform": { "enum": ["none", "uppercase", "capitalize"], "default": "none" }
+          }
+        },
+        "body": {
+          "type": "object",
+          "required": ["family", "weight"],
+          "properties": {
+            "family": { "type": "string" },
+            "weight": { "type": "integer", "examples": [400] },
+            "lineHeight": { "type": "number", "default": 1.5 }
+          }
+        },
+        "caption": {
+          "type": "object",
+          "properties": {
+            "family": { "type": "string" },
+            "weight": { "type": "integer" },
+            "transform": { "enum": ["none", "uppercase"], "default": "none" }
+          }
+        },
+        "scale": {
+          "type": "array",
+          "description": "Font size scale in px: [title, h1, h2, body, caption, small]",
+          "items": { "type": "number" },
+          "minItems": 6,
+          "maxItems": 6,
+          "examples": [[48, 36, 28, 20, 16, 13]]
+        }
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "required": ["margin", "gap"],
+      "properties": {
+        "margin": {
+          "type": "object",
+          "description": "Safe area margins from slide edges (px)",
+          "required": ["top", "right", "bottom", "left"],
+          "properties": {
+            "top": { "type": "number" },
+            "right": { "type": "number" },
+            "bottom": { "type": "number" },
+            "left": { "type": "number" }
+          }
+        },
+        "gap": {
+          "type": "number",
+          "description": "Default gap between elements (px)"
+        },
+        "paragraph": {
+          "type": "number",
+          "description": "Space between paragraphs / list items (px)",
+          "default": 12
+        }
+      }
+    },
+    "slide": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "number", "default": 1280 },
+        "height": { "type": "number", "default": 720 },
+        "cornerRadius": { "type": "number", "default": 0 }
+      }
+    },
+    "decorations": {
+      "type": "object",
+      "description": "Optional decorative elements",
+      "properties": {
+        "divider": {
+          "type": "object",
+          "properties": {
+            "style": { "enum": ["solid", "dashed", "gradient", "none"], "default": "solid" },
+            "color": { "type": "string", "description": "Defaults to colors.border" },
+            "thickness": { "type": "number", "default": 1 }
+          }
+        },
+        "accentBar": {
+          "type": "object",
+          "description": "Decorative accent bar (e.g., top of title slide)",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "position": { "enum": ["top", "bottom", "left"], "default": "top" },
+            "thickness": { "type": "number", "default": 4 }
+          }
+        },
+        "pageNumber": {
+          "type": "object",
+          "properties": {
+            "show": { "type": "boolean", "default": true },
+            "position": { "enum": ["bottom-right", "bottom-center", "bottom-left"], "default": "bottom-right" },
+            "format": { "enum": ["number", "fraction", "none"], "default": "number" }
+          }
+        }
+      }
+    }
+  }
+}

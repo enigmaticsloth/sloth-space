@@ -1,0 +1,34 @@
+{
+  "id": "clean-white",
+  "name": "Clean White",
+  "description": "Pure white background, black text, maximum clarity. The default for most professional use cases.",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F5F5F5",
+    "primary": "#111111",
+    "secondary": "#666666",
+    "accent": "#111111",
+    "on_accent": "#FFFFFF",
+    "border": "#E0E0E0",
+    "table_header_bg": "#F0F0F0",
+    "table_header_text": "#111111",
+    "table_row_alt": "#FAFAFA"
+  },
+  "typography": {
+    "heading": { "family": "Arial", "weight": 700, "letterSpacing": -0.3 },
+    "body": { "family": "Arial", "weight": 400, "lineHeight": 1.6 },
+    "caption": { "family": "Arial", "weight": 400, "transform": "none" },
+    "scale": [44, 32, 24, 18, 14, 12]
+  },
+  "spacing": {
+    "margin": { "top": 60, "right": 72, "bottom": 52, "left": 72 },
+    "gap": 24,
+    "paragraph": 14
+  },
+  "slide": { "width": 1280, "height": 720 },
+  "decorations": {
+    "divider": { "style": "solid", "color": "#E0E0E0", "thickness": 1 },
+    "accentBar": { "enabled": false },
+    "pageNumber": { "show": true, "position": "bottom-right", "format": "number" }
+  }
+}

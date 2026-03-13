@@ -1,0 +1,37 @@
+{
+  "id": "content",
+  "name": "Content Slide",
+  "category": "content",
+  "description": "General-purpose slide with a heading and body content. The workhorse layout — use for explanations, bullet points, paragraphs, or any single-column content.",
+  "regions": [
+    {
+      "id": "heading",
+      "role": "heading",
+      "bounds": { "x": 0, "y": 0, "w": 1136, "h": 50 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "h1",
+      "maxLines": 2
+    },
+    {
+      "id": "divider",
+      "role": "decoration",
+      "bounds": { "x": 0, "y": 62, "w": 60, "h": 4 }
+    },
+    {
+      "id": "body",
+      "role": "body",
+      "bounds": { "x": 0, "y": 88, "w": 1136, "h": 440 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "body"
+    },
+    {
+      "id": "footnote",
+      "role": "caption",
+      "bounds": { "x": 0, "y": 556, "w": 1136, "h": 20 },
+      "align": { "horizontal": "left", "vertical": "bottom" },
+      "fontSize": "small",
+      "maxLines": 1,
+      "optional": true
+    }
+  ]
+}

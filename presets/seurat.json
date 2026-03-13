@@ -1,0 +1,33 @@
+{
+  "id": "seurat",
+  "name": "Seurat",
+  "description": "Warm vibrant palette inspired by Seurat's pointillism — golden yellow, deep teal, coral warmth, earthy green. Lively and structured.",
+  "colors": {
+    "background": "#FDF8EF",
+    "surface": "#F0E8D8",
+    "primary": "#2A2A1E",
+    "secondary": "#6B6B58",
+    "accent": "#C67A3C",
+    "on_accent": "#FFFFFF",
+    "border": "#D9D0C0",
+    "table_header_bg": "#E8D8BD",
+    "table_header_text": "#2A2A1E",
+    "table_row_alt": "#F5F0E5"
+  },
+  "typography": {
+    "heading": { "family": "Arial", "weight": 700, "letterSpacing": -0.3 },
+    "body": { "family": "Arial", "weight": 400, "lineHeight": 1.6 },
+    "caption": { "family": "Arial", "weight": 400, "transform": "none" },
+    "scale": [44, 32, 24, 18, 14, 12]
+  },
+  "spacing": {
+    "margin": { "top": 60, "right": 72, "bottom": 52, "left": 72 },
+    "gap": 24,
+    "paragraph": 14
+  },
+  "slide": { "width": 1280, "height": 720 },
+  "decorations": {
+    "accentBar": { "enabled": false },
+    "pageNumber": { "show": true, "position": "bottom-right", "format": "number" }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "id": "corporate-blue",
+  "name": "Corporate Blue",
+  "description": "Professional navy palette, structured feel. Best for: investor decks, quarterly reports, enterprise presentations, formal meetings.",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#EFF6FF",
+    "primary": "#0F172A",
+    "secondary": "#64748B",
+    "accent": "#1E40AF",
+    "on_accent": "#FFFFFF",
+    "border": "#CBD5E1",
+    "gradient": {
+      "from": "#1E3A5F",
+      "to": "#0F172A",
+      "angle": 135
+    }
+  },
+  "typography": {
+    "heading": {
+      "family": "Inter",
+      "weight": 700,
+      "letterSpacing": -0.3
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400,
+      "lineHeight": 1.55
+    },
+    "caption": {
+      "family": "Inter",
+      "weight": 600,
+      "transform": "uppercase"
+    },
+    "scale": [44, 34, 26, 18, 14, 12]
+  },
+  "spacing": {
+    "margin": { "top": 60, "right": 68, "bottom": 52, "left": 68 },
+    "gap": 22,
+    "paragraph": 12
+  },
+  "slide": {
+    "width": 1280,
+    "height": 720
+  },
+  "decorations": {
+    "divider": { "style": "solid", "thickness": 2 },
+    "accentBar": { "enabled": true, "position": "left", "thickness": 5 },
+    "pageNumber": { "show": true, "position": "bottom-right", "format": "fraction" }
+  }
+}

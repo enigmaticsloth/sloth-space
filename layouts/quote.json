@@ -1,0 +1,35 @@
+{
+  "id": "quote",
+  "name": "Quote Slide",
+  "category": "content",
+  "description": "Large centered quote with attribution. Use for testimonials, key insights, memorable statements, or section transitions with impact.",
+  "background_override": "surface",
+  "regions": [
+    {
+      "id": "quote",
+      "role": "quote",
+      "bounds": { "x": 120, "y": 120, "w": 896, "h": 280 },
+      "align": { "horizontal": "center", "vertical": "middle" },
+      "fontSize": "h1",
+      "maxLines": 6
+    },
+    {
+      "id": "author",
+      "role": "author",
+      "bounds": { "x": 120, "y": 430, "w": 896, "h": 32 },
+      "align": { "horizontal": "center", "vertical": "top" },
+      "fontSize": "body",
+      "maxLines": 1,
+      "optional": true
+    },
+    {
+      "id": "role",
+      "role": "caption",
+      "bounds": { "x": 120, "y": 470, "w": 896, "h": 24 },
+      "align": { "horizontal": "center", "vertical": "top" },
+      "fontSize": "caption",
+      "maxLines": 1,
+      "optional": true
+    }
+  ]
+}

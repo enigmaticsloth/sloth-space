@@ -1,0 +1,45 @@
+{
+  "id": "data-table",
+  "name": "Data Table",
+  "category": "data",
+  "description": "Heading with a data table below. Use for financial data, comparisons, feature matrices, timelines, or any structured tabular information.",
+  "regions": [
+    {
+      "id": "heading",
+      "role": "heading",
+      "bounds": { "x": 0, "y": 0, "w": 1136, "h": 50 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "h1",
+      "maxLines": 2
+    },
+    {
+      "id": "divider",
+      "role": "decoration",
+      "bounds": { "x": 0, "y": 62, "w": 60, "h": 4 }
+    },
+    {
+      "id": "description",
+      "role": "body",
+      "bounds": { "x": 0, "y": 84, "w": 1136, "h": 40 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "body",
+      "maxLines": 2,
+      "optional": true
+    },
+    {
+      "id": "table",
+      "role": "table",
+      "bounds": { "x": 0, "y": 144, "w": 1136, "h": 400 },
+      "align": { "horizontal": "left", "vertical": "top" }
+    },
+    {
+      "id": "source",
+      "role": "caption",
+      "bounds": { "x": 0, "y": 560, "w": 1136, "h": 20 },
+      "align": { "horizontal": "left", "vertical": "bottom" },
+      "fontSize": "small",
+      "maxLines": 1,
+      "optional": true
+    }
+  ]
+}

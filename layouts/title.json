@@ -1,0 +1,44 @@
+{
+  "id": "title",
+  "name": "Title Slide",
+  "category": "opening",
+  "description": "Opening slide for the deck. Big title, optional subtitle and tagline. Use for the first slide or major section dividers.",
+  "background_override": "gradient",
+  "regions": [
+    {
+      "id": "title",
+      "role": "title",
+      "bounds": { "x": 0, "y": 160, "w": 900, "h": 140 },
+      "align": { "horizontal": "left", "vertical": "bottom" },
+      "fontSize": "title",
+      "maxLines": 3
+    },
+    {
+      "id": "subtitle",
+      "role": "subtitle",
+      "bounds": { "x": 0, "y": 320, "w": 700, "h": 60 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "h2",
+      "maxLines": 2,
+      "optional": true
+    },
+    {
+      "id": "tagline",
+      "role": "tagline",
+      "bounds": { "x": 0, "y": 440, "w": 500, "h": 30 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "caption",
+      "maxLines": 1,
+      "optional": true
+    },
+    {
+      "id": "date",
+      "role": "caption",
+      "bounds": { "x": 0, "y": 520, "w": 300, "h": 24 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "small",
+      "maxLines": 1,
+      "optional": true
+    }
+  ]
+}

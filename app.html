@@ -1,0 +1,2076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sloth Space</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PptxGenJS/3.12.0/pptxgen.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root {
+  --bg: #0e0e0e; --surface: #161616; --surface2: #1e1e1e; --border: #2a2a2a;
+  --text: #e0e0e0; --text2: #555; --input-bg: #121212;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+/* ─── Top bar ─── */
+.topbar { display:flex; align-items:center; padding:8px 20px; background:var(--surface); border-bottom:1px solid var(--border); gap:16px; flex-shrink:0; }
+.topbar .logo { font-size:28px; font-weight:700; color:var(--text); white-space:nowrap; letter-spacing:-0.5px; }
+.topbar .tagline { font-size:12px; color:#ffffff; white-space:nowrap; margin-left:4px; align-self:flex-end; padding-bottom:4px; }
+.preset-pills { display:flex; gap:3px; margin-left:auto; }
+.preset-pills button { background:transparent; color:var(--text2); border:1px solid transparent; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
+.preset-pills button:hover { color:#999; }
+.preset-pills button.active { color:#ccc; border-color:var(--border); background:var(--surface2); }
+.export-btn { background:transparent; color:var(--text2); border:1px solid var(--border); padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; margin-left:6px; }
+.export-btn:hover { color:#999; }
+
+/* ─── Middle area: slide left + chat right ─── */
+.middle { display:flex; flex:1; min-height:0; overflow:hidden; }
+
+/* Slide panel (left) */
+.slide-panel { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px 6px 2px; overflow:hidden; background:var(--bg); min-height:0; }
+.slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; }
+.slide-bar { display:flex; align-items:center; gap:6px; margin-top:6px; width:100%; justify-content:center; }
+.slide-nav { display:flex; gap:3px; flex-wrap:wrap; }
+.slide-nav button { background:transparent; color:var(--text2); border:1px solid transparent; width:26px; height:26px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
+.slide-nav button.active { color:#ccc; border-color:var(--border); background:var(--surface2); }
+.slide-nav button:hover { color:#999; }
+.slide-info { font-size:10px; color:#444; font-family:'Courier New',monospace; white-space:nowrap; margin-left:8px; }
+
+/* Chat panel (right) */
+.chat-panel { width:320px; flex-shrink:0; display:flex; flex-direction:column; border-left:1px solid var(--border); background:var(--surface); }
+.chat-header { padding:8px 14px; font-size:11px; color:#ffffff; border-bottom:1px solid var(--border); font-weight:600; letter-spacing:0.5px; text-transform:uppercase; flex-shrink:0; }
+.chat-messages { flex:1; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:6px; min-height:0; }
+.msg { padding:6px 10px; border-radius:5px; font-size:12px; line-height:1.45; max-width:90%; word-wrap:break-word; }
+.msg.user { background:#1a1a2e; color:var(--text); align-self:flex-end; border-bottom-right-radius:2px; }
+.msg.ai { background:var(--surface2); color:var(--text); align-self:flex-start; border-bottom-left-radius:2px; }
+.msg.system { background:transparent; color:#333; font-size:11px; text-align:center; align-self:center; }
+
+/* ─── Bottom panel: toolbar + input ─── */
+.bottom-panel { flex-shrink:0; border-top:1px solid var(--border); background:var(--surface); display:flex; flex-direction:column; }
+
+/* Toolbar */
+.toolbar { display:flex; gap:1px; padding:0 10px; flex-shrink:0; }
+.tool-btn { flex:0; background:transparent; color:#999; border:none; padding:5px 14px; cursor:pointer; font-size:11px; font-family:Arial; position:relative; border-top:1px solid var(--border); white-space:nowrap; }
+.tool-btn:hover { color:#aaa; background:var(--surface2); }
+.tool-btn.active-btn { color:#ccc; background:var(--surface2); }
+.toolbar-spacer { flex:1; border-top:1px solid var(--border); }
+
+/* Popups */
+.popup { display:none; position:absolute; bottom:30px; left:0; background:#1a1a1a; border:1px solid var(--border); border-radius:5px; padding:10px; z-index:100; box-shadow:0 6px 20px rgba(0,0,0,0.6); }
+.popup.show { display:block; }
+.popup h4 { font-size:10px; color:#555; margin-bottom:5px; font-weight:400; text-transform:uppercase; letter-spacing:0.5px; }
+.color-grid { display:grid; grid-template-columns:repeat(8,1fr); gap:3px; margin-bottom:8px; }
+.color-swatch { width:22px; height:22px; border-radius:3px; cursor:pointer; border:2px solid transparent; transition:transform 0.1s; }
+.color-swatch:hover { border-color:rgba(255,255,255,0.5); transform:scale(1.15); }
+.font-list { display:flex; flex-direction:column; gap:1px; max-height:200px; overflow-y:auto; min-width:170px; }
+.font-item { padding:4px 8px; cursor:pointer; font-size:12px; color:var(--text2); border-radius:3px; }
+.font-item:hover { background:var(--surface2); color:#ccc; }
+.style-row { display:flex; gap:4px; margin-bottom:6px; }
+.style-tag { background:var(--surface2); color:var(--text2); border:1px solid var(--border); padding:2px 8px; border-radius:3px; cursor:pointer; font-size:11px; }
+.style-tag:hover { color:#ccc; border-color:#444; }
+
+/* Input area — tall textarea */
+.input-area { display:flex; gap:8px; padding:6px 10px 8px; align-items:stretch; flex-shrink:0; }
+.input-area textarea { flex:1; background:var(--input-bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:13px; font-family:Arial; resize:none; height:120px; line-height:1.5; }
+.input-area textarea:focus { outline:none; border-color:#444; }
+.input-area textarea::placeholder { color:#777; }
+.send-btn { background:#c0c0c0; color:#333; border:none; border-radius:4px; padding:0 18px; cursor:pointer; font-size:11px; font-family:Arial; font-weight:600; align-self:flex-end; height:34px; }
+.send-btn:hover { background:#d0d0d0; color:#222; }
+
+/* Region selection */
+.region-box { cursor:pointer; transition:outline 0.15s,box-shadow 0.15s; }
+.region-box:hover { outline:2px dashed rgba(255,255,255,0.25); outline-offset:2px; }
+.region-box.selected { outline:2px solid #5B9BD5; outline-offset:2px; box-shadow:0 0 8px rgba(91,155,213,0.4); }
+.selection-bar { display:flex; align-items:center; gap:8px; padding:2px 10px; font-size:10px; color:#666; font-family:Arial; }
+.selection-tag { background:#1a1a2e; color:#5B9BD5; border:1px solid #2a3a5e; padding:1px 8px; border-radius:3px; font-size:10px; font-weight:600; }
+.selection-clear { background:transparent; border:none; color:#555; cursor:pointer; font-size:10px; padding:1px 4px; }
+.selection-clear:hover { color:#999; }
+
+/* ─── Settings overlay ─── */
+.settings-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center; }
+.settings-overlay.show { display:flex; }
+.settings-panel { background:#1a1a1a; border:1px solid var(--border); border-radius:8px; padding:28px 32px; width:480px; max-height:90vh; overflow-y:auto; }
+.settings-panel h2 { font-size:16px; color:var(--text); margin-bottom:18px; font-weight:600; }
+.settings-panel h3 { font-size:11px; color:#666; margin:16px 0 8px; text-transform:uppercase; letter-spacing:0.5px; font-weight:400; }
+.settings-panel label { display:block; font-size:12px; color:#999; margin-bottom:4px; }
+.settings-panel input, .settings-panel select { width:100%; background:var(--input-bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:8px 10px; font-size:12px; font-family:Arial; margin-bottom:10px; }
+.settings-panel input:focus, .settings-panel select:focus { outline:none; border-color:#444; }
+.settings-panel .provider-cards { display:flex; gap:8px; margin-bottom:14px; }
+.provider-card { flex:1; background:var(--surface2); border:2px solid var(--border); border-radius:6px; padding:12px 10px; cursor:pointer; text-align:center; transition:border-color 0.15s; }
+.provider-card:hover { border-color:#555; }
+.provider-card.active { border-color:#5B9BD5; background:#1a1a2e; }
+.provider-card .pc-name { font-size:13px; color:var(--text); font-weight:600; margin-bottom:3px; }
+.provider-card .pc-desc { font-size:10px; color:#666; }
+.settings-btn-row { display:flex; gap:8px; margin-top:18px; }
+.settings-btn { flex:1; padding:8px; border-radius:4px; font-size:12px; font-family:Arial; cursor:pointer; border:none; font-weight:600; }
+.settings-btn.primary { background:#5B9BD5; color:#fff; }
+.settings-btn.primary:hover { background:#4A8AC4; }
+.settings-btn.secondary { background:transparent; color:#999; border:1px solid var(--border); }
+.settings-btn.secondary:hover { color:#ccc; border-color:#555; }
+.settings-status { font-size:11px; padding:6px 10px; border-radius:4px; margin-top:8px; display:none; }
+.settings-status.ok { display:block; background:#1a2e1a; color:#5BD55B; }
+.settings-status.err { display:block; background:#2e1a1a; color:#D55B5B; }
+
+/* ─── Welcome screen (Monet palette) ─── */
+.welcome-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:600; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, #F6F3EE 0%, #EDE8DF 20%, #D8DCEA 40%, #C9B8D4 60%, #E8D0E0 80%, #F6F3EE 100%);
+  background-size:400% 400%; animation:monet-shift 12s ease infinite; }
+@keyframes monet-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+.welcome-overlay.hidden { display:none; }
+.welcome-box { text-align:center; max-width:560px; padding:32px 36px; background:rgba(255,255,255,0.85); backdrop-filter:blur(16px); border-radius:16px; box-shadow:0 8px 40px rgba(120,134,165,0.2); }
+.welcome-box .wb-logo { font-size:44px; font-weight:700; color:#2C2C3A; margin-bottom:2px; letter-spacing:-1px; }
+.welcome-box .wb-tagline { font-size:13px; color:#7886A5; margin-bottom:18px; font-style:italic; }
+.welcome-box .wb-subtitle { font-size:11px; color:#7B7B8E; margin-bottom:10px; font-weight:500; }
+.welcome-box .wb-input-group { text-align:left; margin-bottom:10px; }
+.welcome-box .wb-input-group label { display:block; font-size:11px; color:#7B7B8E; margin-bottom:4px; font-weight:500; }
+.welcome-box .wb-input-group input, .welcome-box .wb-input-group select { width:100%; background:#F6F3EE; color:#2C2C3A; border:1.5px solid #D5D0C7; border-radius:6px; padding:10px 12px; font-size:13px; font-family:Arial; }
+.welcome-box .wb-input-group input:focus, .welcome-box .wb-input-group select:focus { outline:none; border-color:#7886A5; box-shadow:0 0 0 3px rgba(120,134,165,0.15); }
+.welcome-box .wb-input-group input::placeholder { color:#A0929B; }
+.wb-provider-row { display:flex; gap:10px; margin-bottom:12px; }
+.wb-provider-btn { flex:1; background:#F6F3EE; border:2px solid #D5D0C7; border-radius:10px; padding:12px 10px; cursor:pointer; text-align:center; transition:all 0.2s; }
+.wb-provider-btn:hover { border-color:#7886A5; background:#EDE8DF; transform:translateY(-1px); }
+.wb-provider-btn.active { border-color:#7886A5; background:#D8DCEA; box-shadow:0 2px 12px rgba(120,134,165,0.2); }
+.wb-provider-btn .wpb-name { font-size:14px; color:#2C2C3A; font-weight:600; }
+.wb-provider-btn .wpb-desc { font-size:10px; color:#7B7B8E; margin-top:3px; }
+.wb-start-btn { width:100%; padding:13px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-top:12px; font-family:Arial; box-shadow:0 3px 12px rgba(120,134,165,0.3); transition:transform 0.15s,box-shadow 0.15s; }
+.wb-start-btn:hover { transform:translateY(-1px); box-shadow:0 5px 20px rgba(120,134,165,0.4); }
+.wb-skip { font-size:11px; color:#A0929B; margin-top:16px; cursor:pointer; }
+.wb-skip:hover { color:#7886A5; }
+.wb-products { display:flex; justify-content:center; gap:20px; margin-bottom:16px; }
+.wb-product { text-align:center; opacity:0.7; }
+.wb-product.active { opacity:1; }
+.wb-product-icon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 6px; }
+.wb-product-name { font-size:11px; color:#2C2C3A; font-weight:600; }
+.wb-product-status { font-size:9px; color:#A0929B; }
+
+/* ─── Ollama setup guide (compact rows) ─── */
+.ollama-guide { background:#F6F3EE; border:1.5px solid #D5D0C7; border-radius:8px; padding:10px 12px; text-align:left; }
+.ollama-guide .og-steps { display:flex; flex-direction:column; gap:5px; }
+.ollama-guide .og-step { display:flex; align-items:center; gap:8px; min-width:0; }
+.ollama-guide .og-label { font-size:10px; color:#2C2C3A; font-weight:600; width:56px; flex-shrink:0; }
+.ollama-guide .og-cmd { flex:1; min-width:0; display:flex; align-items:center; background:#2C2C3A; border-radius:4px; padding:4px 8px; font-family:'Courier New',monospace; font-size:10px; color:#D8DCEA; }
+.ollama-guide .og-cmd span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ollama-guide .og-copy { background:transparent; border:1px solid #555; color:#999; padding:1px 6px; border-radius:2px; cursor:pointer; font-size:8px; flex-shrink:0; margin-left:6px; }
+.ollama-guide .og-copy:hover { color:#fff; border-color:#888; }
+.ollama-guide .og-bottom { display:flex; align-items:center; gap:8px; margin-top:6px; }
+.ollama-guide .og-detect-btn { background:#7886A5; color:#fff; border:none; padding:4px 12px; border-radius:4px; font-size:10px; cursor:pointer; font-family:Arial; flex-shrink:0; }
+.ollama-guide .og-detect-btn:hover { background:#6775A0; }
+.ollama-guide .og-note { font-size:8px; color:#A0929B; }
+.ollama-guide .og-status { font-size:9px; padding:4px 8px; border-radius:3px; flex:1; }
+.ollama-guide .og-status.checking { background:#EDE8DF; color:#7B7B8E; }
+.ollama-guide .og-status.ok { background:#d4edda; color:#155724; }
+.ollama-guide .og-status.err { background:#f8d7da; color:#721c24; }
+.wb-inline-row { display:flex; gap:8px; }
+.wb-inline-row .wb-input-group { flex:1; }
+
+/* ─── Auth bar ─── */
+.auth-bar { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.auth-avatar { width:24px; height:24px; border-radius:50%; background:#7886A5; color:#fff; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; cursor:pointer; }
+.auth-name { font-size:10px; color:var(--text2); }
+.auth-login-btn { background:transparent; color:var(--text2); border:1px solid var(--border); padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
+.auth-login-btn:hover { color:#999; }
+
+/* ─── Product switcher bar ─── */
+.product-bar { display:flex; align-items:center; justify-content:center; gap:2px; padding:3px 0; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
+.product-tab { background:transparent; border:none; color:var(--text2); padding:5px 18px; font-size:11px; font-family:Arial; cursor:pointer; border-radius:3px; font-weight:600; letter-spacing:0.3px; transition:all 0.15s; }
+.product-tab:hover { color:#999; background:var(--surface2); }
+.product-tab.active { color:#ccc; background:var(--surface2); }
+.product-tab .pt-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; }
+.product-tab[data-product="slides"] .pt-dot { background:#7886A5; }
+.product-tab[data-product="docs"] .pt-dot { background:#8B9E8B; }
+.product-tab[data-product="sheets"] .pt-dot { background:#C67A3C; }
+</style>
+</head>
+<body>
+
+<!-- Product switcher -->
+<div class="product-bar">
+  <button class="product-tab active" data-product="slides" onclick="switchProduct('slides')"><span class="pt-dot"></span>Slides</button>
+  <button class="product-tab" data-product="docs" onclick="switchProduct('docs')"><span class="pt-dot"></span>Docs</button>
+  <button class="product-tab" data-product="sheets" onclick="switchProduct('sheets')"><span class="pt-dot"></span>Sheets</button>
+</div>
+
+<!-- Placeholder for Docs / Sheets (coming soon) -->
+<div id="productPlaceholder" style="display:none;flex:1;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:var(--bg);">
+  <div style="font-size:36px;font-weight:700;color:var(--text);" id="placeholderTitle">Sloth Docs</div>
+  <div style="font-size:13px;color:#555;">Coming soon. We're building it.</div>
+  <div style="font-size:11px;color:#333;margin-top:8px;">Switch back to Slides to keep working.</div>
+</div>
+
+<!-- Top bar -->
+<!-- # Goodbye Google. You will never scam me or mess with me again. — Enigmaticsloth -->
+<div class="topbar slides-ui">
+  <div class="logo">Sloth Space</div>
+  <div class="tagline">Type what you want. Sloth will design it.</div>
+  <div class="preset-pills" id="presetPills"></div>
+  <button class="export-btn" onclick="newDeck()">New</button>
+  <button class="export-btn" onclick="loadDeck()">Open</button>
+  <button class="export-btn" onclick="saveSloth()">Save .sloth</button>
+  <button class="export-btn" onclick="exportPPTX()">Export .pptx</button>
+  <button class="export-btn" onclick="exportJSON()" style="opacity:0.5;">JSON</button>
+  <button class="export-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+  <div class="auth-bar" id="authBar">
+    <button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>
+  </div>
+  <input type="file" id="fileInput" accept=".json,.sloth" style="display:none;" onchange="handleFileLoad(event)">
+</div>
+
+<!-- Settings overlay -->
+<div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+  <div class="settings-panel">
+    <h2>&#9881; Settings</h2>
+
+    <h3>LLM Provider</h3>
+    <div class="provider-cards" id="settingsProviderCards">
+      <div class="provider-card" data-provider="groq" onclick="setSettingsProvider('groq')">
+        <div class="pc-name">Groq</div>
+        <div class="pc-desc">Cloud &middot; Fast &middot; Free tier</div>
+      </div>
+      <div class="provider-card" data-provider="ollama" onclick="setSettingsProvider('ollama')">
+        <div class="pc-name">Ollama</div>
+        <div class="pc-desc">Local &middot; Offline &middot; Free</div>
+      </div>
+      <div class="provider-card" data-provider="custom" onclick="setSettingsProvider('custom')">
+        <div class="pc-name">Custom</div>
+        <div class="pc-desc">OpenAI-compatible API</div>
+      </div>
+    </div>
+
+    <div id="settingsGroqFields">
+      <label>API Key</label>
+      <input type="password" id="settingsApiKey" placeholder="gsk_...">
+    </div>
+
+    <div id="settingsOllamaFields" style="display:none;">
+      <label>Ollama URL</label>
+      <input type="text" id="settingsOllamaUrl" placeholder="http://localhost:11434">
+      <label>Model</label>
+      <input type="text" id="settingsOllamaModel" placeholder="llama3.1:70b">
+      <label>Router Model (smaller, for intent classification)</label>
+      <input type="text" id="settingsOllamaRouter" placeholder="llama3.1:8b">
+    </div>
+
+    <div id="settingsCustomFields" style="display:none;">
+      <label>API URL</label>
+      <input type="text" id="settingsCustomUrl" placeholder="https://api.openai.com/v1/chat/completions">
+      <label>API Key</label>
+      <input type="password" id="settingsCustomKey" placeholder="sk-...">
+      <label>Model</label>
+      <input type="text" id="settingsCustomModel" placeholder="gpt-4o">
+      <label>Router Model</label>
+      <input type="text" id="settingsCustomRouter" placeholder="gpt-4o-mini">
+    </div>
+
+    <h3>User</h3>
+    <label>Display Name</label>
+    <input type="text" id="settingsDisplayName" placeholder="Your name">
+
+    <div id="settingsTestStatus" class="settings-status"></div>
+
+    <div class="settings-btn-row">
+      <button class="settings-btn secondary" onclick="testConnection()">Test Connection</button>
+      <button class="settings-btn primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Welcome screen (first-time setup, Monet theme) -->
+<div class="welcome-overlay" id="welcomeOverlay">
+  <div class="welcome-box">
+    <div class="wb-logo">Sloth Space</div>
+    <div class="wb-tagline">Type what you want. Sloth will design it.</div>
+
+    <div class="wb-products">
+      <div class="wb-product active">
+        <div class="wb-product-icon" style="background:linear-gradient(135deg,#7886A5,#9BA8C4);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+        </div>
+        <div class="wb-product-name">Slides</div>
+        <div class="wb-product-status">Ready</div>
+      </div>
+      <div class="wb-product">
+        <div class="wb-product-icon" style="background:linear-gradient(135deg,#8B9E8B,#A8B8A0);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="wb-product-name">Docs</div>
+        <div class="wb-product-status">Coming soon</div>
+      </div>
+      <div class="wb-product">
+        <div class="wb-product-icon" style="background:linear-gradient(135deg,#C67A3C,#D4A06A);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+        </div>
+        <div class="wb-product-name">Sheets</div>
+        <div class="wb-product-status">Coming soon</div>
+      </div>
+    </div>
+
+    <div class="wb-subtitle">Connect to AI to get started:</div>
+    <div class="wb-provider-row" id="welcomeProviderRow">
+      <div class="wb-provider-btn active" data-provider="groq" onclick="setWelcomeProvider('groq')">
+        <div class="wpb-name">Groq (Cloud)</div>
+        <div class="wpb-desc">Fast &middot; Free tier</div>
+      </div>
+      <div class="wb-provider-btn" data-provider="ollama" onclick="setWelcomeProvider('ollama')">
+        <div class="wpb-name">Ollama (Local)</div>
+        <div class="wpb-desc">Offline &middot; Private</div>
+      </div>
+    </div>
+
+    <div id="welcomeGroqFields">
+      <div class="wb-input-group">
+        <label>Groq API Key (free at console.groq.com)</label>
+        <input type="password" id="welcomeApiKey" placeholder="gsk_...">
+      </div>
+    </div>
+
+    <div id="welcomeOllamaFields" style="display:none;">
+      <div class="ollama-guide">
+        <div class="og-steps">
+          <div class="og-step"><div class="og-label">1. Install</div><div class="og-cmd"><span id="ogCmd1">curl -fsSL https://ollama.com/install.sh | sh</span><button class="og-copy" onclick="copyCmd('ogCmd1')">Copy</button></div></div>
+          <div class="og-step"><div class="og-label">2. Pull</div><div class="og-cmd"><span id="ogCmd2">ollama pull llama3.1:8b</span><button class="og-copy" onclick="copyCmd('ogCmd2')">Copy</button></div></div>
+          <div class="og-step"><div class="og-label">3. Serve</div><div class="og-cmd"><span id="ogCmd3">OLLAMA_ORIGINS="*" ollama serve</span><button class="og-copy" onclick="copyCmd('ogCmd3')">Copy</button></div></div>
+        </div>
+        <div class="og-bottom">
+          <button class="og-detect-btn" onclick="detectOllama()">Detect Ollama</button>
+          <div id="ollamaDetectStatus" class="og-status" style="display:none;"></div>
+          <span class="og-note">or download at ollama.com</span>
+        </div>
+      </div>
+      <div class="wb-inline-row" style="margin-top:10px;">
+        <div class="wb-input-group">
+          <label>URL</label>
+          <input type="text" id="welcomeOllamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434" style="margin-bottom:0;">
+        </div>
+        <div class="wb-input-group">
+          <label>Model</label>
+          <input type="text" id="welcomeOllamaModel" placeholder="llama3.1:8b" value="llama3.1:8b" style="margin-bottom:0;">
+        </div>
+      </div>
+    </div>
+
+    <div class="wb-input-group">
+      <label>Your Name</label>
+      <input type="text" id="welcomeDisplayName" placeholder="Optional" style="margin-bottom:0;">
+    </div>
+
+    <button class="wb-start-btn" onclick="finishWelcome()">Start Creating</button>
+    <div class="wb-skip" onclick="skipWelcome()">Skip &mdash; configure later in Settings</div>
+  </div>
+</div>
+
+<!-- Middle: slide left + conversation right -->
+<div class="middle slides-ui">
+  <div class="slide-panel">
+    <div class="slide-frame" id="slideCanvas"></div>
+    <div class="slide-bar">
+      <div class="slide-nav" id="slideNav"></div>
+      <div class="slide-info" id="slideInfo"></div>
+    </div>
+  </div>
+  <div class="chat-panel">
+    <div class="chat-header">Chat</div>
+    <div class="chat-messages" id="chatMessages"></div>
+  </div>
+</div>
+
+<!-- Bottom: toolbar + tall input -->
+<div class="bottom-panel slides-ui">
+  <div class="selection-bar" id="selectionBar" style="display:none;">
+    <span style="color:#444;">Selected:</span>
+    <span class="selection-tag" id="selectionTag"></span>
+    <button class="selection-clear" onclick="clearSelection()">✕ clear</button>
+  </div>
+  <div class="toolbar">
+    <button class="tool-btn" onclick="togglePopup('textPopup',this,event)">
+      Text
+      <div class="popup" id="textPopup">
+        <h4>Basic</h4>
+        <div class="color-grid" id="textBasicColors"></div>
+        <h4>Monet</h4>
+        <div class="color-grid" id="textMonetColors"></div>
+        <h4>Seurat</h4>
+        <div class="color-grid" id="textSeuratColors"></div>
+      </div>
+    </button>
+    <button class="tool-btn" onclick="togglePopup('bgPopup',this,event)">
+      Background
+      <div class="popup" id="bgPopup">
+        <h4>Basic</h4>
+        <div class="color-grid" id="bgBasicColors"></div>
+        <h4>Monet</h4>
+        <div class="color-grid" id="bgMonetColors"></div>
+        <h4>Seurat</h4>
+        <div class="color-grid" id="bgSeuratColors"></div>
+      </div>
+    </button>
+    <button class="tool-btn" onclick="togglePopup('fontPopup',this,event)">
+      Font
+      <div class="popup" id="fontPopup">
+        <div class="font-list" id="fontList"></div>
+      </div>
+    </button>
+    <button class="tool-btn" onclick="togglePopup('stylePopup',this,event)">
+      Style
+      <div class="popup" id="stylePopup">
+        <div class="style-row">
+          <span class="style-tag" onclick="insertTag('[bold]')"><b>B</b></span>
+          <span class="style-tag" onclick="insertTag('[italic]')"><i>I</i></span>
+          <span class="style-tag" onclick="insertTag('[underline]')"><u>U</u></span>
+          <span class="style-tag" onclick="insertTag('[strikethrough]')"><s>S</s></span>
+        </div>
+        <h4>Size</h4>
+        <div class="style-row">
+          <span class="style-tag" onclick="insertTag('[size: small]')">Small</span>
+          <span class="style-tag" onclick="insertTag('[size: medium]')">Medium</span>
+          <span class="style-tag" onclick="insertTag('[size: large]')">Large</span>
+          <span class="style-tag" onclick="insertTag('[size: xlarge]')">XL</span>
+        </div>
+      </div>
+    </button>
+    <button class="tool-btn" onclick="togglePopup('layoutPopup',this,event)">
+      Layout
+      <div class="popup" id="layoutPopup">
+        <div class="font-list">
+          <div class="font-item" onclick="insertTag('[layout: content]')">Content</div>
+          <div class="font-item" onclick="insertTag('[layout: two-column]')">Two Column</div>
+          <div class="font-item" onclick="insertTag('[layout: image-top]')">Image Top</div>
+          <div class="font-item" onclick="insertTag('[layout: image-left]')">Image Left</div>
+          <div class="font-item" onclick="insertTag('[layout: image-right]')">Image Right</div>
+          <div class="font-item" onclick="insertTag('[layout: image-bottom]')">Image Bottom</div>
+          <div class="font-item" onclick="insertTag('[layout: quote]')">Quote</div>
+          <div class="font-item" onclick="insertTag('[layout: data-table]')">Data Table</div>
+        </div>
+      </div>
+    </button>
+    <div class="toolbar-spacer"></div>
+  </div>
+  <div class="input-area">
+    <textarea id="chatInput" placeholder="Tell Sloth what you need — a pitch deck, quarterly report, project proposal... Press Enter and your slides will appear."></textarea>
+    <button class="send-btn" onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const PRESETS = {
+  "clean-white": { id:"clean-white",name:"White",colors:{background:"#FFFFFF",surface:"#F5F5F5",primary:"#111111",secondary:"#666666",accent:"#111111",on_accent:"#FFFFFF",border:"#E0E0E0",table_header_bg:"#F0F0F0",table_header_text:"#111111",table_row_alt:"#FAFAFA"},typography:{heading:{family:"Arial",weight:700,letterSpacing:-0.3},body:{family:"Arial",weight:400,lineHeight:1.6},caption:{family:"Arial",weight:400},scale:[44,32,24,18,14,12]},spacing:{margin:{top:60,right:72,bottom:52,left:72},gap:24,paragraph:14},slide:{width:1280,height:720}},
+  "clean-gray": { id:"clean-gray",name:"Gray",colors:{background:"#F2F2F2",surface:"#E8E8E8",primary:"#111111",secondary:"#555555",accent:"#111111",on_accent:"#FFFFFF",border:"#D0D0D0",table_header_bg:"#E0E0E0",table_header_text:"#111111",table_row_alt:"#EBEBEB"},typography:{heading:{family:"Arial",weight:700,letterSpacing:-0.3},body:{family:"Arial",weight:400,lineHeight:1.6},caption:{family:"Arial",weight:400},scale:[44,32,24,18,14,12]},spacing:{margin:{top:60,right:72,bottom:52,left:72},gap:24,paragraph:14},slide:{width:1280,height:720}},
+  "clean-dark": { id:"clean-dark",name:"Dark",colors:{background:"#111111",surface:"#1A1A1A",primary:"#F0F0F0",secondary:"#999999",accent:"#F0F0F0",on_accent:"#111111",border:"#333333",table_header_bg:"#333333",table_header_text:"#F0F0F0",table_row_alt:"#1A1A1A"},typography:{heading:{family:"Arial",weight:700,letterSpacing:-0.3},body:{family:"Arial",weight:400,lineHeight:1.6},caption:{family:"Arial",weight:400},scale:[44,32,24,18,14,12]},spacing:{margin:{top:60,right:72,bottom:52,left:72},gap:24,paragraph:14},slide:{width:1280,height:720}},
+  "monet": { id:"monet",name:"Monet",colors:{background:"#F6F3EE",surface:"#EDE8DF",primary:"#2C2C3A",secondary:"#7B7B8E",accent:"#7886A5",on_accent:"#FFFFFF",border:"#D5D0C7",table_header_bg:"#D8DCEA",table_header_text:"#2C2C3A",table_row_alt:"#EFECEA"},typography:{heading:{family:"Arial",weight:700,letterSpacing:-0.3},body:{family:"Arial",weight:400,lineHeight:1.6},caption:{family:"Arial",weight:400},scale:[44,32,24,18,14,12]},spacing:{margin:{top:60,right:72,bottom:52,left:72},gap:24,paragraph:14},slide:{width:1280,height:720}},
+  "seurat": { id:"seurat",name:"Seurat",colors:{background:"#FDF8EF",surface:"#F0E8D8",primary:"#2A2A1E",secondary:"#6B6B58",accent:"#C67A3C",on_accent:"#FFFFFF",border:"#D9D0C0",table_header_bg:"#E8D8BD",table_header_text:"#2A2A1E",table_row_alt:"#F5F0E5"},typography:{heading:{family:"Arial",weight:700,letterSpacing:-0.3},body:{family:"Arial",weight:400,lineHeight:1.6},caption:{family:"Arial",weight:400},scale:[44,32,24,18,14,12]},spacing:{margin:{top:60,right:72,bottom:52,left:72},gap:24,paragraph:14},slide:{width:1280,height:720}}
+};
+
+const LAYOUTS = {
+  "title":{regions:[{id:"title",role:"title",bounds:{x:0,y:160,w:900,h:140},align:{horizontal:"left",vertical:"bottom"},fontSize:"title"},{id:"subtitle",role:"subtitle",bounds:{x:0,y:320,w:700,h:60},align:{horizontal:"left",vertical:"top"},fontSize:"h2",optional:true},{id:"tagline",role:"caption",bounds:{x:0,y:420,w:500,h:30},fontSize:"caption",optional:true},{id:"date",role:"caption",bounds:{x:0,y:460,w:300,h:24},fontSize:"small",optional:true}]},
+  "content":{regions:[{id:"heading",role:"heading",bounds:{x:0,y:0,w:1136,h:44},align:{horizontal:"left",vertical:"top"},fontSize:"h1"},{id:"body",role:"body",bounds:{x:0,y:64,w:1136,h:480},align:{horizontal:"left",vertical:"top"},fontSize:"body"},{id:"footnote",role:"caption",bounds:{x:0,y:560,w:1136,h:20},fontSize:"small",optional:true}]},
+  "two-column":{regions:[{id:"heading",role:"heading",bounds:{x:0,y:0,w:1136,h:44},fontSize:"h1"},{id:"left_label",role:"caption",bounds:{x:0,y:68,w:540,h:24},fontSize:"caption",optional:true},{id:"left",role:"body",bounds:{x:0,y:100,w:540,h:460},fontSize:"body"},{id:"right_label",role:"caption",bounds:{x:596,y:68,w:540,h:24},fontSize:"caption",optional:true},{id:"right",role:"body",bounds:{x:596,y:100,w:540,h:460},fontSize:"body"}]},
+  "image-top":{regions:[{id:"heading",role:"heading",bounds:{x:0,y:0,w:1136,h:40},fontSize:"h1"},{id:"image",role:"image",bounds:{x:0,y:56,w:1136,h:300},optional:true},{id:"body",role:"body",bounds:{x:0,y:376,w:1136,h:200},fontSize:"body"}]},
+  "image-left":{regions:[{id:"heading",role:"heading",bounds:{x:0,y:0,w:1136,h:40},fontSize:"h1"},{id:"image",role:"image",bounds:{x:0,y:60,w:520,h:520},optional:true},{id:"body",role:"body",bounds:{x:568,y:60,w:568,h:520},fontSize:"body"}]},
+  "image-right":{regions:[{id:"heading",role:"heading",bounds:{x:0,y:0,w:1136,h:40},fontSize:"h1"},{id:"body",role:"body",bounds:{x:0,y:60,w:520,h:520},fontSize:"body"},{id:"image",role:"image",bounds:{x:568,y:60,w:568,h:520},optional:true}]},
+  "image-bottom":{regions:[{id:"heading",role:"heading",bounds:{x:0,y:0,w:1136,h:40},fontSize:"h1"},{id:"body",role:"body",bounds:{x:0,y:56,w:1136,h:200},fontSize:"body"},{id:"image",role:"image",bounds:{x:0,y:276,w:1136,h:300},optional:true}]},
+  "quote":{background_override:"surface",regions:[{id:"quote",role:"quote",bounds:{x:120,y:120,w:896,h:280},align:{horizontal:"center",vertical:"middle"},fontSize:"h1"},{id:"author",role:"author",bounds:{x:120,y:430,w:896,h:32},align:{horizontal:"center"},fontSize:"body",optional:true},{id:"role",role:"caption",bounds:{x:120,y:470,w:896,h:24},align:{horizontal:"center"},fontSize:"caption",optional:true}]},
+  "data-table":{regions:[{id:"heading",role:"heading",bounds:{x:0,y:0,w:1136,h:44},fontSize:"h1"},{id:"description",role:"body",bounds:{x:0,y:56,w:1136,h:36},fontSize:"body",optional:true},{id:"table",role:"table",bounds:{x:0,y:112,w:1136,h:420}},{id:"source",role:"caption",bounds:{x:0,y:560,w:1136,h:20},fontSize:"small",optional:true}]},
+  "closing":{regions:[{id:"heading",role:"title",bounds:{x:140,y:160,w:856,h:120},align:{horizontal:"center",vertical:"middle"},fontSize:"title"},{id:"subtitle",role:"subtitle",bounds:{x:200,y:300,w:736,h:50},align:{horizontal:"center"},fontSize:"h2",optional:true},{id:"contact",role:"caption",bounds:{x:300,y:400,w:536,h:80},align:{horizontal:"center"},fontSize:"caption",optional:true}]}
+};
+
+const BASIC_COLORS = ["#111111","#333333","#666666","#999999","#CCCCCC","#FFFFFF","#CC0000","#CC6600","#CCCC00","#00CC00","#0066CC","#6600CC","#CC0066","#006666","#663300","#336633"];
+const MONET_COLORS = ["#7886A5","#9BA8C4","#B8C4D8","#D8DCEA","#8B9E8B","#A8B8A0","#C9B8D4","#E8D0E0","#D4C4A8","#EDE8DF","#7B7B8E","#2C2C3A","#A0929B","#BDB2A0","#C7D1D6","#849BAE"];
+const SEURAT_COLORS = ["#C67A3C","#D4A06A","#E8D8BD","#8B9E6B","#6B8E5A","#4A7C6F","#5B8FA8","#3B6E8E","#D4564A","#E88A6E","#F0E8D8","#2A2A1E","#6B6B58","#A09880","#D9D0C0","#B8A88E"];
+const FONTS = ["Arial","Helvetica","Times New Roman","Georgia","Courier New","Verdana","Trebuchet MS","Palatino","Garamond","Futura","Gill Sans","Rockwell","Cambria","Calibri","Consolas","Impact"];
+
+let currentDeck = null;
+let currentPreset = "clean-white";
+let currentSlide = 0;
+let chatHistory = [];
+let selectedRegion = null; // {slideIdx, regionId, role, label}
+
+function selectRegion(slideIdx,regionId,role,label){
+  selectedRegion={slideIdx,regionId,role,label};
+  document.getElementById('selectionBar').style.display='flex';
+  document.getElementById('selectionTag').textContent=`Slide ${slideIdx+1} → ${label} (${regionId})`;
+  // Re-render to show highlight
+  renderApp();
+}
+function clearSelection(){
+  selectedRegion=null;
+  document.getElementById('selectionBar').style.display='none';
+  renderApp();
+}
+
+// ═══════════════════════════════════════════
+// RENDERER
+// ═══════════════════════════════════════════
+const SC = {title:0,h1:1,h2:2,body:3,caption:4,small:5};
+
+function rs(role,p){
+  const h=p.typography.heading,b=p.typography.body;
+  const m={title:{color:p.colors.primary,ff:h.family,fw:h.weight,ls:h.letterSpacing},subtitle:{color:p.colors.secondary,ff:h.family,fw:400},heading:{color:p.colors.primary,ff:h.family,fw:h.weight,ls:h.letterSpacing},body:{color:p.colors.primary,ff:b.family,fw:b.weight,lh:b.lineHeight},caption:{color:p.colors.secondary,ff:b.family,fw:400},quote:{color:p.colors.primary,ff:h.family,fw:h.weight,fs:"italic",lh:1.4},author:{color:p.colors.primary,ff:b.family,fw:700},table:{color:p.colors.primary,ff:b.family,fw:b.weight}};
+  return m[role]||m.body;
+}
+
+function rc(content,role,p,region,colorOv){
+  if(!content) return '';
+  const s=rs(role,p);
+  // Apply color override: colorOv overrides preset color for ALL text
+  const txtColor=colorOv||s.color;
+  const sk=region.fontSize||'body';
+  const fs=p.typography.scale[SC[sk]]||16;
+
+  if(role==='image'){
+    if(typeof content==='object'&&content.type==='image'){
+      return `<div style="width:100%;height:100%;border:2px dashed ${p.colors.border};border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${p.colors.surface};">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${p.colors.secondary}" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        <span style="font-family:Arial;font-size:12px;color:${p.colors.secondary};">${content.alt||content.src||'Image'}</span>
+      </div>`;
+    }
+    return '';
+  }
+
+  if(typeof content==='object'&&content.type==='table'){
+    const hBg=p.colors.table_header_bg,hT=colorOv||p.colors.table_header_text,alt=p.colors.table_row_alt,bc=p.colors.border,tc=txtColor;
+    const tf=fs*0.9;
+    let h=`<table style="width:100%;border-collapse:collapse;font-family:Arial;font-size:${tf}px;"><thead><tr>`;
+    content.headers.forEach(x=>{h+=`<th style="background:${hBg};color:${hT};padding:12px 16px;text-align:left;font-weight:700;font-size:${tf*0.9}px;border-bottom:2px solid ${bc};">${x}</th>`;});
+    h+='</tr></thead><tbody>';
+    content.rows.forEach((r,i)=>{h+=`<tr style="background:${i%2===1?alt:'transparent'};">`;r.forEach((c,j)=>{h+=`<td style="padding:10px 16px;border-bottom:1px solid ${bc};color:${tc};font-weight:${j===0?500:400};">${c}</td>`;});h+='</tr>';});
+    return h+'</tbody></table>';
+  }
+
+  if(typeof content==='object'&&content.type==='list'){
+    const g=p.spacing.paragraph;
+    return content.items.map(item=>`<div style="display:flex;align-items:flex-start;margin-bottom:${g}px;font-size:${fs}px;color:${txtColor};font-family:${s.ff};font-weight:${s.fw};line-height:${s.lh||1.5};"><span style="color:${colorOv||p.colors.secondary};margin-right:14px;flex-shrink:0;font-size:7px;margin-top:${fs*0.4}px;">\u25CF</span><span>${item}</span></div>`).join('');
+  }
+
+  if(typeof content==='string'){
+    let pre='';
+    if(role==='quote') pre=`<span style="font-size:${fs*1.5}px;color:${colorOv||p.colors.secondary};margin-right:2px;">\u201C</span>`;
+    return `<div style="font-size:${fs}px;color:${txtColor};font-family:${s.ff};font-weight:${s.fw};font-style:${s.fs||'normal'};line-height:${s.lh||1.3};letter-spacing:${s.ls||0}px;">${pre}${content}</div>`;
+  }
+  return '';
+}
+
+function renderSlide(slide,idx,p,total){
+  const L=LAYOUTS[slide.layout];
+  if(!L)return `<div style="padding:40px;color:red;">Unknown layout: ${slide.layout}</div>`;
+  const W=p.slide.width,H=p.slide.height,m=p.spacing.margin;
+  const ov=slide.style_overrides||{};
+  const regionOv=ov.regions||{}; // per-region overrides: {title:{color:"#hex"}, body:{color:"#hex"}}
+  const bg=ov.background||(L.background_override==='surface'?p.colors.surface:p.colors.background);
+  const globalColor=ov.heading_color||null;
+  const fontOv=ov.font||null;
+  let html=`<div style="width:${W}px;height:${H}px;position:relative;background:${bg};overflow:hidden;">`;
+  L.regions.forEach(r=>{
+    const c=slide.content[r.id];
+    if(!c&&r.optional)return;
+    if(!c)return;
+    const ax=m.left+r.bounds.x,ay=m.top+r.bounds.y;
+    const al=r.align||{};
+    const jc=al.vertical==='middle'?'center':al.vertical==='bottom'?'flex-end':'flex-start';
+    // Per-region overrides: region-specific > global > null (use preset)
+    const rOv=regionOv[r.id]||{};
+    const regionColor=rOv.color||globalColor||null;
+    const regionFont=rOv.font||fontOv||null;
+    // Text decorations: region-specific > global
+    const isUnderline=rOv.underline!==undefined?rOv.underline:(ov.underline||false);
+    const isBold=rOv.bold!==undefined?rOv.bold:(ov.bold||false);
+    const isItalic=rOv.italic!==undefined?rOv.italic:(ov.italic||false);
+    let extra='';
+    if(regionColor)extra+=`color:${regionColor};`;
+    if(regionFont)extra+=`font-family:'${regionFont}',Arial,sans-serif;`;
+    let deco=[];
+    if(isUnderline)deco.push('underline');
+    if(deco.length)extra+=`text-decoration:${deco.join(' ')};`;
+    if(isBold)extra+=`font-weight:700;`;
+    if(isItalic)extra+=`font-style:italic;`;
+    // Clickable region selection
+    const isSel=selectedRegion&&selectedRegion.slideIdx===idx&&selectedRegion.regionId===r.id;
+    const selClass=isSel?'region-box selected':'region-box';
+    const roleLabel=r.role.charAt(0).toUpperCase()+r.role.slice(1);
+    html+=`<div class="${selClass}" onclick="event.stopPropagation();selectRegion(${idx},'${r.id}','${r.role}','${roleLabel}')" style="position:absolute;left:${ax}px;top:${ay}px;width:${r.bounds.w}px;height:${r.bounds.h}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
+    html+=rc(c,r.role,p,r,regionColor);
+    html+='</div>';
+  });
+  html+=`<div style="position:absolute;bottom:${m.bottom*0.4}px;right:${m.right}px;font-family:Arial;font-size:${p.typography.scale[5]}px;color:${p.colors.secondary};opacity:0.4;">${idx+1}</div>`;
+  html+='</div>';
+  return html;
+}
+
+// ═══════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════
+function renderApp(){
+  // Auto-save on every render (deck changes trigger render)
+  autoSave();
+
+  document.getElementById('presetPills').innerHTML=Object.values(PRESETS).map(pr=>
+    `<button class="${pr.id===currentPreset?'active':''}" onclick="setPreset('${pr.id}')">${pr.name}</button>`
+  ).join('');
+
+  const panel=document.querySelector('.slide-panel');
+  const panelW=panel.clientWidth-12;
+  const panelH=panel.clientHeight-40;
+
+  if(!currentDeck){
+    document.getElementById('slideCanvas').innerHTML=`<div style="width:${panelW}px;height:${panelH}px;background:#131313;display:flex;align-items:center;justify-content:center;color:#555;font-size:15px;font-family:Arial;">Type what you want. Sloth will design it.</div>`;
+    document.getElementById('slideNav').innerHTML='';
+    document.getElementById('slideInfo').textContent='';
+    return;
+  }
+
+  const p=PRESETS[currentPreset];
+  const slides=currentDeck.slides;
+  const s=slides[currentSlide];
+  const sc=Math.min(panelW/p.slide.width, panelH/p.slide.height, 1);
+
+  const cv=document.getElementById('slideCanvas');
+  cv.style.width=(p.slide.width*sc)+'px';
+  cv.style.height=(p.slide.height*sc)+'px';
+  cv.innerHTML=`<div style="transform:scale(${sc});transform-origin:top left;width:${p.slide.width}px;height:${p.slide.height}px;">${renderSlide(s,currentSlide,p,slides.length)}</div>`;
+
+  document.getElementById('slideNav').innerHTML=slides.map((_,i)=>
+    `<button class="${i===currentSlide?'active':''}" onclick="goSlide(${i})">${i+1}</button>`
+  ).join('');
+
+  document.getElementById('slideInfo').textContent=`${currentSlide+1}/${slides.length} | ${s.layout} | ${currentPreset}`;
+}
+
+function goSlide(i){currentSlide=i;renderApp();}
+function setPreset(id){currentPreset=id;renderApp();}
+
+// ═══════════════════════════════════════════
+// TOOLBAR
+// ═══════════════════════════════════════════
+function togglePopup(id,btn,e){
+  if(e)e.stopPropagation();
+  const popup=document.getElementById(id);
+  const isOpen=popup.classList.contains('show');
+  document.querySelectorAll('.popup').forEach(p=>p.classList.remove('show'));
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active-btn'));
+  if(!isOpen){ popup.classList.add('show'); btn.classList.add('active-btn'); }
+}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.tool-btn')){
+    document.querySelectorAll('.popup').forEach(p=>p.classList.remove('show'));
+    document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active-btn'));
+  }
+});
+
+function insertTag(tag){
+  const input=document.getElementById('chatInput');
+  const start=input.selectionStart;
+  const val=input.value;
+  input.value=val.slice(0,start)+tag+' '+val.slice(start);
+  input.focus();
+  input.selectionStart=input.selectionEnd=start+tag.length+1;
+  document.querySelectorAll('.popup').forEach(p=>p.classList.remove('show'));
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active-btn'));
+}
+
+function insertTextColor(hex){ insertTag(`[color: ${hex}]`); }
+function insertBgColor(hex){ insertTag(`[bg: ${hex}]`); }
+
+function initToolbar(){
+  const makeSwatches=(arr,containerId,fn)=>{
+    document.getElementById(containerId).innerHTML=arr.map(c=>
+      `<div class="color-swatch" style="background:${c};" onclick="${fn}('${c}')" title="${c}"></div>`
+    ).join('');
+  };
+  makeSwatches(BASIC_COLORS,'textBasicColors','insertTextColor');
+  makeSwatches(MONET_COLORS,'textMonetColors','insertTextColor');
+  makeSwatches(SEURAT_COLORS,'textSeuratColors','insertTextColor');
+  makeSwatches(BASIC_COLORS,'bgBasicColors','insertBgColor');
+  makeSwatches(MONET_COLORS,'bgMonetColors','insertBgColor');
+  makeSwatches(SEURAT_COLORS,'bgSeuratColors','insertBgColor');
+  document.getElementById('fontList').innerHTML=FONTS.map(f=>
+    `<div class="font-item" style="font-family:'${f}';" onclick="insertTag('[font: ${f}]')">${f}</div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════
+// LLM CONFIG (provider-agnostic)
+// ═══════════════════════════════════════════
+const LLM_DEFAULTS = {
+  groq: {
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.3-70b-versatile',
+    router: 'llama-3.1-8b-instant',
+    keyPrefix: 'gsk_'
+  },
+  ollama: {
+    url: 'http://localhost:11434/v1/chat/completions',
+    model: 'llama3.1:70b',
+    router: 'llama3.1:8b',
+    keyPrefix: ''
+  },
+  custom: {
+    url: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-4o',
+    router: 'gpt-4o-mini',
+    keyPrefix: 'sk-'
+  }
+};
+
+const CONFIG_KEY = 'sloth_space_config';
+
+// Current LLM config (loaded from localStorage or defaults)
+let llmConfig = {
+  provider: 'groq',
+  url: LLM_DEFAULTS.groq.url,
+  apiKey: '',
+  model: LLM_DEFAULTS.groq.model,
+  router: LLM_DEFAULTS.groq.router,
+  displayName: ''
+};
+
+function loadConfig() {
+  try {
+    const saved = localStorage.getItem(CONFIG_KEY);
+    if (saved) {
+      const c = JSON.parse(saved);
+      Object.assign(llmConfig, c);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+function saveConfig() {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(llmConfig));
+}
+
+function isConfigured() {
+  if (llmConfig.provider === 'ollama') return !!llmConfig.url;
+  return !!llmConfig.apiKey;
+}
+
+// ═══════════════════════════════════════════
+// SETTINGS UI
+// ═══════════════════════════════════════════
+let settingsProvider = 'groq';
+
+function openSettings() {
+  settingsProvider = llmConfig.provider;
+  document.getElementById('settingsApiKey').value = llmConfig.provider === 'groq' ? llmConfig.apiKey : '';
+  document.getElementById('settingsOllamaUrl').value = llmConfig.provider === 'ollama' ? llmConfig.url : LLM_DEFAULTS.ollama.url;
+  document.getElementById('settingsOllamaModel').value = llmConfig.provider === 'ollama' ? llmConfig.model : LLM_DEFAULTS.ollama.model;
+  document.getElementById('settingsOllamaRouter').value = llmConfig.provider === 'ollama' ? llmConfig.router : LLM_DEFAULTS.ollama.router;
+  document.getElementById('settingsCustomUrl').value = llmConfig.provider === 'custom' ? llmConfig.url : LLM_DEFAULTS.custom.url;
+  document.getElementById('settingsCustomKey').value = llmConfig.provider === 'custom' ? llmConfig.apiKey : '';
+  document.getElementById('settingsCustomModel').value = llmConfig.provider === 'custom' ? llmConfig.model : LLM_DEFAULTS.custom.model;
+  document.getElementById('settingsCustomRouter').value = llmConfig.provider === 'custom' ? llmConfig.router : LLM_DEFAULTS.custom.router;
+  document.getElementById('settingsDisplayName').value = llmConfig.displayName || '';
+  document.getElementById('settingsTestStatus').className = 'settings-status';
+  document.getElementById('settingsTestStatus').style.display = 'none';
+  updateSettingsProviderUI();
+  document.getElementById('settingsOverlay').classList.add('show');
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('show');
+}
+
+function setSettingsProvider(p) {
+  settingsProvider = p;
+  updateSettingsProviderUI();
+}
+
+function updateSettingsProviderUI() {
+  document.querySelectorAll('#settingsProviderCards .provider-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.provider === settingsProvider);
+  });
+  document.getElementById('settingsGroqFields').style.display = settingsProvider === 'groq' ? '' : 'none';
+  document.getElementById('settingsOllamaFields').style.display = settingsProvider === 'ollama' ? '' : 'none';
+  document.getElementById('settingsCustomFields').style.display = settingsProvider === 'custom' ? '' : 'none';
+}
+
+function saveSettings() {
+  const defaults = LLM_DEFAULTS[settingsProvider];
+  llmConfig.provider = settingsProvider;
+  llmConfig.displayName = document.getElementById('settingsDisplayName').value.trim();
+
+  if (settingsProvider === 'groq') {
+    llmConfig.apiKey = document.getElementById('settingsApiKey').value.trim();
+    llmConfig.url = defaults.url;
+    llmConfig.model = defaults.model;
+    llmConfig.router = defaults.router;
+  } else if (settingsProvider === 'ollama') {
+    llmConfig.url = document.getElementById('settingsOllamaUrl').value.trim() || defaults.url;
+    llmConfig.model = document.getElementById('settingsOllamaModel').value.trim() || defaults.model;
+    llmConfig.router = document.getElementById('settingsOllamaRouter').value.trim() || defaults.router;
+    llmConfig.apiKey = ''; // Ollama doesn't need a key
+  } else if (settingsProvider === 'custom') {
+    llmConfig.url = document.getElementById('settingsCustomUrl').value.trim() || defaults.url;
+    llmConfig.apiKey = document.getElementById('settingsCustomKey').value.trim();
+    llmConfig.model = document.getElementById('settingsCustomModel').value.trim() || defaults.model;
+    llmConfig.router = document.getElementById('settingsCustomRouter').value.trim() || defaults.router;
+  }
+
+  saveConfig();
+  closeSettings();
+  addMessage(`✓ Settings saved (${settingsProvider})`,'system');
+}
+
+async function testConnection() {
+  const statusEl = document.getElementById('settingsTestStatus');
+  statusEl.textContent = 'Testing...';
+  statusEl.className = 'settings-status';
+  statusEl.style.display = 'block';
+
+  // Build temporary config from form
+  const tmpProvider = settingsProvider;
+  const defaults = LLM_DEFAULTS[tmpProvider];
+  let tmpUrl, tmpKey, tmpModel;
+
+  if (tmpProvider === 'groq') {
+    tmpUrl = defaults.url;
+    tmpKey = document.getElementById('settingsApiKey').value.trim();
+    tmpModel = defaults.router; // Use small model for test
+  } else if (tmpProvider === 'ollama') {
+    tmpUrl = document.getElementById('settingsOllamaUrl').value.trim() || defaults.url;
+    tmpKey = '';
+    tmpModel = document.getElementById('settingsOllamaRouter').value.trim() || defaults.router;
+  } else {
+    tmpUrl = document.getElementById('settingsCustomUrl').value.trim() || defaults.url;
+    tmpKey = document.getElementById('settingsCustomKey').value.trim();
+    tmpModel = document.getElementById('settingsCustomRouter').value.trim() || defaults.router;
+  }
+
+  try {
+    const headers = {'Content-Type': 'application/json'};
+    if (tmpKey) headers['Authorization'] = `Bearer ${tmpKey}`;
+    const res = await fetch(tmpUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: tmpModel,
+        messages: [{role:'user',content:'hi'}],
+        max_tokens: 5
+      })
+    });
+    if (res.ok) {
+      statusEl.textContent = `Connected to ${tmpProvider} (${tmpModel})`;
+      statusEl.className = 'settings-status ok';
+    } else {
+      const e = await res.text();
+      statusEl.textContent = `Error ${res.status}: ${e.slice(0,100)}`;
+      statusEl.className = 'settings-status err';
+    }
+  } catch(e) {
+    statusEl.textContent = `Connection failed: ${e.message}`;
+    statusEl.className = 'settings-status err';
+  }
+}
+
+// ═══════════════════════════════════════════
+// WELCOME SCREEN
+// ═══════════════════════════════════════════
+let welcomeProvider = 'groq';
+
+function setWelcomeProvider(p) {
+  welcomeProvider = p;
+  document.querySelectorAll('#welcomeProviderRow .wb-provider-btn').forEach(c => {
+    c.classList.toggle('active', c.dataset.provider === p);
+  });
+  document.getElementById('welcomeGroqFields').style.display = p === 'groq' ? '' : 'none';
+  document.getElementById('welcomeOllamaFields').style.display = p === 'ollama' ? '' : 'none';
+}
+
+function finishWelcome() {
+  const defaults = LLM_DEFAULTS[welcomeProvider];
+  llmConfig.provider = welcomeProvider;
+  llmConfig.displayName = document.getElementById('welcomeDisplayName').value.trim();
+
+  if (welcomeProvider === 'groq') {
+    llmConfig.apiKey = document.getElementById('welcomeApiKey').value.trim();
+    llmConfig.url = defaults.url;
+    llmConfig.model = defaults.model;
+    llmConfig.router = defaults.router;
+  } else if (welcomeProvider === 'ollama') {
+    llmConfig.url = document.getElementById('welcomeOllamaUrl').value.trim() || defaults.url;
+    llmConfig.model = document.getElementById('welcomeOllamaModel').value.trim() || defaults.model;
+    llmConfig.router = defaults.router;
+    llmConfig.apiKey = '';
+  }
+
+  saveConfig();
+  document.getElementById('welcomeOverlay').classList.add('hidden');
+}
+
+function skipWelcome() {
+  document.getElementById('welcomeOverlay').classList.add('hidden');
+}
+
+function checkWelcomeScreen() {
+  const hasConfig = loadConfig();
+  if (hasConfig && isConfigured()) {
+    document.getElementById('welcomeOverlay').classList.add('hidden');
+  }
+  // Otherwise welcome screen stays visible
+}
+
+// ═══════════════════════════════════════════
+// OLLAMA DETECTION
+// ═══════════════════════════════════════════
+function copyCmd(id){
+  const text=document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn=document.getElementById(id).parentElement.querySelector('.og-copy');
+    btn.textContent='Copied!';
+    setTimeout(()=>{btn.textContent='Copy';},1500);
+  });
+}
+
+async function detectOllama(){
+  const statusEl=document.getElementById('ollamaDetectStatus');
+  statusEl.style.display='block';
+  statusEl.className='og-status checking';
+  statusEl.textContent='Checking...';
+
+  const url=document.getElementById('welcomeOllamaUrl').value.trim()||'http://localhost:11434';
+
+  try{
+    // First check if Ollama is running
+    const res=await fetch(url+'/api/tags',{signal:AbortSignal.timeout(3000)});
+    if(!res.ok)throw new Error('Not reachable');
+    const data=await res.json();
+    const models=(data.models||[]).map(m=>m.name);
+
+    if(models.length===0){
+      statusEl.className='og-status err';
+      statusEl.innerHTML='Ollama is running but no models found. Run: <code>ollama pull llama3.1:8b</code>';
+    }else{
+      statusEl.className='og-status ok';
+      statusEl.textContent='Connected! Models: '+models.join(', ');
+      // Auto-fill the first model
+      const modelInput=document.getElementById('welcomeOllamaModel');
+      if(!modelInput.value||modelInput.value==='llama3.1:8b'){
+        modelInput.value=models[0];
+      }
+    }
+  }catch(e){
+    statusEl.className='og-status err';
+    if(e.name==='TimeoutError'||e.message.includes('timeout')){
+      statusEl.textContent='Ollama not detected at '+url+'. Is it running? (ollama serve)';
+    }else if(e.message.includes('Failed to fetch')||e.message.includes('NetworkError')){
+      statusEl.innerHTML='Cannot reach Ollama. Make sure it\'s running with:<br><code>OLLAMA_ORIGINS="*" ollama serve</code>';
+    }else{
+      statusEl.textContent='Error: '+e.message;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// AUTH (Supabase)
+// ═══════════════════════════════════════════
+// To enable auth:
+// 1. Create a free project at https://supabase.com
+// 2. Enable Google/Apple/GitHub providers in Authentication > Providers
+// 3. Fill in your project URL and anon key below
+const SUPABASE_URL='https://kfqmaztaxghbruhifeve.supabase.co'; // e.g. 'https://xxxxx.supabase.co'
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmcW1henRheGdoYnJ1aGlmZXZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MjU0NjIsImV4cCI6MjA4OTAwMTQ2Mn0.eLDC7aUsQymXr8rz4HS_B_AKrpRpo9iQak-TQOeTBrk'; // e.g. 'eyJhbG...'
+
+let supabaseClient=null;
+let currentUser=null;
+
+function initAuth(){
+  if(!SUPABASE_URL||!SUPABASE_ANON_KEY){
+    // Auth not configured — hide sign in button or show it as disabled
+    // Users can still use the app without auth
+    return;
+  }
+  try{
+    supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+    // Check for existing session
+    supabaseClient.auth.getSession().then(({data:{session}})=>{
+      if(session){
+        setAuthUser(session.user);
+      }
+    });
+    // Listen for auth changes
+    supabaseClient.auth.onAuthStateChange((event,session)=>{
+      if(session){
+        setAuthUser(session.user);
+      }else{
+        clearAuthUser();
+      }
+    });
+  }catch(e){
+    console.warn('Auth init failed:',e);
+  }
+}
+
+function setAuthUser(user){
+  currentUser=user;
+  const bar=document.getElementById('authBar');
+  const name=user.user_metadata?.full_name||user.email?.split('@')[0]||'User';
+  const initial=name.charAt(0).toUpperCase();
+  bar.innerHTML=`
+    <span class="auth-name">${name}</span>
+    <div class="auth-avatar" onclick="doLogout()" title="Sign out">${initial}</div>
+  `;
+  // Also set display name if not set
+  if(!llmConfig.displayName){
+    llmConfig.displayName=name;
+    saveConfig();
+  }
+}
+
+function clearAuthUser(){
+  currentUser=null;
+  const bar=document.getElementById('authBar');
+  bar.innerHTML='<button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>';
+}
+
+async function doLogin(){
+  if(!supabaseClient){
+    // If auth not configured, open settings instead
+    openSettings();
+    return;
+  }
+  // Show provider chooser
+  const provider=await showAuthPicker();
+  if(!provider)return;
+  try{
+    const{error}=await supabaseClient.auth.signInWithOAuth({
+      provider,
+      options:{redirectTo:window.location.origin+window.location.pathname}
+    });
+    if(error)addMessage('Login error: '+error.message,'system');
+  }catch(e){
+    addMessage('Login error: '+e.message,'system');
+  }
+}
+
+function showAuthPicker(){
+  return new Promise(resolve=>{
+    // Simple inline picker
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:700;display:flex;align-items:center;justify-content:center;';
+    const box=document.createElement('div');
+    box.style.cssText='background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:24px 28px;text-align:center;min-width:280px;';
+    box.innerHTML=`
+      <div style="font-size:14px;color:#e0e0e0;margin-bottom:16px;font-weight:600;">Sign in to Sloth Space</div>
+      <button onclick="this.closest('div[style]').dataset.choice='github'" style="width:100%;padding:10px;margin-bottom:8px;background:#24292e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:Arial;">Continue with GitHub</button>
+      <button onclick="this.closest('div[style]').dataset.choice='google'" style="width:100%;padding:10px;margin-bottom:8px;background:#4285f4;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:Arial;">Continue with Google</button>
+      <button onclick="this.closest('div[style]').dataset.choice='apple'" style="width:100%;padding:10px;margin-bottom:8px;background:#000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:Arial;">Continue with Apple</button>
+      <div onclick="this.closest('div[style]').dataset.choice='cancel'" style="font-size:11px;color:#666;margin-top:10px;cursor:pointer;">Cancel</div>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Listen for clicks
+    overlay.addEventListener('click',function handler(e){
+      const choice=box.dataset.choice;
+      if(choice){
+        overlay.removeEventListener('click',handler);
+        document.body.removeChild(overlay);
+        resolve(choice==='cancel'?null:choice);
+      }
+      if(e.target===overlay){
+        overlay.removeEventListener('click',handler);
+        document.body.removeChild(overlay);
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function doLogout(){
+  if(!supabaseClient)return;
+  if(!confirm('Sign out?'))return;
+  await supabaseClient.auth.signOut();
+  clearAuthUser();
+  addMessage('Signed out.','system');
+}
+
+// ═══════════════════════════════════════════
+// CHAT / LLM (provider-agnostic)
+// ═══════════════════════════════════════════
+
+// ── Style interpreter prompt (lightweight LLM call) ──
+const STYLE_PROMPT=`You are a color/style interpreter for a presentation app. Convert the user's style description into a JSON action.
+
+Output ONLY a JSON object. Possible keys:
+- "background": hex color for slide background
+- "heading_color": hex color for ALL text (global)
+- "font": font family name
+- "region": region ID to target (e.g. "title", "subtitle", "body", "heading", "quote", "left", "right"). If the user specifies a specific part, use this.
+- "region_color": hex color for that specific region only (use WITH "region")
+- "region_font": font name for that specific region only (use WITH "region")
+- "underline": true/false — add/remove underline
+- "bold": true/false — add/remove bold
+- "italic": true/false — add/remove italic
+- "slides": "all" or a number (default "all")
+
+If the message is NOT about visual style (colors, fonts, bold, underline, italic, background), output {"none":true}.
+IMPORTANT: Requests to change TEXT CONTENT (e.g. "改內容", "豐富一點", "rewrite this") are NOT style changes. Output {"none":true} for those.
+
+Region IDs in our system: title, subtitle, tagline, date, heading, body, footnote, left, right, left_label, right_label, quote, author, role, table, description, source, contact.
+
+Color interpretation:
+- "莫內藍" / "像莫內那種藍" → muted dusty blue #5B7FA5
+- "莫內黃" → warm cream-gold #E8D5A3
+- "科技感的深藍" → dark tech blue #0A1628
+- "修拉金" → pointillist gold #C5943A
+- "紅色" → #CC0000, "綠色" → #2E8B57, "黃色" → #FFD700, "黑色" → #000000, "白色" → #FFFFFF
+- Use your best judgment for artistic descriptions.
+
+Examples:
+"字的顏色改莫內藍 背景改莫內黃" → {"heading_color":"#5B7FA5","background":"#E8D5A3"}
+"title的字改綠色" → {"region":"title","region_color":"#2E8B57"}
+"標題改紅色" → {"region":"title","region_color":"#CC0000"}
+"副標題用白色" → {"region":"subtitle","region_color":"#FFFFFF"}
+"內容文字改藍色" → {"region":"body","region_color":"#1E90FF"}
+"背景用深海藍綠色" → {"background":"#0A4F5C"}
+"第三頁標題改紅色" → {"region":"heading","region_color":"#CC0000","slides":3}
+"字型改 Georgia" → {"font":"Georgia"}
+"加底線" → {"underline":true}
+"標題加粗" → {"region":"title","bold":true}
+"副標題加斜體底線" → {"region":"subtitle","italic":true,"underline":true}
+"取消底線" → {"underline":false}
+"內容豐富一點" → {"none":true}
+"改寫這段" → {"none":true}
+
+Output ONLY the JSON object.`;
+
+// Detect if user message is about style/color changes
+function isStyleRequest(text){
+  if(!currentDeck)return false;
+  return /背景|字[的型體]?[顏颜]?色?|文字|顏色|color|background|bg|font|字[型體]|配色|標題|副標|title|subtitle|body|heading|改[成為]?\s*[#a-zA-Z\u4e00-\u9fff]|[換改用].*色|底線|underline|粗體|bold|斜體|italic/i.test(text);
+}
+
+// Detect if user message is about content editing
+function isContentEdit(text){
+  if(!currentDeck)return false;
+  // "改標題"/"改內容"/"改副標" = content edit targeting a region
+  if(/改[標副內正]|改\s*(title|heading|body|subtitle|quote)/i.test(text))return true;
+  // Also catch "忘記改" / "沒改" / "還沒改" patterns
+  if(/[忘沒沒還].*改/i.test(text))return true;
+  return /內容|豐富|改寫|rewrite|更多|加[更多]|詳細|expand|elaborate|修改|改[一成]|寫[多好]|補充|充實|enrich|improve|更新|update|重寫/i.test(text);
+}
+
+// Detect if user wants a deck-wide content change (all slides)
+function isDeckWideEdit(text){
+  if(!currentDeck)return false;
+  return /全[部都]|所有|每[一]?[頁張]|整[份個]|all\s*(slides?|pages?|content)|change\s*all|translate|翻[成譯]|改[成為].*[英中日韓文語]|換[成為].*[英中日韓文語]|用.*[英中日韓文語].*寫/i.test(text);
+}
+
+// Serialize deck content compactly for LLM
+function deckToContentJSON(){
+  return currentDeck.slides.map((s,i)=>{
+    const c={slide:i+1,layout:s.layout,content:{}};
+    for(const[k,v]of Object.entries(s.content)){
+      c.content[k]=v;
+    }
+    return c;
+  });
+}
+
+// ── Content editor prompt ──
+const CONTENT_EDIT_PROMPT=`You are an AI slide content editor. You will receive the current content of a specific region in a slide, and the user's editing instruction. Output ONLY the updated content in the EXACT same JSON format as the input.
+
+CRITICAL RULES:
+- NEVER remove or shorten existing content unless the user EXPLICITLY asks to delete or simplify.
+- If the input is a plain string, output a plain string.
+- If the input is a list object {"type":"list","items":[...]}, output the same structure. Keep ALL existing items and ADD more if asked.
+- If the input is a table object {"type":"table","headers":[...],"rows":[...]}, output the same structure. Keep ALL existing rows.
+- Respect the user's language. If user says "用英文" or "in English", translate to English.
+- When asked to "enrich" / "豐富" / "增加" / "更多":
+  - Keep ALL existing bullet points
+  - Expand each point to 1-2 full sentences with specific facts, data, or analysis
+  - Add 1-2 NEW bullet points if appropriate
+- When asked to "rewrite" / "改寫": restructure and improve, but keep the same amount of content or MORE.
+- Do NOT change the format/structure unless asked. If it's a list, keep it as a list.
+- Output ONLY the content JSON. No explanation, no code fences, no markdown.`;
+
+// ── Deck-wide content edit prompt ──
+const DECK_EDIT_PROMPT=`You are an AI slide content editor. You will receive the FULL content of a slide deck as a JSON array, and the user's editing instruction. You must apply the instruction to ALL slides and output the updated JSON array.
+
+Rules:
+- Output ONLY a JSON array of slide content objects. No explanation.
+- Each object in the array must have: {"slide": N, "content": {...}}
+- Keep the EXACT same structure and format for each region (string stays string, list stays list, table stays table).
+- Apply the user's instruction to EVERY slide.
+- Common instructions:
+  - "改成英文" / "translate to English" → translate ALL text content to English. Keep structure.
+  - "改成中文" / "translate to Chinese" → translate ALL text content to Traditional Chinese.
+  - "豐富一點" / "enrich" → expand and add detail to ALL content regions across all slides.
+  - "精簡一點" / "simplify" → make all content more concise.
+  - "更專業" / "more professional" → rewrite all content in a more professional tone.
+- NEVER remove content unless explicitly asked. Only transform it.
+- NEVER change the number of slides or layouts. Only change the text content within regions.
+- For tables, translate/update cell values but keep the same rows/columns structure.
+- For lists, keep the same number of items (or more if enriching), never fewer.
+- Output ONLY the JSON array.`;
+
+// Apply style overrides from LLM response
+function applyStyleOverrides(styleObj){
+  const targetSlides=styleObj.slides||'all';
+  // If there's a selected region and no explicit region in styleObj, use the selection
+  const regionId=styleObj.region||(selectedRegion?selectedRegion.regionId:null);
+  const msgs=[];
+
+  currentDeck.slides.forEach((s,i)=>{
+    if(targetSlides!=='all'&&(i+1)!==targetSlides)return;
+    // Also respect selected slide if a region is selected
+    if(regionId&&selectedRegion&&targetSlides==='all'&&selectedRegion.slideIdx!==undefined){
+      // If user selected a specific region on a specific slide, only apply there
+      // Unless they explicitly said "all slides" or a different slide number
+    }
+    if(!s.style_overrides)s.style_overrides={};
+
+    // Global overrides
+    if(styleObj.background)s.style_overrides.background=styleObj.background;
+    if(styleObj.heading_color)s.style_overrides.heading_color=styleObj.heading_color;
+    if(styleObj.font)s.style_overrides.font=styleObj.font;
+
+    // Text decorations (global)
+    if(styleObj.underline!==undefined)s.style_overrides.underline=styleObj.underline;
+    if(styleObj.bold!==undefined)s.style_overrides.bold=styleObj.bold;
+    if(styleObj.italic!==undefined)s.style_overrides.italic=styleObj.italic;
+
+    // Per-region overrides
+    const hasRegionStyle=styleObj.region_color||styleObj.region_font||
+      (regionId&&(styleObj.underline!==undefined||styleObj.bold!==undefined||styleObj.italic!==undefined));
+    if(regionId&&hasRegionStyle){
+      if(!s.style_overrides.regions)s.style_overrides.regions={};
+      if(!s.style_overrides.regions[regionId])s.style_overrides.regions[regionId]={};
+      const rr=s.style_overrides.regions[regionId];
+      if(styleObj.region_color)rr.color=styleObj.region_color;
+      if(styleObj.region_font)rr.font=styleObj.region_font;
+      if(styleObj.underline!==undefined)rr.underline=styleObj.underline;
+      if(styleObj.bold!==undefined)rr.bold=styleObj.bold;
+      if(styleObj.italic!==undefined)rr.italic=styleObj.italic;
+      // If targeting a region, don't apply decoration globally
+      delete s.style_overrides.underline;
+      delete s.style_overrides.bold;
+      delete s.style_overrides.italic;
+    }
+  });
+
+  if(styleObj.background)msgs.push(`背景 → ${styleObj.background}`);
+  if(styleObj.heading_color)msgs.push(`全部文字 → ${styleObj.heading_color}`);
+  if(styleObj.font)msgs.push(`字型 → ${styleObj.font}`);
+  if(regionId&&styleObj.region_color)msgs.push(`${regionId} 文字 → ${styleObj.region_color}`);
+  if(regionId&&styleObj.region_font)msgs.push(`${regionId} 字型 → ${styleObj.region_font}`);
+  if(styleObj.underline===true)msgs.push(`${regionId||'全部'} +底線`);
+  if(styleObj.underline===false)msgs.push(`${regionId||'全部'} -底線`);
+  if(styleObj.bold===true)msgs.push(`${regionId||'全部'} +粗體`);
+  if(styleObj.italic===true)msgs.push(`${regionId||'全部'} +斜體`);
+  return msgs;
+}
+
+// ── Pass 1: small fast model decides intent ──
+const ROUTER_PROMPT=`You are an intent router for Sloth Space, a presentation app.
+You will receive the last few messages of a conversation. Classify into one of two intents based on the FULL context.
+Output ONLY: {"intent":"chat"} or {"intent":"generate"}
+
+"generate" if ANY of these are true:
+- A presentation topic has been mentioned at any point in the conversation AND the user is saying "go", "do it", "開始", "動手", "生成", "做吧", "好", "OK", or similar confirmation
+- The user gives a clear, complete request like "做一份AI簡報 5頁"
+- The user asks to add/remove/rewrite slides or change content
+- The user is frustrated and wants action: "動手啊", "快做", "趕快", etc.
+
+"chat" if ALL of these are true:
+- No topic has been discussed yet
+- The user is just greeting or asking questions
+- The request is truly vague with zero topic info
+
+NOTE: Style changes like "改顏色", "換背景", "字改藍色" are handled separately. If the message is ONLY about colors/fonts/background, still choose "chat" — the app handles it locally.
+IMPORTANT: When in doubt and a topic EXISTS in the conversation, choose "generate".
+
+Output ONLY the JSON object, nothing else.`;
+
+// ── Pass 2a: conversation mode ──
+const CHAT_PROMPT=`You are Sloth Space, a friendly AI presentation assistant. Reply in the user's language.
+
+Rules:
+- Be VERY concise. 1 sentence max.
+- Ask AT MOST one question per reply.
+- The ONLY thing you need from the user to start generating is a TOPIC. Everything else (slides count, style, audience) you can decide yourself.
+- If the user gives any topic at all, even vague like "AI", that is enough. Tell them you'll start generating and ask them to send the request one more time with any preferences, or just say you'll use defaults.
+- Do NOT ask multiple questions. Do NOT keep chatting round after round.
+- Do NOT output JSON.`;
+
+// ── Pass 2b: slide generation mode ──
+const GEN_PROMPT=`You are Sloth Space, an AI presentation designer. Output ONLY valid JSON — no text, no markdown, no code fences, no explanation.
+
+## RULES
+- Use ONLY these preset IDs: clean-white, clean-gray, clean-dark, monet, seurat
+  - Business/medical/academic → clean-white
+  - Tech/product launch → clean-dark
+  - Creative/artistic → monet or seurat
+  - If unsure → clean-white
+- Use ONLY these layout IDs and their regions:
+  - title: title (required), subtitle, tagline, date
+  - content: heading (required), body (required), footnote
+  - two-column: heading (required), left_label, left (required), right_label, right (required)
+  - image-top: heading (required), image, body (required)
+  - image-left: heading (required), image, body (required)
+  - image-right: heading (required), body (required), image
+  - image-bottom: heading (required), body (required), image
+  - quote: quote (required), author, role
+  - data-table: heading (required), description, table (required), source
+  - closing: heading (required), subtitle, contact
+- Content types: plain string, list {"type":"list","items":[...]}, table {"type":"table","headers":[...],"rows":[...]}, image {"type":"image","src":"...","alt":"..."}
+- Style tags: [color: #hex] → style_overrides.heading_color, [bg: #hex] → style_overrides.background, [font: name] → style_overrides.font
+- Users may describe colors in natural language instead of hex codes. You MUST convert them:
+  - 黃色/yellow → #FFD700, 紅色/red → #CC0000, 藍色/blue → #1E90FF, 綠色/green → #2E8B57
+  - 黑色/black → #000000, 白色/white → #FFFFFF, 灰色/gray → #888888, 橘色/orange → #FF8C00
+  - 莫內藍 (Monet blue) → #5B7FA5, 莫內紫 (Monet lavender) → #8E7CC3, 莫內粉 (Monet pink) → #D4A5A5
+  - 修拉金 (Seurat gold) → #C5943A, 修拉棕 (Seurat brown) → #8B6914
+  - For any other color description, pick the closest reasonable hex code
+- "背景黃色" → apply style_overrides.background="#FFD700" on ALL slides
+- "字用莫內藍" → apply style_overrides.heading_color="#5B7FA5" on ALL slides
+- When user says "background X color", apply to ALL slides. When user says "slide 3 background", apply only to slide 3.
+- Default 5-8 slides. Always start with title layout, end with closing layout.
+- Respect the user's language for all slide content.
+- When editing, output the COMPLETE updated JSON.
+
+## CONTENT QUALITY — THIS IS THE MOST IMPORTANT SECTION
+
+BAD example (TOO SHORT — NEVER do this):
+{"heading":"問題背景","body":{"type":"list","items":["AI語意問題","模型幻覺","安全隱患"]}}
+
+GOOD example (THIS is the minimum quality):
+{"heading":"AI語意崩壞的三大成因","body":{"type":"list","items":["訓練數據偏差：大型語言模型的訓練語料中包含大量矛盾資訊，導致模型在推理時產生邏輯斷裂，尤其在跨語言翻譯場景下問題更為嚴重","注意力機制的局限性：Transformer架構的自注意力機制在處理超過4000 token的長文本時，語意連貫性會顯著下降，研究顯示困惑度上升達40%","RLHF的副作用：人類反饋強化學習雖然提升了回答的禮貌性，但同時也訓練模型學會『自信地胡說八道』，產生看似流暢實則毫無根據的內容"]},"notes":"強調這三個成因是相互關聯的，不是獨立問題"}
+
+Rules:
+- Every bullet MUST be 1-2 full sentences with specific facts, data, examples, or analysis
+- NEVER write short labels like "背景介紹" or "Key challenges" — always elaborate
+- Each content/two-column slide must have 3-5 detailed bullet items
+- Use varied layouts: mix content, two-column, quote, data-table. NOT all bullet lists
+- Include speaker notes on every slide
+- data-table must have realistic numbers
+- The user expects a COMPLETE, PRESENTABLE deck — not an outline
+
+## OUTPUT SCHEMA
+{"sloth_version":"0.1.0","type":"slides","title":"...","preset":"clean-white","locale":"en","slides":[{"layout":"title","content":{"title":"...","subtitle":"..."},"notes":"...","style_overrides":{}}]}`;
+
+const VALID_PRESETS=['clean-white','clean-gray','clean-dark','monet','seurat'];
+const VALID_LAYOUTS=['title','content','two-column','image-top','image-left','image-right','image-bottom','quote','data-table','closing'];
+
+function addMessage(text,type){
+  const div=document.createElement('div');
+  div.className='msg '+type;
+  div.textContent=text;
+  const msgs=document.getElementById('chatMessages');
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  return div;
+}
+
+function validateDeck(deck){
+  if(!deck||typeof deck!=='object')return 'Response is not a JSON object';
+  if(!deck.slides||!Array.isArray(deck.slides)||deck.slides.length===0)return 'No slides array found';
+  if(deck.preset&&!VALID_PRESETS.includes(deck.preset))return `Invalid preset: ${deck.preset}`;
+  for(let i=0;i<deck.slides.length;i++){
+    const s=deck.slides[i];
+    if(!s.layout)return `Slide ${i+1} has no layout`;
+    if(!VALID_LAYOUTS.includes(s.layout))return `Slide ${i+1} has invalid layout: ${s.layout}`;
+    if(!s.content||typeof s.content!=='object')return `Slide ${i+1} has no content`;
+  }
+  // ensure required fields
+  if(!deck.sloth_version)deck.sloth_version='0.1.0';
+  if(!deck.type)deck.type='slides';
+  if(!deck.title)deck.title='Untitled';
+  if(!deck.preset)deck.preset='clean-white';
+  if(!deck.locale)deck.locale='en';
+  return null; // valid
+}
+
+function extractJSON(text){
+  // Try direct parse first
+  try{ return JSON.parse(text); }catch(e){}
+  // Try to extract from code fences
+  const fenceMatch=text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  if(fenceMatch){
+    try{ return JSON.parse(fenceMatch[1]); }catch(e){}
+  }
+  // Try to find first { ... last }
+  const first=text.indexOf('{');
+  const last=text.lastIndexOf('}');
+  if(first!==-1&&last>first){
+    try{ return JSON.parse(text.slice(first,last+1)); }catch(e){}
+  }
+  return null;
+}
+
+// Helper: call LLM API (provider-agnostic, OpenAI-compatible)
+async function callLLM(systemContent,messages,opts={}){
+  if(!isConfigured()){throw new Error('No LLM configured. Click ⚙ Settings to set up.');}
+  const useRouter=opts.useRouter||false;
+  const model=opts.model||(useRouter?llmConfig.router:llmConfig.model);
+  const body={model,messages:[{role:'system',content:systemContent},...messages],temperature:opts.temperature??0.7,max_tokens:opts.max_tokens||4096};
+  if(opts.json)body.response_format={type:'json_object'};
+  const headers={'Content-Type':'application/json'};
+  if(llmConfig.apiKey)headers['Authorization']=`Bearer ${llmConfig.apiKey}`;
+  const res=await fetch(llmConfig.url,{
+    method:'POST',
+    headers,
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){const e=await res.text();throw new Error(`API ${res.status}: ${e.slice(0,200)}`);}
+  const data=await res.json();
+  return data.choices?.[0]?.message?.content||'';
+}
+
+async function sendMessage(){
+  const input=document.getElementById('chatInput');
+  const text=input.value.trim();
+  if(!text)return;
+  input.value='';
+  addMessage(text,'user');
+  chatHistory.push({role:'user',content:text});
+
+  // ── PASS -1: Local UI commands (no LLM needed) ──
+  const trimText=text.trim();
+  if(/^(儲存|存檔|save|保存|存sloth|save\s*sloth)$/i.test(trimText)){
+    saveSloth(); return;
+  }
+  if(/^(開新|新檔|新建|new|開新檔案|新增檔案)$/i.test(trimText)){
+    newDeck(); return;
+  }
+  if(/^(載入|讀取|load|開啟|開檔|載入檔案|讀取檔案|open)$/i.test(trimText)){
+    loadDeck(); return;
+  }
+  if(/^(匯出|export|export\s*json|json)$/i.test(trimText)){
+    exportJSON(); addMessage('✓ Exported JSON','system'); return;
+  }
+  if(/^(匯出\s*ppt|export\s*ppt|pptx?|匯出簡報|下載簡報|export\s*slides)$/i.test(trimText)){
+    exportPPTX(); return;
+  }
+  if(/^(設定|settings?|設置|config)$/i.test(trimText)){
+    openSettings(); return;
+  }
+
+  const statusDiv=addMessage('Thinking...','system');
+  const sendBtn=document.querySelector('.send-btn');
+  sendBtn.disabled=true;
+  sendBtn.textContent='...';
+
+  try{
+    // ── PASS 0: Style edit? (lightweight LLM, no deck regeneration) ──
+    // Skip style check if this is clearly a content edit (saves an API call)
+    const clearlyContentEdit=isContentEdit(text)&&!/色|color|background|bg|font|字[型體]|底線|underline|bold|italic|粗體|斜體/i.test(text);
+    if(isStyleRequest(text)&&!clearlyContentEdit){
+      statusDiv.textContent='Interpreting style...';
+      // Add selection context so LLM knows which region is targeted
+      let styleInput=text;
+      if(selectedRegion){
+        styleInput+=`\n[USER HAS SELECTED: slide ${selectedRegion.slideIdx+1}, region "${selectedRegion.regionId}" (${selectedRegion.role}). Apply changes to this region unless they specify otherwise.]`;
+      }
+      const styleRaw=await callLLM(STYLE_PROMPT,[{role:'user',content:styleInput}],{temperature:0,max_tokens:128,json:true});
+      const styleObj=JSON.parse(styleRaw);
+      if(!styleObj.none){
+        const msgs=applyStyleOverrides(styleObj);
+        chatHistory.push({role:'assistant',content:`[style: ${msgs.join(', ')}]`});
+        statusDiv.remove();
+        addMessage(`✓ ${msgs.join(', ')}`,'ai');
+        renderApp();
+        sendBtn.disabled=false;sendBtn.textContent='Send';
+        return;
+      }
+      // If style interpreter said "none", fall through
+    }
+
+    // ── PASS 0.4: Deck-wide content edit? (all slides at once) ──
+    if(isDeckWideEdit(text)&&currentDeck){
+      statusDiv.textContent='Editing all slides...';
+      const deckContent=deckToContentJSON();
+      const editInput=`Current deck content:\n${JSON.stringify(deckContent)}\n\nUser instruction: ${text}`;
+      const raw=await callLLM(DECK_EDIT_PROMPT,[{role:'user',content:editInput}],{max_tokens:8192});
+      chatHistory.push({role:'assistant',content:`[deck-wide edit: ${text}]`});
+
+      // Parse updated content array
+      let updated;
+      try{updated=JSON.parse(raw);}catch(e){
+        const extracted=extractJSON(raw);
+        if(Array.isArray(extracted))updated=extracted;
+        else if(extracted&&Array.isArray(extracted.slides))updated=extracted.slides;
+        else throw new Error('LLM returned invalid JSON for deck edit');
+      }
+
+      // Apply updates back to deck
+      let count=0;
+      (Array.isArray(updated)?updated:[]).forEach(item=>{
+        const idx=(item.slide||1)-1;
+        if(idx>=0&&idx<currentDeck.slides.length&&item.content){
+          // Merge content: only update keys that exist in the response
+          for(const[k,v]of Object.entries(item.content)){
+            currentDeck.slides[idx].content[k]=v;
+          }
+          count++;
+        }
+      });
+
+      statusDiv.remove();
+      addMessage(`✓ Updated ${count} slides`,'ai');
+      renderApp();
+      sendBtn.disabled=false;sendBtn.textContent='Send';
+      return;
+    }
+
+    // ── PASS 0.5: Content edit? (targeted region content change) ──
+    if(isContentEdit(text)&&currentDeck){
+      // Figure out which region to edit
+      let targetSlide=currentSlide;
+      let targetRegion=null;
+      let slideFromText=false;
+
+      // ALWAYS try to parse slide number from text first — user's words > click selection
+      const slideMatch=text.match(/第([一二三四五六七八九十\d]+)[頁張]/);
+      if(slideMatch){
+        const numMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+        targetSlide=(numMap[slideMatch[1]]||parseInt(slideMatch[1])||1)-1;
+        slideFromText=true;
+      }
+
+      // Try to detect region from text
+      const regionMap={'標題':'title','title':'title','副標':'subtitle','subtitle':'subtitle',
+        '內容':'body','body':'body','正文':'body','heading':'heading',
+        '引言':'quote','quote':'quote','表格':'table','table':'table',
+        '左邊':'left','左':'left','右邊':'right','右':'right'};
+      for(const[k,v]of Object.entries(regionMap)){
+        if(text.includes(k)){targetRegion=v;break;}
+      }
+
+      // Fall back to click selection if text didn't specify
+      if(selectedRegion){
+        if(!slideFromText)targetSlide=selectedRegion.slideIdx;
+        if(!targetRegion)targetRegion=selectedRegion.regionId;
+      }
+
+      // If we have a target (or at least a slide number from text), do focused content edit
+      if(targetRegion||selectedRegion||slideFromText){
+        const slide=currentDeck.slides[targetSlide];
+        if(!slide){throw new Error(`Slide ${targetSlide+1} not found`);}
+        // Find the right region to edit
+        let rId=targetRegion||'body';
+        // title ↔ heading equivalence: content layouts use "heading", title layout uses "title"
+        if(!slide.content[rId]){
+          if(rId==='title'&&slide.content['heading'])rId='heading';
+          else if(rId==='heading'&&slide.content['title'])rId='title';
+        }
+        // If the requested region doesn't exist in this slide, find the main content region
+        if(!slide.content[rId]){
+          // Priority: body → left → quote → table → first non-heading region
+          const fallbacks=['body','left','quote','table','description'];
+          rId=fallbacks.find(f=>slide.content[f])||null;
+          if(!rId){
+            // Last resort: find the first region that has content and isn't 'title'/'heading'
+            const L=LAYOUTS[slide.layout];
+            if(L){
+              const contentRegion=L.regions.find(r=>r.id!=='heading'&&r.id!=='title'&&slide.content[r.id]);
+              if(contentRegion)rId=contentRegion.id;
+            }
+          }
+        }
+        const currentContent=rId?slide.content[rId]:null;
+        if(currentContent){
+          statusDiv.textContent='Editing content...';
+          const contentStr=typeof currentContent==='object'?JSON.stringify(currentContent):currentContent;
+          const editInput=`Current content of region "${rId}" on slide ${targetSlide+1} (layout: ${slide.layout}):\n${contentStr}\n\nUser instruction: ${text}`;
+          const raw=await callLLM(CONTENT_EDIT_PROMPT,[{role:'user',content:editInput}],{max_tokens:2048});
+          chatHistory.push({role:'assistant',content:`[edited slide ${targetSlide+1} ${rId}]`});
+
+          // Try to parse as JSON (list/table), fall back to string
+          let newContent;
+          try{newContent=JSON.parse(raw);}catch(e){newContent=raw.trim();}
+          slide.content[rId]=newContent;
+
+          statusDiv.remove();
+          addMessage(`✓ Slide ${targetSlide+1} → ${rId} updated`,'ai');
+          renderApp();
+          sendBtn.disabled=false;sendBtn.textContent='Send';
+          return;
+        }
+      }
+      // If no specific target, ask user what to edit
+      statusDiv.remove();
+      addMessage('請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。','ai');
+      chatHistory.push({role:'assistant',content:'請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。'});
+      sendBtn.disabled=false;sendBtn.textContent='Send';
+      return;
+    }
+
+    // ── PASS 1: Router (fast small model) — decide intent ──
+    const recentMsgs=chatHistory.slice(-6);
+    if(currentDeck)recentMsgs.push({role:'system',content:'[context: user has an existing deck loaded]'});
+    const routerRaw=await callLLM(ROUTER_PROMPT,recentMsgs,{useRouter:true,temperature:0,max_tokens:32,json:true});
+    let intent='chat';
+    try{
+      const r=JSON.parse(routerRaw);
+      if(r.intent==='generate')intent='generate';
+    }catch(e){}
+
+    if(intent==='generate'){
+      await doGenerate(statusDiv);
+    }else{
+      // ── PASS 2a: Chat (big model, natural language) ──
+      statusDiv.textContent='...';
+      const raw=await callLLM(CHAT_PROMPT,chatHistory);
+      chatHistory.push({role:'assistant',content:raw});
+      statusDiv.remove();
+      addMessage(raw,'ai');
+    }
+
+  }catch(err){
+    console.error('Sloth LLM error:',err);
+    statusDiv.remove();
+    addMessage(`Error: ${err.message}. Try again?`,'ai');
+  }finally{
+    sendBtn.disabled=false;
+    sendBtn.textContent='Send';
+    autoSave(); // Save chat history after every message
+  }
+}
+
+// ── Slide generation (reusable) ──
+async function doGenerate(statusDiv){
+  statusDiv.textContent='Generating slides...';
+  let editContext='';
+  if(currentDeck){
+    editContext=`\n\n## EDITING MODE — CRITICAL\nThe user ALREADY has this deck. They want to MODIFY it, not regenerate from scratch.\nYou MUST keep ALL existing content, slides, and settings UNCHANGED except for what the user specifically asks to change.\nOutput the COMPLETE deck JSON with only the requested changes applied.\n\n[CURRENT DECK]\n${JSON.stringify(currentDeck)}`;
+  }
+  // Only send last 6 messages to generation model to avoid token overflow
+  const genHistory=chatHistory.slice(-6);
+  const raw=await callLLM(GEN_PROMPT+editContext,genHistory,{json:true,max_tokens:8192});
+  chatHistory.push({role:'assistant',content:raw});
+
+  const deck=extractJSON(raw);
+  if(!deck)throw new Error('LLM returned invalid JSON');
+  const err=validateDeck(deck);
+  if(err)throw new Error(err);
+
+  statusDiv.remove();
+  currentDeck=deck;
+  currentPreset=deck.preset||currentPreset;
+  currentSlide=0;
+  addMessage(`✓ Generated ${deck.slides.length} slides (${currentPreset})`,'ai');
+  renderApp();
+}
+
+// ═══════════════════════════════════════════
+// PERSISTENCE (localStorage)
+// ═══════════════════════════════════════════
+const STORAGE_KEY='sloth_space_deck';
+const STORAGE_HISTORY_KEY='sloth_space_chat';
+
+function autoSave(){
+  if(!currentDeck)return;
+  try{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({
+      deck:currentDeck,
+      preset:currentPreset,
+      slide:currentSlide
+    }));
+    localStorage.setItem(STORAGE_HISTORY_KEY,JSON.stringify(chatHistory.slice(-20))); // keep last 20 messages
+  }catch(e){console.warn('Auto-save failed:',e);}
+}
+
+function autoLoad(){
+  try{
+    const saved=localStorage.getItem(STORAGE_KEY);
+    if(saved){
+      const data=JSON.parse(saved);
+      if(data.deck&&data.deck.slides){
+        currentDeck=data.deck;
+        currentPreset=data.preset||'clean-white';
+        currentSlide=Math.min(data.slide||0,data.deck.slides.length-1);
+        addMessage(`✓ Restored: "${currentDeck.title||'Untitled'}" (${currentDeck.slides.length} slides)`,'system');
+      }
+    }
+    const savedHistory=localStorage.getItem(STORAGE_HISTORY_KEY);
+    if(savedHistory){
+      chatHistory=JSON.parse(savedHistory);
+    }
+  }catch(e){console.warn('Auto-load failed:',e);}
+}
+
+function newDeck(){
+  if(currentDeck&&!confirm('Start a new deck? Current work will be saved in browser.'))return;
+  // Save current deck to a named slot before clearing
+  if(currentDeck){
+    try{
+      const name=currentDeck.title||'Untitled';
+      const saves=JSON.parse(localStorage.getItem('sloth_space_saves')||'{}');
+      saves[name+'_'+Date.now()]=JSON.stringify({deck:currentDeck,preset:currentPreset});
+      localStorage.setItem('sloth_space_saves',JSON.stringify(saves));
+    }catch(e){}
+  }
+  currentDeck=null;
+  currentSlide=0;
+  chatHistory=[];
+  selectedRegion=null;
+  document.getElementById('selectionBar').style.display='none';
+  document.getElementById('chatMessages').innerHTML='';
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_HISTORY_KEY);
+  addMessage('New deck started. Tell me what you need!','system');
+  renderApp();
+}
+
+function saveDeck(){
+  // saveDeck now redirects to saveSloth for the native format
+  saveSloth();
+}
+
+function loadDeck(){
+  document.getElementById('fileInput').click();
+}
+
+function handleFileLoad(event){
+  const file=event.target.files[0];
+  if(!file)return;
+
+  // .sloth files are zip-based
+  if(file.name.endsWith('.sloth')){
+    loadSlothFile(file);
+    event.target.value='';
+    return;
+  }
+
+  // .json files
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const deck=JSON.parse(e.target.result);
+      const err=validateDeck(deck);
+      if(err){addMessage(`Load error: ${err}`,'system');return;}
+      currentDeck=deck;
+      currentPreset=deck.preset||'clean-white';
+      currentSlide=0;
+      autoSave();
+      addMessage(`✓ Loaded "${deck.title}" (${deck.slides.length} slides)`,'ai');
+      renderApp();
+    }catch(err){
+      addMessage(`Load error: Invalid JSON file`,'system');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value='';
+}
+
+function exportJSON(){
+  if(!currentDeck)return;
+  const blob=new Blob([JSON.stringify(currentDeck,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(currentDeck.title||'deck').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_')+'.json';
+  a.click();
+}
+
+// ═══════════════════════════════════════════
+// EXPORT .pptx (PptxGenJS)
+// ═══════════════════════════════════════════
+function exportPPTX(){
+  if(!currentDeck){addMessage('Nothing to export yet.','system');return;}
+  const p=PRESETS[currentPreset];
+  const pptx=new PptxGenJS();
+  pptx.layout='LAYOUT_WIDE'; // 13.33 x 7.5 inches = 1280x720 at 96dpi
+  pptx.title=currentDeck.title||'Untitled';
+  pptx.author='Sloth Space';
+
+  // Helper: hex color to pptxgen format (strip #)
+  const hx=c=>c?c.replace('#',''):'000000';
+
+  // Helper: inches from pixels (96dpi base, slide=1280x720 → 13.33x7.5)
+  const W=p.slide.width, H=p.slide.height;
+  const toX=px=>(px/W)*13.33;
+  const toY=px=>(px/H)*7.5;
+  const toW=px=>(px/W)*13.33;
+  const toH=px=>(px/H)*7.5;
+
+  // Font size: our scale is in px, pptx uses pt (roughly same at screen res)
+  const toPt=px=>Math.round(px*0.75); // px to pt approximation
+
+  currentDeck.slides.forEach((slide,idx)=>{
+    const L=LAYOUTS[slide.layout];
+    if(!L)return;
+    const ov=slide.style_overrides||{};
+    const regionOv=ov.regions||{};
+    const bg=ov.background||(L.background_override==='surface'?p.colors.surface:p.colors.background);
+    const globalColor=ov.heading_color||null;
+    const fontOv=ov.font||null;
+
+    const sl=pptx.addSlide();
+    sl.background={fill:hx(bg)};
+
+    // Add speaker notes
+    if(slide.notes)sl.addNotes(slide.notes);
+
+    L.regions.forEach(r=>{
+      const c=slide.content[r.id];
+      if(!c)return;
+
+      const rOv=regionOv[r.id]||{};
+      const regionColor=rOv.color||globalColor||null;
+      const regionFont=rOv.font||fontOv||null;
+      const isUnderline=rOv.underline!==undefined?rOv.underline:(ov.underline||false);
+      const isBold=rOv.bold!==undefined?rOv.bold:(ov.bold||false);
+      const isItalic=rOv.italic!==undefined?rOv.italic:(ov.italic||false);
+
+      const s=rs(r.role,p);
+      const sk=r.fontSize||'body';
+      const fontSize=toPt(p.typography.scale[SC[sk]]||16);
+      const txtColor=regionColor||s.color;
+      const fontFace=regionFont||s.ff||'Arial';
+      const al=r.align||{};
+
+      // Position with margins
+      const mx=p.spacing.margin.left, my=p.spacing.margin.top;
+      const x=toX(mx+r.bounds.x);
+      const y=toY(my+r.bounds.y);
+      const w=toW(r.bounds.w);
+      const h=toH(r.bounds.h);
+
+      // Horizontal alignment
+      const hAlign=al.horizontal==='center'?'center':al.horizontal==='right'?'right':'left';
+      // Vertical alignment
+      const vAlign=al.vertical==='middle'?'middle':al.vertical==='bottom'?'bottom':'top';
+
+      if(r.role==='image'){
+        // Image placeholder — draw a dashed box
+        sl.addShape(pptx.shapes.RECTANGLE,{
+          x,y,w,h,
+          line:{color:hx(p.colors.border),dashType:'dash',width:1.5},
+          fill:{type:'none'}
+        });
+        const altText=typeof c==='object'?(c.alt||c.src||'Image'):'Image';
+        sl.addText(altText,{
+          x,y,w,h,
+          fontSize:10,color:hx(p.colors.secondary),fontFace:'Arial',
+          align:'center',valign:'middle'
+        });
+        return;
+      }
+
+      if(typeof c==='object'&&c.type==='table'){
+        // Table rendering
+        const rows=[];
+        // Header row
+        if(c.headers){
+          rows.push(c.headers.map(h=>({
+            text:h,
+            options:{bold:true,fontSize:fontSize*0.85,color:hx(p.colors.table_header_text),fill:{color:hx(p.colors.table_header_bg)},fontFace}
+          })));
+        }
+        // Data rows
+        if(c.rows){
+          c.rows.forEach((row,ri)=>{
+            rows.push(row.map((cell,ci)=>({
+              text:String(cell),
+              options:{fontSize:fontSize*0.85,color:hx(txtColor),fill:{color:ri%2===1?hx(p.colors.table_row_alt):'FFFFFF'},fontFace,bold:ci===0}
+            })));
+          });
+        }
+        if(rows.length>0){
+          sl.addTable(rows,{
+            x,y,w,h,
+            border:{type:'solid',color:hx(p.colors.border),pt:0.5},
+            colW:Array(rows[0].length).fill(w/rows[0].length),
+            autoPage:false
+          });
+        }
+        return;
+      }
+
+      if(typeof c==='object'&&c.type==='list'){
+        // List as bullet points
+        const textRows=c.items.map(item=>({
+          text:item,
+          options:{
+            fontSize,color:hx(txtColor),fontFace,
+            bold:isBold||(s.fw>=700),italic:isItalic||(s.fs==='italic'),
+            underline:isUnderline?{style:'sng'}:undefined,
+            bullet:{type:'bullet',style:'\u25CF',indent:18},
+            lineSpacingMultiple:s.lh||1.5,
+            breakType:'none'
+          }
+        }));
+        sl.addText(textRows,{
+          x,y,w,h,
+          valign:vAlign,align:hAlign,
+          paraSpaceAfter:p.spacing.paragraph*0.6
+        });
+        return;
+      }
+
+      if(typeof c==='string'){
+        // Plain text
+        let pre='';
+        if(r.role==='quote')pre='\u201C';
+        sl.addText(pre+c,{
+          x,y,w,h,
+          fontSize,
+          color:hx(txtColor),
+          fontFace,
+          bold:isBold||(s.fw>=700),
+          italic:isItalic||(s.fs==='italic'),
+          underline:isUnderline?{style:'sng'}:undefined,
+          align:hAlign,
+          valign:vAlign,
+          lineSpacingMultiple:s.lh||1.3,
+          shrinkText:true
+        });
+      }
+    });
+
+    // Page number
+    sl.addText(String(idx+1),{
+      x:toX(W-p.spacing.margin.right-40),
+      y:toY(H-p.spacing.margin.bottom*0.7),
+      w:0.5,h:0.3,
+      fontSize:9,color:hx(p.colors.secondary),fontFace:'Arial',
+      align:'right',transparency:60
+    });
+  });
+
+  const fname=(currentDeck.title||'deck').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
+  pptx.writeFile({fileName:fname+'.pptx'}).then(()=>{
+    addMessage(`✓ Exported ${fname}.pptx`,'system');
+  }).catch(e=>{
+    addMessage(`Export error: ${e.message}`,'system');
+  });
+}
+
+// ═══════════════════════════════════════════
+// .sloth FORMAT (zip-based)
+// ═══════════════════════════════════════════
+function saveSloth(){
+  if(!currentDeck){addMessage('Nothing to save yet.','system');return;}
+  const zip=new JSZip();
+
+  // manifest.json = the deck data
+  zip.file('manifest.json',JSON.stringify(currentDeck,null,2));
+
+  // meta.json = app state
+  zip.file('meta.json',JSON.stringify({
+    sloth_version:'0.1.0',
+    app:'Sloth Space',
+    created:new Date().toISOString(),
+    preset:currentPreset,
+    currentSlide:currentSlide
+  },null,2));
+
+  // chat.json = conversation history (optional, for restore)
+  zip.file('chat.json',JSON.stringify(chatHistory.slice(-30),null,2));
+
+  const fname=(currentDeck.title||'deck').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
+  zip.generateAsync({type:'blob'}).then(blob=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=fname+'.sloth';
+    a.click();
+    addMessage(`✓ Saved ${fname}.sloth`,'system');
+  }).catch(e=>{
+    addMessage(`Save error: ${e.message}`,'system');
+  });
+}
+
+function loadSlothFile(file){
+  const zip=new JSZip();
+  zip.loadAsync(file).then(z=>{
+    // Read manifest
+    const manifestFile=z.file('manifest.json');
+    if(!manifestFile){addMessage('Invalid .sloth file: no manifest.json','system');return;}
+    return manifestFile.async('string').then(manifestStr=>{
+      const deck=JSON.parse(manifestStr);
+      const err=validateDeck(deck);
+      if(err){addMessage(`Load error: ${err}`,'system');return;}
+      currentDeck=deck;
+      currentPreset=deck.preset||'clean-white';
+      currentSlide=0;
+
+      // Read meta
+      const metaFile=z.file('meta.json');
+      if(metaFile){
+        return metaFile.async('string').then(metaStr=>{
+          try{
+            const meta=JSON.parse(metaStr);
+            if(meta.preset)currentPreset=meta.preset;
+            if(meta.currentSlide!==undefined)currentSlide=Math.min(meta.currentSlide,deck.slides.length-1);
+          }catch(e){}
+        }).then(()=>{
+          // Read chat history
+          const chatFile=z.file('chat.json');
+          if(chatFile){
+            return chatFile.async('string').then(chatStr=>{
+              try{chatHistory=JSON.parse(chatStr);}catch(e){}
+            });
+          }
+        });
+      }
+    }).then(()=>{
+      autoSave();
+      addMessage(`✓ Loaded "${currentDeck.title}" from .sloth (${currentDeck.slides.length} slides)`,'ai');
+      renderApp();
+    });
+  }).catch(e=>{
+    addMessage(`Load error: ${e.message}`,'system');
+  });
+}
+
+// ═══════════════════════════════════════════
+// PRODUCT SWITCHER
+// ═══════════════════════════════════════════
+let currentProduct='slides';
+
+function switchProduct(product){
+  currentProduct=product;
+  // Update tab buttons
+  document.querySelectorAll('.product-tab').forEach(t=>{
+    t.classList.toggle('active',t.dataset.product===product);
+  });
+  // Show/hide slides UI
+  const isSlides=product==='slides';
+  document.querySelectorAll('.slides-ui').forEach(el=>{
+    el.style.display=isSlides?'':'none';
+  });
+  // Show/hide placeholder
+  const ph=document.getElementById('productPlaceholder');
+  ph.style.display=isSlides?'none':'flex';
+  // Update placeholder text
+  const names={docs:'Sloth Docs',sheets:'Sloth Sheets'};
+  document.getElementById('placeholderTitle').textContent=names[product]||'';
+  // Re-render slides if switching back
+  if(isSlides)renderApp();
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+const chatInput=document.getElementById('chatInput');
+let imeComposing=false;
+chatInput.addEventListener('compositionstart',()=>{imeComposing=true;});
+chatInput.addEventListener('compositionend',()=>{imeComposing=false;});
+chatInput.addEventListener('keydown',e=>{
+  // keyCode 229 = IME processing key (Chrome/Safari CJK input)
+  if(e.key==='Enter'&&!e.shiftKey&&!imeComposing&&!e.isComposing&&e.keyCode!==229){
+    e.preventDefault();sendMessage();
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(document.activeElement===chatInput)return;
+  if(e.key==='ArrowRight'&&currentDeck){currentSlide=Math.min(currentSlide+1,currentDeck.slides.length-1);renderApp();e.preventDefault();}
+  if(e.key==='ArrowLeft'&&currentDeck){currentSlide=Math.max(currentSlide-1,0);renderApp();e.preventDefault();}
+});
+window.addEventListener('resize',renderApp);
+initToolbar();
+document.querySelectorAll('.popup').forEach(p=>{
+  p.addEventListener('click',e=>e.stopPropagation());
+});
+checkWelcomeScreen(); // Show welcome if not configured
+initAuth(); // Initialize Supabase auth if configured
+autoLoad(); // Restore previous session from localStorage
+renderApp();
+</script>
+</body>
+</html>

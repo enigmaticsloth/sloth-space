@@ -1,0 +1,35 @@
+{
+  "id": "closing",
+  "name": "Closing Slide",
+  "category": "closing",
+  "description": "Final slide. Big centered message with optional contact info. Use as the last slide — thank you, call to action, or Q&A.",
+  "background_override": "gradient",
+  "regions": [
+    {
+      "id": "heading",
+      "role": "title",
+      "bounds": { "x": 140, "y": 160, "w": 856, "h": 120 },
+      "align": { "horizontal": "center", "vertical": "middle" },
+      "fontSize": "title",
+      "maxLines": 2
+    },
+    {
+      "id": "subtitle",
+      "role": "subtitle",
+      "bounds": { "x": 200, "y": 300, "w": 736, "h": 50 },
+      "align": { "horizontal": "center", "vertical": "top" },
+      "fontSize": "h2",
+      "maxLines": 2,
+      "optional": true
+    },
+    {
+      "id": "contact",
+      "role": "caption",
+      "bounds": { "x": 300, "y": 420, "w": 536, "h": 80 },
+      "align": { "horizontal": "center", "vertical": "top" },
+      "fontSize": "caption",
+      "maxLines": 3,
+      "optional": true
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "id": "image-bottom",
+  "name": "Image Bottom",
+  "category": "content",
+  "description": "Title at top, body text in the middle, image at the bottom. Use when the text explanation comes first, image supports it below.",
+  "regions": [
+    {
+      "id": "heading",
+      "role": "heading",
+      "bounds": { "x": 0, "y": 0, "w": 1136, "h": 40 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "h1",
+      "maxLines": 1
+    },
+    {
+      "id": "body",
+      "role": "body",
+      "bounds": { "x": 0, "y": 56, "w": 1136, "h": 200 },
+      "align": { "horizontal": "left", "vertical": "top" },
+      "fontSize": "body"
+    },
+    {
+      "id": "image",
+      "role": "image",
+      "bounds": { "x": 0, "y": 276, "w": 1136, "h": 300 },
+      "align": { "horizontal": "center", "vertical": "middle" },
+      "optional": true
+    }
+  ]
+}

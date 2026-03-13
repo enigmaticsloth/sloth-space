@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sloth Space — Renderer v2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a1a;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px;
+    min-height: 100vh;
+  }
+  .header { text-align: center; margin-bottom: 32px; }
+  .header h1 { font-size: 24px; font-weight: 700; color: #f1f1f1; margin-bottom: 6px; }
+  .header p { font-size: 13px; color: #888; }
+  .header .goodbye { font-family: 'Courier New', monospace; font-size: 11px; color: #cc0000; margin-top: 10px; }
+
+  .controls { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .controls button {
+    background: #222; color: #aaa; border: 1px solid #333; padding: 6px 16px;
+    border-radius: 4px; cursor: pointer; font-size: 12px; font-family: Arial, sans-serif; transition: all 0.15s;
+  }
+  .controls button:hover { border-color: #666; color: #fff; }
+  .controls button.active { background: #444; color: #fff; border-color: #666; }
+
+  .slide-nav { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; }
+  .slide-nav button {
+    background: #2a2a2a; color: #888; border: 1px solid #333; width: 32px; height: 32px;
+    border-radius: 4px; cursor: pointer; font-size: 12px; font-family: Arial, sans-serif;
+  }
+  .slide-nav button:hover { color: #fff; border-color: #555; }
+  .slide-nav button.active { background: #555; color: #fff; border-color: #777; }
+
+  .slide-wrap { margin-bottom: 24px; }
+  .slide-label { font-size: 11px; color: #555; margin-bottom: 6px; font-family: 'Courier New', monospace; }
+  .slide-frame { box-shadow: 0 4px 24px rgba(0,0,0,0.5); border-radius: 2px; overflow: hidden; }
+  .notes { max-width: 720px; text-align: center; margin-top: 12px; font-size: 12px; color: #555; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Sloth Space Renderer v2</h1>
+  <p>5 presets &middot; 10 layouts &middot; Arrow keys to navigate</p>
+  <div class="goodbye"># Goodbye Google. &mdash; Enigmaticsloth</div>
+</div>
+
+<div class="controls" id="presetPicker"></div>
+<div class="slide-nav" id="slideNav"></div>
+<div class="slide-wrap">
+  <div class="slide-label" id="slideLabel"></div>
+  <div class="slide-frame" id="slideCanvas"></div>
+</div>
+<div class="notes" id="speakerNotes"></div>
+
+<script>
+const PRESETS = {
+  "clean-white": {
+    id: "clean-white", name: "White",
+    colors: { background: "#FFFFFF", surface: "#F5F5F5", primary: "#111111", secondary: "#666666", accent: "#111111", on_accent: "#FFFFFF", border: "#E0E0E0", table_header_bg: "#F0F0F0", table_header_text: "#111111", table_row_alt: "#FAFAFA" },
+    typography: { heading: { family: "Arial", weight: 700, letterSpacing: -0.3 }, body: { family: "Arial", weight: 400, lineHeight: 1.6 }, caption: { family: "Arial", weight: 400, transform: "none" }, scale: [44, 32, 24, 18, 14, 12] },
+    spacing: { margin: { top: 60, right: 72, bottom: 52, left: 72 }, gap: 24, paragraph: 14 },
+    slide: { width: 1280, height: 720 },
+    decorations: { accentBar: { enabled: false }, pageNumber: { show: true, position: "bottom-right", format: "number" } }
+  },
+  "clean-gray": {
+    id: "clean-gray", name: "Gray",
+    colors: { background: "#F2F2F2", surface: "#E8E8E8", primary: "#111111", secondary: "#555555", accent: "#111111", on_accent: "#FFFFFF", border: "#D0D0D0", table_header_bg: "#E0E0E0", table_header_text: "#111111", table_row_alt: "#EBEBEB" },
+    typography: { heading: { family: "Arial", weight: 700, letterSpacing: -0.3 }, body: { family: "Arial", weight: 400, lineHeight: 1.6 }, caption: { family: "Arial", weight: 400, transform: "none" }, scale: [44, 32, 24, 18, 14, 12] },
+    spacing: { margin: { top: 60, right: 72, bottom: 52, left: 72 }, gap: 24, paragraph: 14 },
+    slide: { width: 1280, height: 720 },
+    decorations: { accentBar: { enabled: false }, pageNumber: { show: true, position: "bottom-right", format: "number" } }
+  },
+  "clean-dark": {
+    id: "clean-dark", name: "Dark",
+    colors: { background: "#111111", surface: "#1A1A1A", primary: "#F0F0F0", secondary: "#999999", accent: "#F0F0F0", on_accent: "#111111", border: "#333333", table_header_bg: "#333333", table_header_text: "#F0F0F0", table_row_alt: "#1A1A1A" },
+    typography: { heading: { family: "Arial", weight: 700, letterSpacing: -0.3 }, body: { family: "Arial", weight: 400, lineHeight: 1.6 }, caption: { family: "Arial", weight: 400, transform: "none" }, scale: [44, 32, 24, 18, 14, 12] },
+    spacing: { margin: { top: 60, right: 72, bottom: 52, left: 72 }, gap: 24, paragraph: 14 },
+    slide: { width: 1280, height: 720 },
+    decorations: { accentBar: { enabled: false }, pageNumber: { show: true, position: "bottom-right", format: "number" } }
+  },
+  "monet": {
+    id: "monet", name: "Monet",
+    colors: { background: "#F6F3EE", surface: "#EDE8DF", primary: "#2C2C3A", secondary: "#7B7B8E", accent: "#7886A5", on_accent: "#FFFFFF", border: "#D5D0C7", table_header_bg: "#D8DCEA", table_header_text: "#2C2C3A", table_row_alt: "#EFECEA" },
+    typography: { heading: { family: "Arial", weight: 700, letterSpacing: -0.3 }, body: { family: "Arial", weight: 400, lineHeight: 1.6 }, caption: { family: "Arial", weight: 400, transform: "none" }, scale: [44, 32, 24, 18, 14, 12] },
+    spacing: { margin: { top: 60, right: 72, bottom: 52, left: 72 }, gap: 24, paragraph: 14 },
+    slide: { width: 1280, height: 720 },
+    decorations: { accentBar: { enabled: false }, pageNumber: { show: true, position: "bottom-right", format: "number" } }
+  },
+  "seurat": {
+    id: "seurat", name: "Seurat",
+    colors: { background: "#FDF8EF", surface: "#F0E8D8", primary: "#2A2A1E", secondary: "#6B6B58", accent: "#C67A3C", on_accent: "#FFFFFF", border: "#D9D0C0", table_header_bg: "#E8D8BD", table_header_text: "#2A2A1E", table_row_alt: "#F5F0E5" },
+    typography: { heading: { family: "Arial", weight: 700, letterSpacing: -0.3 }, body: { family: "Arial", weight: 400, lineHeight: 1.6 }, caption: { family: "Arial", weight: 400, transform: "none" }, scale: [44, 32, 24, 18, 14, 12] },
+    spacing: { margin: { top: 60, right: 72, bottom: 52, left: 72 }, gap: 24, paragraph: 14 },
+    slide: { width: 1280, height: 720 },
+    decorations: { accentBar: { enabled: false }, pageNumber: { show: true, position: "bottom-right", format: "number" } }
+  }
+};
+
+const LAYOUTS = {
+  "title": {
+    id: "title", background_override: "none",
+    regions: [
+      { id: "title", role: "title", bounds: { x: 0, y: 160, w: 900, h: 140 }, align: { horizontal: "left", vertical: "bottom" }, fontSize: "title" },
+      { id: "subtitle", role: "subtitle", bounds: { x: 0, y: 320, w: 700, h: 60 }, align: { horizontal: "left", vertical: "top" }, fontSize: "h2", optional: true },
+      { id: "tagline", role: "caption", bounds: { x: 0, y: 420, w: 500, h: 30 }, align: { horizontal: "left", vertical: "top" }, fontSize: "caption", optional: true },
+      { id: "date", role: "caption", bounds: { x: 0, y: 460, w: 300, h: 24 }, align: { horizontal: "left", vertical: "top" }, fontSize: "small", optional: true }
+    ]
+  },
+  "content": {
+    id: "content",
+    regions: [
+      { id: "heading", role: "heading", bounds: { x: 0, y: 0, w: 1136, h: 44 }, align: { horizontal: "left", vertical: "top" }, fontSize: "h1" },
+      { id: "body", role: "body", bounds: { x: 0, y: 64, w: 1136, h: 480 }, align: { horizontal: "left", vertical: "top" }, fontSize: "body" },
+      { id: "footnote", role: "caption", bounds: { x: 0, y: 560, w: 1136, h: 20 }, align: { horizontal: "left", vertical: "bottom" }, fontSize: "small", optional: true }
+    ]
+  },
+  "two-column": {
+    id: "two-column",
+    regions: [
+      { id: "heading", role: "heading", bounds: { x: 0, y: 0, w: 1136, h: 44 }, align: { horizontal: "left", vertical: "top" }, fontSize: "h1" },
+      { id: "left_label", role: "caption", bounds: { x: 0, y: 68, w: 540, h: 24 }, align: { horizontal: "left", vertical: "top" }, fontSize: "caption", optional: true },
+      { id: "left", role: "body", bounds: { x: 0, y: 100, w: 540, h: 460 }, align: { horizontal: "left", vertical: "top" }, fontSize: "body" },
+      { id: "right_label", role: "caption", bounds: { x: 596, y: 68, w: 540, h: 24 }, align: { horizontal: "left", vertical: "top" }, fontSize: "caption", optional: true },
+      { id: "right", role: "body", bounds: { x: 596, y: 100, w: 540, h: 460 }, align: { horizontal: "left", vertical: "top" }, fontSize: "body" }
+    ]
+  },
+  "image-top": {
+    id: "image-top",
+    regions: [
+      { id: "heading", role: "heading", bounds: { x: 0, y: 0, w: 1136, h: 40 }, align: { horizontal: "left", vertical: "top" }, fontSize: "h1" },
+      { id: "image", role: "image", bounds: { x: 0, y: 56, w: 1136, h: 300 }, optional: true },
+      { id: "body", role: "body", bounds: { x: 0, y: 376, w: 1136, h: 200 }, align: { horizontal: "left", vertical: "top" }, fontSize: "body" }
+    ]
+  },
+  "image-left": {
+    id: "image-left",
+    regions: [
+      { id: "heading", role: "heading", bounds: { x: 0, y: 0, w: 1136, h: 40 }, align: { horizontal: "left", vertical: "top" }, fontSize: "h1" },
+      { id: "image", role: "image", bounds: { x: 0, y: 60, w: 520, h: 520 }, optional: true },
+      { id: "body", role: "body", bounds: { x: 568, y: 60, w: 568, h: 520 }, align: { horizontal: "left", vertical: "top" }, fontSize: "body" }
+    ]
+  },
+  "image-right": {
+    id: "image-right",
+    regions: [
+      { id: "heading", role: "heading", bounds: { x: 0, y: 0, w: 1136, h: 40 }, align: { horizontal: "left", vertical: "top" }, fontSize: "h1" },
+      { id: "body", role: "body", bounds: { x: 0, y: 60, w: 520, h: 520 }, align: { horizontal: "left", vertical: "top" }, fontSize: "body" },
+      { id: "image", role: "image", bounds: { x: 568, y: 60, w: 568, h: 520 }, optional: true }
+    ]
+  },
+  "image-bottom": {
+    id: "image-bottom",
+    regions: [
+      { id: "heading", role: "heading", bounds: { x: 0, y: 0, w: 1136, h: 40 }, align: { horizontal: "left", vertical: "top" }, fontSize: "h1" },
+      { id: "body", role: "body", bounds: { x: 0, y: 56, w: 1136, h: 200 }, align: { horizontal: "left", vertical: "top" }, fontSize: "body" },
+      { id: "image", role: "image", bounds: { x: 0, y: 276, w: 1136, h: 300 }, optional: true }
+    ]
+  },
+  "quote": {
+    id: "quote", background_override: "surface",
+    regions: [
+      { id: "quote", role: "quote", bounds: { x: 120, y: 120, w: 896, h: 280 }, align: { horizontal: "center", vertical: "middle" }, fontSize: "h1" },
+      { id: "author", role: "author", bounds: { x: 120, y: 430, w: 896, h: 32 }, align: { horizontal: "center", vertical: "top" }, fontSize: "body", optional: true },
+      { id: "role", role: "caption", bounds: { x: 120, y: 470, w: 896, h: 24 }, align: { horizontal: "center", vertical: "top" }, fontSize: "caption", optional: true }
+    ]
+  },
+  "data-table": {
+    id: "data-table",
+    regions: [
+      { id: "heading", role: "heading", bounds: { x: 0, y: 0, w: 1136, h: 44 }, align: { horizontal: "left", vertical: "top" }, fontSize: "h1" },
+      { id: "description", role: "body", bounds: { x: 0, y: 56, w: 1136, h: 36 }, align: { horizontal: "left", vertical: "top" }, fontSize: "body", optional: true },
+      { id: "table", role: "table", bounds: { x: 0, y: 112, w: 1136, h: 420 }, align: { horizontal: "left", vertical: "top" } },
+      { id: "source", role: "caption", bounds: { x: 0, y: 560, w: 1136, h: 20 }, align: { horizontal: "left", vertical: "bottom" }, fontSize: "small", optional: true }
+    ]
+  },
+  "closing": {
+    id: "closing",
+    regions: [
+      { id: "heading", role: "title", bounds: { x: 140, y: 160, w: 856, h: 120 }, align: { horizontal: "center", vertical: "middle" }, fontSize: "title" },
+      { id: "subtitle", role: "subtitle", bounds: { x: 200, y: 300, w: 736, h: 50 }, align: { horizontal: "center", vertical: "top" }, fontSize: "h2", optional: true },
+      { id: "contact", role: "caption", bounds: { x: 300, y: 400, w: 536, h: 80 }, align: { horizontal: "center", vertical: "top" }, fontSize: "caption", optional: true }
+    ]
+  }
+};
+
+const MANIFEST = {
+  preset: "clean-white",
+  slides: [
+    { layout: "title", content: { title: "MedAI", subtitle: "Transforming Healthcare with Intelligent Diagnostics", tagline: "Early detection. Better outcomes. Lower costs.", date: "March 2026  |  Series A" }, notes: "Open with the core value proposition." },
+    { layout: "content", content: { heading: "The Problem", body: { type: "list", items: ["Diagnostic errors affect 12 million Americans annually", "Average time to diagnosis for rare diseases: 4.8 years", "Radiologist burnout at all-time high \u2014 49% report symptoms", "Rural hospitals lack specialist coverage for 60% of operating hours", "Late-stage cancer detection costs 3\u20135x more than early-stage"] }, footnote: "Sources: BMJ Quality & Safety, AHRQ, Medscape 2025" }, notes: "Frame the problem in human terms first, then financial." },
+    { layout: "two-column", content: { heading: "Our Solution", left_label: "What We Do", left: { type: "list", items: ["AI-assisted diagnostic imaging analysis", "Real-time second opinion for radiologists", "Automated triage and priority flagging", "Multi-modal: CT, MRI, X-ray, pathology"] }, right_label: "How It Works", right: { type: "list", items: ["Integrates into existing PACS workflows", "No hardware changes required", "Results in under 90 seconds", "Explainable AI \u2014 shows reasoning, not just answers"] } }, notes: "Emphasize zero-friction integration." },
+    { layout: "image-top", content: { heading: "Product Demo", image: { type: "image", src: "demo-screenshot.png", alt: "MedAI diagnostic interface" }, body: "Our interface overlays AI analysis directly onto DICOM images. Radiologists see highlighted regions of interest with confidence scores and differential diagnoses \u2014 all within their existing workflow." }, notes: "Show the product. This is where the demo screenshot goes." },
+    { layout: "image-left", content: { image: { type: "image", src: "lung-scan.png", alt: "CT scan with AI overlay" }, heading: "Case Study", body: { type: "list", items: ["92.4% sensitivity, 96.1% specificity", "Detected stage-1 nodule missed by 3 radiologists", "Detection time reduced from 12 min to 47 sec", "Deployed at Johns Hopkins since Q3 2025"] } }, notes: "Real case, real numbers." },
+    { layout: "data-table", content: { heading: "Market Opportunity", description: "AI diagnostics market projected to reach $45.2B by 2030, growing at 34% CAGR.", table: { type: "table", headers: ["Segment", "2025 TAM", "2030 TAM", "CAGR"], rows: [["Radiology AI", "$3.2B", "$12.8B", "32%"], ["Pathology AI", "$1.1B", "$6.4B", "42%"], ["Clinical Decision Support", "$2.8B", "$11.2B", "32%"], ["Remote Diagnostics", "$1.5B", "$14.8B", "58%"]] }, source: "Grand View Research, Markets and Markets" }, notes: "Remote diagnostics is the fastest-growing segment." },
+    { layout: "content", content: { heading: "Traction & Validation", body: { type: "list", items: ["FDA 510(k) cleared for chest X-ray analysis (Nov 2025)", "3 hospital systems in paid pilot", "47% reduction in time-to-diagnosis in pilot deployments", "$1.2M ARR, growing 28% month-over-month"] } }, notes: "Lead with FDA clearance." },
+    { layout: "quote", content: { quote: "MedAI caught a stage-1 lung nodule that three radiologists had missed. That patient is alive today because of this technology.", author: "Dr. Sarah Chen", role: "Chief of Radiology, Johns Hopkins Medicine" }, notes: "Let the doctor tell the story." },
+    { layout: "image-bottom", content: { heading: "Our Team", body: "Founded by a team of physicians, AI researchers, and healthcare operators from Stanford, Johns Hopkins, and Google Health. Combined 60+ years in clinical AI deployment.", image: { type: "image", src: "team-photo.png", alt: "MedAI founding team" } }, notes: "Team photo here." },
+    { layout: "closing", content: { heading: "Let's Save Lives Together", subtitle: "Series A  |  $15M  |  50 hospitals by 2027", contact: "Johnny Lin  |  johnny@medai.health  |  medai.health" }, notes: "Clear ask. Clear milestone." }
+  ]
+};
+
+// ═══════════════════════════════════════════
+// RENDERER
+// ═══════════════════════════════════════════
+const SCALE = { title: 0, h1: 1, h2: 2, body: 3, caption: 4, small: 5 };
+
+function rs(role, p) {
+  const h = p.typography.heading, b = p.typography.body;
+  const m = {
+    title: { color: p.colors.primary, ff: h.family, fw: h.weight, ls: h.letterSpacing },
+    subtitle: { color: p.colors.secondary, ff: h.family, fw: 400 },
+    heading: { color: p.colors.primary, ff: h.family, fw: h.weight, ls: h.letterSpacing },
+    body: { color: p.colors.primary, ff: b.family, fw: b.weight, lh: b.lineHeight },
+    caption: { color: p.colors.secondary, ff: b.family, fw: 400 },
+    quote: { color: p.colors.primary, ff: h.family, fw: h.weight, fs: "italic", lh: 1.4 },
+    author: { color: p.colors.primary, ff: b.family, fw: 700 },
+    table: { color: p.colors.primary, ff: b.family, fw: b.weight },
+  };
+  return m[role] || m.body;
+}
+
+function bg(p, l) {
+  const o = l.background_override;
+  if (o === 'surface') return p.colors.surface;
+  return p.colors.background;
+}
+
+function rc(content, role, p, region) {
+  if (!content) return '';
+  const s = rs(role, p);
+  const sk = region.fontSize || 'body';
+  const fs = p.typography.scale[SCALE[sk]] || 16;
+
+  if (role === 'image') {
+    if (typeof content === 'object' && content.type === 'image') {
+      return `<div style="width:100%;height:100%;border:2px dashed ${p.colors.border};border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${p.colors.surface};">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${p.colors.secondary}" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        <span style="font-family:Arial;font-size:12px;color:${p.colors.secondary};">${content.alt || content.src}</span>
+      </div>`;
+    }
+    return '';
+  }
+
+  if (typeof content === 'object' && content.type === 'table') {
+    const hBg = p.colors.table_header_bg, hT = p.colors.table_header_text;
+    const alt = p.colors.table_row_alt, bc = p.colors.border, tc = p.colors.primary;
+    const tf = fs * 0.9;
+    let h = `<table style="width:100%;border-collapse:collapse;font-family:Arial;font-size:${tf}px;"><thead><tr>`;
+    content.headers.forEach(x => { h += `<th style="background:${hBg};color:${hT};padding:12px 16px;text-align:left;font-weight:700;font-size:${tf*0.9}px;border-bottom:2px solid ${bc};">${x}</th>`; });
+    h += '</tr></thead><tbody>';
+    content.rows.forEach((r, i) => {
+      h += `<tr style="background:${i%2===1?alt:'transparent'};">`;
+      r.forEach((c, j) => { h += `<td style="padding:10px 16px;border-bottom:1px solid ${bc};color:${tc};font-weight:${j===0?500:400};">${c}</td>`; });
+      h += '</tr>';
+    });
+    return h + '</tbody></table>';
+  }
+
+  if (typeof content === 'object' && content.type === 'list') {
+    const g = p.spacing.paragraph;
+    return content.items.map(item =>
+      `<div style="display:flex;align-items:flex-start;margin-bottom:${g}px;font-size:${fs}px;color:${s.color};font-family:${s.ff};font-weight:${s.fw};line-height:${s.lh||1.5};">
+        <span style="color:${p.colors.secondary};margin-right:14px;flex-shrink:0;font-size:7px;margin-top:${fs*0.4}px;">\u25CF</span>
+        <span>${item}</span>
+      </div>`
+    ).join('');
+  }
+
+  if (typeof content === 'string') {
+    let pre = '';
+    if (role === 'quote') pre = `<span style="font-size:${fs*1.5}px;color:${p.colors.secondary};margin-right:2px;">\u201C</span>`;
+    return `<div style="font-size:${fs}px;color:${s.color};font-family:${s.ff};font-weight:${s.fw};font-style:${s.fs||'normal'};line-height:${s.lh||1.3};letter-spacing:${s.ls||0}px;">${pre}${content}</div>`;
+  }
+  return '';
+}
+
+function renderSlide(slide, idx, p, total) {
+  const L = LAYOUTS[slide.layout];
+  if (!L) return '';
+  const W = p.slide.width, H = p.slide.height, m = p.spacing.margin;
+  let html = `<div style="width:${W}px;height:${H}px;position:relative;background:${bg(p,L)};overflow:hidden;">`;
+
+  L.regions.forEach(r => {
+    const c = slide.content[r.id];
+    if (!c && r.optional) return;
+    if (!c) return;
+    const ax = m.left + r.bounds.x, ay = m.top + r.bounds.y;
+    const al = r.align || {};
+    const jc = al.vertical==='middle'?'center':al.vertical==='bottom'?'flex-end':'flex-start';
+    html += `<div style="position:absolute;left:${ax}px;top:${ay}px;width:${r.bounds.w}px;height:${r.bounds.h}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;">`;
+    html += rc(c, r.role, p, r);
+    html += '</div>';
+  });
+
+  html += `<div style="position:absolute;bottom:${m.bottom*0.4}px;right:${m.right}px;font-family:Arial;font-size:${p.typography.scale[5]}px;color:${p.colors.secondary};opacity:0.4;">${idx+1}</div>`;
+  html += '</div>';
+  return html;
+}
+
+// ═══════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════
+let curP = MANIFEST.preset, curS = 0;
+
+function render() {
+  const p = PRESETS[curP], s = MANIFEST.slides[curS], n = MANIFEST.slides.length;
+  const maxW = Math.min(window.innerWidth - 40, 1280);
+  const sc = maxW / p.slide.width;
+  const cv = document.getElementById('slideCanvas');
+  cv.style.width = (p.slide.width*sc)+'px';
+  cv.style.height = (p.slide.height*sc)+'px';
+  cv.innerHTML = `<div style="transform:scale(${sc});transform-origin:top left;width:${p.slide.width}px;height:${p.slide.height}px;">${renderSlide(s,curS,p,n)}</div>`;
+  document.getElementById('slideLabel').textContent = `${curS+1}/${n}  |  layout: ${s.layout}  |  preset: ${curP}`;
+  document.getElementById('speakerNotes').textContent = s.notes ? `Notes: ${s.notes}` : '';
+  document.getElementById('slideNav').innerHTML = MANIFEST.slides.map((_,i) =>
+    `<button class="${i===curS?'active':''}" onclick="go(${i})">${i+1}</button>`
+  ).join('');
+  document.getElementById('presetPicker').innerHTML = Object.values(PRESETS).map(pr =>
+    `<button class="${pr.id===curP?'active':''}" onclick="sp('${pr.id}')">${pr.name}</button>`
+  ).join('');
+}
+function go(i){curS=i;render();}
+function sp(id){curP=id;render();}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '){curS=Math.min(curS+1,MANIFEST.slides.length-1);render();e.preventDefault();}
+  if(e.key==='ArrowLeft'){curS=Math.max(curS-1,0);render();e.preventDefault();}
+});
+window.addEventListener('resize',render);
+render();
+</script>
+</body>
+</html>

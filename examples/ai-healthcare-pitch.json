@@ -1,0 +1,130 @@
+{
+  "_comment": "This is what the LLM outputs when a user says: 'AI in healthcare, investor pitch deck, 7 slides, modern dark style'",
+  "_user_input": "AI在醫療領域的應用，給投資人看的 pitch deck，7頁，風格簡約深色",
+
+  "sloth_version": "0.1.0",
+  "type": "slides",
+  "title": "MedAI — Transforming Healthcare with Intelligent Diagnostics",
+  "author": "Johnny Lin",
+  "created": "2026-03-14T12:00:00Z",
+  "locale": "en",
+  "preset": "minimal-dark",
+
+  "slides": [
+    {
+      "layout": "title",
+      "content": {
+        "title": "MedAI",
+        "subtitle": "Transforming Healthcare with Intelligent Diagnostics",
+        "tagline": "Early detection. Better outcomes. Lower costs.",
+        "date": "March 2026  |  Series A"
+      },
+      "notes": "Open with the core value proposition. Emphasize that this is not just AI — it's AI that saves lives and reduces costs."
+    },
+
+    {
+      "layout": "content",
+      "content": {
+        "heading": "The Problem",
+        "body": {
+          "type": "list",
+          "items": [
+            "Diagnostic errors affect 12 million Americans annually (BMJ, 2024)",
+            "Average time to diagnosis for rare diseases: 4.8 years",
+            "Radiologist burnout at all-time high — 49% report symptoms",
+            "Rural hospitals lack specialist coverage for 60% of operating hours",
+            "Late-stage cancer detection costs 3-5x more than early-stage"
+          ]
+        },
+        "footnote": "Sources: BMJ Quality & Safety, AHRQ, Medscape Physician Burnout Report 2025"
+      },
+      "notes": "Frame the problem in human terms first, then financial. Investors need to feel the urgency."
+    },
+
+    {
+      "layout": "two-column",
+      "content": {
+        "heading": "Our Solution",
+        "left_label": "WHAT WE DO",
+        "left": {
+          "type": "list",
+          "items": [
+            "AI-assisted diagnostic imaging analysis",
+            "Real-time second opinion for radiologists",
+            "Automated triage and priority flagging",
+            "Multi-modal: CT, MRI, X-ray, pathology"
+          ]
+        },
+        "right_label": "HOW IT WORKS",
+        "right": {
+          "type": "list",
+          "items": [
+            "Integrates into existing PACS workflows",
+            "No hardware changes required",
+            "Results in under 90 seconds",
+            "Explainable AI — shows reasoning, not just answers"
+          ]
+        }
+      },
+      "notes": "Emphasize zero-friction integration. Hospitals hate rip-and-replace."
+    },
+
+    {
+      "layout": "data-table",
+      "content": {
+        "heading": "Market Opportunity",
+        "description": "The AI diagnostics market is projected to reach $45.2B by 2030, growing at 34% CAGR.",
+        "table": {
+          "type": "table",
+          "headers": ["Segment", "2025 TAM", "2030 TAM", "CAGR"],
+          "rows": [
+            ["Radiology AI", "$3.2B", "$12.8B", "32%"],
+            ["Pathology AI", "$1.1B", "$6.4B", "42%"],
+            ["Clinical Decision Support", "$2.8B", "$11.2B", "32%"],
+            ["Remote Diagnostics", "$1.5B", "$14.8B", "58%"]
+          ]
+        },
+        "source": "Grand View Research, Markets and Markets, internal analysis"
+      },
+      "notes": "Remote diagnostics is the fastest-growing segment — this is our expansion vector."
+    },
+
+    {
+      "layout": "content",
+      "content": {
+        "heading": "Traction & Validation",
+        "body": {
+          "type": "list",
+          "items": [
+            "FDA 510(k) cleared for chest X-ray analysis (Nov 2025)",
+            "3 hospital systems in paid pilot (Johns Hopkins, Mayo Clinic, Kaohsiung Medical)",
+            "92.4% sensitivity / 96.1% specificity on lung nodule detection benchmark",
+            "47% reduction in time-to-diagnosis in pilot deployments",
+            "$1.2M ARR, growing 28% month-over-month"
+          ]
+        }
+      },
+      "notes": "Lead with FDA clearance — this is the moat. Follow with credible hospital names."
+    },
+
+    {
+      "layout": "quote",
+      "content": {
+        "quote": "MedAI caught a stage-1 lung nodule that three radiologists had missed. That patient is alive today because of this technology.",
+        "author": "Dr. Sarah Chen",
+        "role": "Chief of Radiology, Johns Hopkins Medicine"
+      },
+      "notes": "Let the doctor tell the story. This is more powerful than any metric."
+    },
+
+    {
+      "layout": "closing",
+      "content": {
+        "heading": "Let's Save Lives Together",
+        "subtitle": "Series A  |  $15M  |  Scaling to 50 hospitals by 2027",
+        "contact": "Johnny Lin  |  johnny@medai.health  |  medai.health"
+      },
+      "notes": "Clear ask: $15M Series A. Clear milestone: 50 hospitals. End with contact info."
+    }
+  ]
+}

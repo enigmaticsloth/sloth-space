@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://slothspace.dev/schema/layout.json",
+  "title": "Sloth Space Slide Layout",
+  "description": "Defines a reusable slide layout template with positioned regions that content fills into.",
+  "type": "object",
+  "required": ["id", "name", "category", "regions"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Unique kebab-case identifier",
+      "examples": ["title", "content", "two-column"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name",
+      "examples": ["Title Slide", "Content Slide"]
+    },
+    "category": {
+      "type": "string",
+      "enum": ["opening", "content", "data", "closing"],
+      "description": "Layout category for LLM to select from"
+    },
+    "description": {
+      "type": "string",
+      "description": "When to use this layout (guidance for LLM)"
+    },
+    "background_override": {
+      "type": "string",
+      "enum": ["accent", "gradient", "surface", "none"],
+      "default": "none",
+      "description": "If set, overrides the slide background using preset colors"
+    },
+    "regions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Region" },
+      "minItems": 1,
+      "description": "Positioned content regions on the slide"
+    }
+  },
+  "$defs": {
+    "Region": {
+      "type": "object",
+      "required": ["id", "role", "bounds"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Region identifier. Content keys must match this.",
+          "examples": ["title", "subtitle", "body", "image", "left", "right"]
+        },
+        "role": {
+          "type": "string",
+          "enum": ["title", "subtitle", "heading", "body", "list", "table", "image", "caption", "metric", "quote", "author", "tagline", "decoration"],
+          "description": "Semantic role — determines which typography/color from preset to use"
+        },
+        "bounds": {
+          "type": "object",
+          "required": ["x", "y", "w", "h"],
+          "description": "Position and size in px (base: 1280x720 slide). Values use the MARGIN-RELATIVE coordinate system: x/y are offsets from the preset's margin edges, NOT from the slide edge. The renderer adds margins automatically. Use 0,0 to start at top-left margin corner.",
+          "properties": {
+            "x": { "type": "number", "description": "X offset from left margin (px)" },
+            "y": { "type": "number", "description": "Y offset from top margin (px)" },
+            "w": { "type": "number", "description": "Width (px). Use 'fill' concept: if omitted, fills to right margin." },
+            "h": { "type": "number", "description": "Height (px). Use 'fill' concept: if omitted, fills to bottom margin." }
+          }
+        },
+        "align": {
+          "type": "object",
+          "properties": {
+            "horizontal": { "enum": ["left", "center", "right"], "default": "left" },
+            "vertical": { "enum": ["top", "middle", "bottom"], "default": "top" }
+          }
+        },
+        "maxLines": {
+          "type": "integer",
+          "description": "Max lines of text. Overflow is truncated with ellipsis.",
+          "minimum": 1
+        },
+        "fontSize": {
+          "type": "string",
+          "enum": ["title", "h1", "h2", "body", "caption", "small"],
+          "description": "Maps to preset typography.scale index. Overrides role default."
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, region is hidden when content is not provided"
+        }
+      }
+    }
+  }
+}

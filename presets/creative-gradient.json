@@ -1,0 +1,51 @@
+{
+  "id": "creative-gradient",
+  "name": "Creative Gradient",
+  "description": "Bold gradients, vibrant accent colors, energetic feel. Best for: marketing decks, social media pitches, creative portfolios, hackathon presentations.",
+  "colors": {
+    "background": "#0F0F0F",
+    "surface": "#1C1C2E",
+    "primary": "#FFFFFF",
+    "secondary": "#C4B5FD",
+    "accent": "#A78BFA",
+    "on_accent": "#FFFFFF",
+    "border": "#3B3B5C",
+    "gradient": {
+      "from": "#7C3AED",
+      "to": "#EC4899",
+      "angle": 135
+    }
+  },
+  "typography": {
+    "heading": {
+      "family": "Inter",
+      "weight": 800,
+      "letterSpacing": -1
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400,
+      "lineHeight": 1.6
+    },
+    "caption": {
+      "family": "Inter",
+      "weight": 600,
+      "transform": "uppercase"
+    },
+    "scale": [52, 38, 28, 20, 15, 13]
+  },
+  "spacing": {
+    "margin": { "top": 60, "right": 72, "bottom": 56, "left": 72 },
+    "gap": 28,
+    "paragraph": 16
+  },
+  "slide": {
+    "width": 1280,
+    "height": 720
+  },
+  "decorations": {
+    "divider": { "style": "gradient", "thickness": 2 },
+    "accentBar": { "enabled": true, "position": "bottom", "thickness": 4 },
+    "pageNumber": { "show": true, "position": "bottom-center", "format": "number" }
+  }
+}
