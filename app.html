@@ -54,10 +54,14 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .fn-local-badge { font-size:8px; background:#555; color:#ccc; padding:1px 4px; border-radius:3px; margin-left:4px; }
 
 /* ─── Top bar ─── */
-.topbar { display:flex; align-items:center; padding:8px 20px; background:var(--surface); border-bottom:1px solid var(--border); gap:16px; flex-shrink:0; }
+.topbar { display:flex; align-items:center; padding:8px 20px; background:var(--surface); border-bottom:1px solid var(--border); gap:12px; flex-shrink:0; }
+.topbar-left { display:flex; align-items:center; gap:12px; flex-shrink:0; }
+.topbar-center { flex:1; display:flex; align-items:center; justify-content:center; gap:2px; min-width:0; overflow:hidden; }
+.topbar-right { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto; }
+.topbar-settings-btn { font-size:20px !important; line-height:1 !important; padding:2px 8px !important; }
 .topbar .logo { font-size:28px; font-weight:700; color:var(--text); white-space:nowrap; letter-spacing:-0.5px; }
 .topbar .tagline { font-size:12px; color:#ffffff; white-space:nowrap; margin-left:4px; align-self:flex-end; padding-bottom:4px; }
-.preset-pills { display:flex; gap:3px; margin-left:auto; }
+.preset-pills, .topbar-center { display:flex; gap:3px; }
 .preset-pills button { background:transparent; color:var(--text2); border:1px solid transparent; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
 .preset-pills button:hover { color:#999; }
 .preset-pills button.active { color:#ccc; border-color:var(--border); background:var(--surface2); }
@@ -415,9 +419,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .dt-font-size { width:40px; text-align:center; background:#1a1a1a; color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 4px; font-size:10px; font-family:'Courier New',monospace; -webkit-appearance:none; appearance:none; -moz-appearance:textfield; }
 .dt-font-size::-webkit-inner-spin-button, .dt-font-size::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
 /* Insert (+) menu */
-.insert-plus-btn { background:#7886A5 !important; color:#fff !important; border-radius:4px !important; padding:2px 10px !important; font-size:16px !important; font-weight:700 !important; line-height:1.2 !important; margin:2px 0 !important; min-width:28px; text-align:center; }
+.insert-plus-btn { background:#7886A5 !important; color:#fff !important; border-radius:5px !important; padding:3px 14px !important; font-size:20px !important; font-weight:700 !important; line-height:1 !important; margin:2px 4px 2px 0 !important; min-width:36px; min-height:28px; text-align:center; border:none !important; }
 .insert-plus-btn:hover { background:#8a9cc0 !important; }
-.insert-group { border-right:none !important; }
+.insert-group { border-right:1px solid var(--border) !important; padding-right:6px !important; }
 .insert-menu { position:absolute; top:100%; left:0; margin-top:4px; background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:4px 0; z-index:300; box-shadow:0 6px 24px rgba(0,0,0,0.6); min-width:180px; max-height:320px; overflow-y:auto; }
 .insert-menu-title { font-size:9px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:4px 12px 2px; }
 .insert-menu-item { padding:7px 12px; font-size:11px; color:#ccc; cursor:pointer; transition:background 0.1s; white-space:nowrap; }
@@ -972,20 +976,26 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 <!-- Top bar -->
 <!-- # Goodbye Google. You will never scam me or mess with me again. — Enigmaticsloth -->
 <div class="topbar">
-  <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
-  <div class="logo" onclick="showModePicker()" style="cursor:pointer;" title="Home">Sloth Space</div>
-  <div class="tagline" style="color:#777;">Type what you want. Sloth will design it.</div>
-  <div class="mode-badge" id="modeBadge" onclick="toggleModeSwitchMenu(event)" title="Switch mode">
-    <svg class="mode-badge-icon" id="modeBadgeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-    <span id="modeBadgeLabel">Slide</span>
-    <div class="mode-switch-menu" id="modeSwitchMenu" style="display:none;"></div>
+  <!-- Left: nav + branding + mode -->
+  <div class="topbar-left">
+    <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
+    <div class="logo" onclick="showModePicker()" style="cursor:pointer;" title="Home">Sloth Space</div>
+    <div class="tagline" style="color:#777;">Type what you want. Sloth will design it.</div>
+    <div class="mode-badge" id="modeBadge" onclick="toggleModeSwitchMenu(event)" title="Switch mode">
+      <svg class="mode-badge-icon" id="modeBadgeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+      <span id="modeBadgeLabel">Slide</span>
+      <div class="mode-switch-menu" id="modeSwitchMenu" style="display:none;"></div>
+    </div>
   </div>
-  <div class="preset-pills tb-topbar-slide" id="presetPills"></div>
-  <!-- Unified export area — adapts per mode -->
-  <div class="topbar-exports" id="topbarExports"></div>
-  <button class="export-btn" onclick="openSettings()" title="Settings" style="font-size:20px;line-height:1;padding:2px 8px;">&#9881;</button>
-  <div class="auth-bar" id="authBar">
-    <button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>
+  <!-- Center: preset pills (slide-only, fills remaining space) -->
+  <div class="topbar-center" id="presetPills"></div>
+  <!-- Right: exports + settings + auth (always right-aligned) -->
+  <div class="topbar-right">
+    <div class="topbar-exports" id="topbarExports"></div>
+    <button class="export-btn topbar-settings-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+    <div class="auth-bar" id="authBar">
+      <button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>
+    </div>
   </div>
   <input type="file" id="fileInput" accept=".json,.sloth" style="display:none;" onchange="handleFileLoad(event)">
 </div>
@@ -1408,7 +1418,28 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   </div>
   <!-- Unified toolbar (adapts to current mode) -->
   <div class="toolbar" id="unifiedToolbar">
-    <!-- Undo/Redo (all modes) -->
+    <!-- INSERT (+) — leftmost, prominent -->
+    <div class="dt-group insert-group" style="position:relative;">
+      <button class="dt-btn insert-plus-btn" id="insertPlusBtn" onclick="toggleInsertMenu(event)" title="Insert">
+        <span>+</span>
+      </button>
+      <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleInsertedFiles(this.files)">
+      <div class="insert-menu" id="insertMenu" style="display:none;">
+        <div class="insert-menu-title">Insert</div>
+        <div class="insert-menu-item" onclick="triggerLocalImageInsert()">🖼 Image (local file)</div>
+        <div class="insert-menu-item" onclick="triggerUrlImageInsert()">🔗 Image (URL)</div>
+        <div class="insert-menu-item tb-doc-only" onclick="docInsertDivider();hideInsertMenu()">— Divider</div>
+        <div class="insert-menu-item tb-doc-only" onclick="docInsertTablePrompt();hideInsertMenu()">⊞ Table (AI)</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: content]');hideInsertMenu()">📄 Layout: Content</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: two-column]');hideInsertMenu()">📑 Layout: Two Column</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-top]');hideInsertMenu()">🖼 Layout: Image Top</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-left]');hideInsertMenu()">◧ Layout: Image Left</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-right]');hideInsertMenu()">◨ Layout: Image Right</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: quote]');hideInsertMenu()">❝ Layout: Quote</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: data-table]');hideInsertMenu()">📊 Layout: Data Table</div>
+      </div>
+    </div>
+    <!-- Undo/Redo -->
     <div class="undo-redo-group">
       <button class="undo-redo-btn" id="undoBtn" onclick="modeUndo()" title="Undo (Ctrl+Z)">&#8630;</button>
       <button class="undo-redo-btn" id="redoBtn" onclick="modeRedo()" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
@@ -1426,7 +1457,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         <option value="numbered">1. Numbered</option>
       </select>
     </div>
-    <!-- Shared: Text formatting -->
+    <!-- Text formatting -->
     <div class="dt-group">
       <button class="dt-btn" onclick="modeExecCmd('bold')" title="Bold (Ctrl+B)"><strong>B</strong></button>
       <button class="dt-btn" onclick="modeExecCmd('italic')" title="Italic (Ctrl+I)"><em>I</em></button>
@@ -1435,7 +1466,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       <button class="dt-btn" onclick="modeExecCmd('superscript')" title="Superscript">X<sup style="font-size:8px;">²</sup></button>
       <button class="dt-btn" onclick="modeExecCmd('subscript')" title="Subscript">X<sub style="font-size:8px;">₂</sub></button>
     </div>
-    <!-- Shared: Font family & size -->
+    <!-- Font family & size -->
     <div class="dt-group">
       <select class="dt-select" id="dtFontFamily" onchange="modeToolbarFont(this.value)" title="Font family">
         <option value="Arial">Arial</option>
@@ -1451,7 +1482,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       </select>
       <input type="number" class="dt-font-size" id="dtFontSize" value="15" min="8" max="72" onchange="modeToolbarFontSize(this.value)" title="Font size (px)">
     </div>
-    <!-- Shared: Colors -->
+    <!-- Colors -->
     <div class="dt-group">
       <label title="Text color" style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:0 4px;border-top:1px solid var(--border);font-size:10px;color:#aaa;">
         A <input type="color" id="dtTextColor" value="#e0e0e0" onchange="modeToolbarTextColor(this.value)" style="width:18px;height:18px;border:none;background:none;cursor:pointer;padding:0;">
@@ -1460,30 +1491,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         <span style="background:#7886A5;color:#fff;padding:0 3px;border-radius:2px;font-size:9px;">bg</span>
         <input type="color" id="dtBgColor" value="#1e1e1e" onchange="modeToolbarBgColor(this.value)" style="width:18px;height:18px;border:none;background:none;cursor:pointer;padding:0;">
       </label>
-    </div>
-    <!-- Shared: Insert (+) menu -->
-    <div class="dt-group insert-group" style="position:relative;">
-      <button class="dt-btn insert-plus-btn" id="insertPlusBtn" onclick="toggleInsertMenu(event)" title="Insert">
-        <span>+</span>
-      </button>
-      <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleInsertedFiles(this.files)">
-      <div class="insert-menu" id="insertMenu" style="display:none;">
-        <div class="insert-menu-title">Insert</div>
-        <!-- Shared items -->
-        <div class="insert-menu-item" onclick="triggerLocalImageInsert()">🖼 Image (local file)</div>
-        <div class="insert-menu-item" onclick="triggerUrlImageInsert()">🔗 Image (URL)</div>
-        <!-- Doc-only items -->
-        <div class="insert-menu-item tb-doc-only" onclick="docInsertDivider();hideInsertMenu()">— Divider</div>
-        <div class="insert-menu-item tb-doc-only" onclick="docInsertTablePrompt();hideInsertMenu()">⊞ Table (AI)</div>
-        <!-- Slide-only items -->
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: content]');hideInsertMenu()">📄 Layout: Content</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: two-column]');hideInsertMenu()">📑 Layout: Two Column</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-top]');hideInsertMenu()">🖼 Layout: Image Top</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-left]');hideInsertMenu()">◧ Layout: Image Left</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-right]');hideInsertMenu()">◨ Layout: Image Right</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: quote]');hideInsertMenu()">❝ Layout: Quote</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: data-table]');hideInsertMenu()">📊 Layout: Data Table</div>
-      </div>
     </div>
     <!-- Doc-only: Zoom -->
     <div class="dt-group tb-doc-only" style="display:none;">
@@ -4141,7 +4148,7 @@ const MODE_EXPORTS={
 function updateTopbarForMode(mode){
   // Preset pills: only for slide mode
   const pills=document.getElementById('presetPills');
-  if(pills) pills.style.display=(mode==='slide')?'':'none';
+  if(pills) pills.style.display=(mode==='slide')?'flex':'none';
 
   // Export buttons: mode-specific
   const exArea=document.getElementById('topbarExports');
@@ -4298,10 +4305,17 @@ function docZoomReset(){
   applyDocZoom();
 }
 function applyDocZoom(){
+  // Apply zoom to the entire doc canvas so the page + margins all scale together
+  // Using CSS zoom (well-supported) so scrollbar and layout adjust naturally
+  const canvas=document.getElementById('docCanvas');
+  if(canvas){
+    canvas.style.zoom=(docZoomLevel/100);
+  }
+  // Clear any old transform on docPage from previous version
   const page=document.getElementById('docPage');
   if(page){
-    page.style.transform=`scale(${docZoomLevel/100})`;
-    page.style.transformOrigin='top center';
+    page.style.transform='';
+    page.style.transformOrigin='';
   }
   const label=document.getElementById('docZoomLabel');
   if(label) label.textContent=docZoomLevel+'%';
@@ -6066,19 +6080,22 @@ For slides: {"intent":"content_edit","slide":N or null,"region":"regionId" or nu
 For docs: {"intent":"content_edit"}
 Examples: "改標題", "第三頁的內容豐富一點", "rewrite the body text"
 
-"generate" — create new content: slides/deck, doc/article, add new content.
-Examples: "做一份AI簡報", "加三頁", "寫一篇文章", "generate an article about stem cells", "做吧", "make a 5-page pitch deck", "寫一篇幹細胞的文章"
+"generate" — create new content: slides/deck, doc/article, add new content. Also when user gives a TOPIC they want written about.
+Examples: "做一份AI簡報", "加三頁", "寫一篇文章", "generate an article about stem cells", "做吧", "make a 5-page pitch deck", "寫一篇幹細胞的文章", "生成海膽的介紹", "介紹量子力學", "寫關於咖啡的文章", "生成XX介紹", "XX的介紹"
 
 "chat" — just conversation, greetings, questions, no action needed.
 Examples: "你好", "這是什麼app", "hello", "what can you do"
 
 RULES:
 - Check the [Context] for the current mode (slide/doc/sheet/workspace).
-- In DOC mode: if the user gives a TOPIC or asks to write/generate content → "generate". If they ask to edit existing content → "content_edit" or "deck_edit".
+- In DOC mode: if the user gives a TOPIC or asks to write/generate/create content → ALWAYS "generate". If they ask to edit existing content → "content_edit" or "deck_edit".
+- CRITICAL: In DOC mode, phrases like "生成X", "寫X", "介紹X", "X的介紹", "generate X", "write about X", "create an article about X" are ALL "generate" intent. Do NOT ask clarifying questions. Do NOT choose "chat". Always route to "generate" when the user mentions a topic they want content about.
 - In SLIDE mode: standard slide-related routing as before.
 - When the user gives a TOPIC or confirms ("好","OK","做吧","go"), choose "generate".
+- When in doubt between "chat" and "generate": if the user mentions ANY topic or subject they want created/written → ALWAYS choose "generate".
 - When in doubt between "content_edit" and "generate": if editing existing content→content_edit, if creating new→generate.
 - "image" and "style" only apply in slide mode. In doc mode, route to "generate" or "content_edit" instead.
+- NEVER choose "chat" when the user is clearly asking for content creation in doc mode.
 
 Output ONLY the JSON object.`;
 
@@ -6606,6 +6623,16 @@ async function sendMessage(){
       intent=routerData.intent||'chat';
     }catch(e){
       console.warn('Router parse failed:',e,'raw:',routerRaw);
+    }
+
+    // ── Doc mode safety net: if router says "chat" but message looks like a content request, override to "generate" ──
+    if(currentMode==='doc'&&intent==='chat'){
+      const docGenPattern=/^(生成|寫|介紹|撰寫|create|write|generate|draft|compose|explain|描述|說明|整理)/i;
+      const topicPattern=/(的介紹|的文章|的報告|的說明|about\s+\w|article|report|essay|document)/i;
+      if(docGenPattern.test(trimText)||topicPattern.test(trimText)){
+        intent='generate';
+        console.log('Router override: chat→generate for doc mode topic request');
+      }
     }
 
     // ── Dispatch based on router intent ──
