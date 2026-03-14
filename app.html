@@ -4337,33 +4337,43 @@ renderApp();
 (function(){
   const DEMOS=[
     {
-      prompt:'Make a pitch deck about AI startups',
-      aiReply:'Creating a 6-slide pitch deck with Monet palette...',
+      prompt:'Create a pitch deck for Sloth Space, an AI presentation tool',
+      aiReply:'Got it! Generating a 6-slide deck with Monet palette \u2014 cover, features, demo, architecture, roadmap, and closing...',
       slide:{
         bg:'linear-gradient(135deg,#E8DDD0,#D8CEBE)',
-        title:'The Future of AI',titleColor:'#4A5D7A',
-        subtitle:'A New Era of Innovation',subtitleColor:'#7886A5',
-        body:'Market size \u2022 Technology \u2022 Team \u2022 Vision',bodyColor:'#6B7B6B'
+        title:'Sloth Space',titleColor:'#4A5D7A',
+        subtitle:'AI-Native Presentations, Reimagined',subtitleColor:'#7886A5',
+        body:'Just describe what you need.\nSloth turns your words into beautiful slides \u2014 instantly.',bodyColor:'#6B7B6B'
       }
     },
     {
-      prompt:'\u7522\u751F\u4E00\u4EFD\u5B63\u5EA6\u5831\u544A',
-      aiReply:'\u6B63\u5728\u7522\u751F Q4 \u5831\u544A\uFF0C\u5305\u542B\u8CA1\u52D9\u6458\u8981...',
+      prompt:'Build a startup investor deck with market analysis and financials',
+      aiReply:'Creating an investor deck with TAM/SAM/SOM breakdown, competitive landscape, revenue projections, and team slides...',
       slide:{
         bg:'linear-gradient(135deg,#7886A5,#9BA8C4)',
-        title:'Q4 Report',titleColor:'#fff',
-        subtitle:'2026 \u5E74\u7B2C\u56DB\u5B63\u5EA6',subtitleColor:'rgba(255,255,255,0.8)',
-        body:'\u71DF\u6536\u589E\u9577 23% \u2022 \u5BA2\u6236\u6EFF\u610F\u5EA6 94%',bodyColor:'rgba(255,255,255,0.6)'
+        title:'Series A Funding',titleColor:'#fff',
+        subtitle:'NovaMind \u2014 Redefining Personalized Learning',subtitleColor:'rgba(255,255,255,0.85)',
+        body:'$4.2B TAM \u2022 3x YoY Growth \u2022 12K Active Users\n85% Retention \u2022 $1.8M ARR',bodyColor:'rgba(255,255,255,0.6)'
       }
     },
     {
-      prompt:'Design a creative portfolio showcase',
-      aiReply:'Building a portfolio with Seurat-inspired colors...',
+      prompt:'Design a product launch presentation with bold visuals',
+      aiReply:'Building a launch deck with Seurat-inspired accents \u2014 hero slide, key features, pricing tiers, and call to action...',
       slide:{
         bg:'linear-gradient(135deg,#2D4A3E,#3A5A4E)',
-        title:'Creative Works',titleColor:'#E8C56D',
-        subtitle:'Portfolio 2026',subtitleColor:'#A8D5A2',
-        body:'Photography \u2022 Design \u2022 Illustration',bodyColor:'rgba(255,255,255,0.5)'
+        title:'Introducing Arc',titleColor:'#E8C56D',
+        subtitle:'The Smartest Way to Manage Your Workflow',subtitleColor:'#A8D5A2',
+        body:'Automate \u2022 Collaborate \u2022 Ship Faster\nFrom idea to production in half the time.',bodyColor:'rgba(255,255,255,0.5)'
+      }
+    },
+    {
+      prompt:'Make a quarterly business review with KPIs and team highlights',
+      aiReply:'Generating Q4 review \u2014 executive summary, revenue dashboard, customer metrics, OKR scorecard, and next quarter outlook...',
+      slide:{
+        bg:'linear-gradient(135deg,#3A2E4A,#5A4E6A)',
+        title:'Q4 Business Review',titleColor:'#E8D5A3',
+        subtitle:'FY2026 \u2014 Exceeding Every Benchmark',subtitleColor:'rgba(232,213,163,0.7)',
+        body:'Revenue +23% \u2022 NPS 78 \u2022 Churn < 2%\nNew Markets: APAC, LATAM \u2022 Team +40%',bodyColor:'rgba(255,255,255,0.5)'
       }
     }
   ];
@@ -4397,7 +4407,7 @@ renderApp();
       if(pi<=demo.prompt.length){
         promptEl.textContent=demo.prompt.slice(0,pi);
         pi++;
-        animTimer=setTimeout(typePrompt,35+Math.random()*25);
+        animTimer=setTimeout(typePrompt,18+Math.random()*12);
       }else{
         // Phase 2: Show user message
         animTimer=setTimeout(showUserMsg,400);
