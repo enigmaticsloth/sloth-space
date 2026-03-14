@@ -406,12 +406,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="table"] .table-add-row:hover { color:#aaa; border-color:#666; }
 
 /* Drag handle */
-.doc-block-handle { position:absolute; left:-28px; top:50%; transform:translateY(-50%); width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#555; border-radius:3px; z-index:5; }
-/* For fit-content blocks (image, table), handle goes inside top-right so it stays reachable */
+.doc-block-handle { position:absolute; right:4px; top:4px; width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#666; border-radius:4px; z-index:5; background:rgba(255,255,255,0.04); }
 .doc-block[data-type="image"] .doc-block-handle,
-.doc-block[data-type="table"] .doc-block-handle { left:auto; right:4px; top:4px; transform:none; background:rgba(0,0,0,0.5); color:#aaa; border-radius:4px; padding:2px; }
+.doc-block[data-type="table"] .doc-block-handle { background:rgba(0,0,0,0.5); color:#aaa; padding:2px; }
 .doc-block:hover .doc-block-handle, .doc-block.selected .doc-block-handle { opacity:1; }
-.doc-block-handle:hover { color:#999; background:rgba(255,255,255,0.05); }
+.doc-block-handle:hover { color:#ccc; background:rgba(255,255,255,0.1); }
 .doc-block-handle:active { cursor:grabbing; }
 
 /* Block type selector menu */
@@ -5112,12 +5111,11 @@ function renderDocMode(){
     return `<div class="doc-block${selected}" data-type="${block.type}" data-block-id="${block.id}"${numAttr}
       contenteditable="${isEditing?'true':'false'}"
       data-placeholder="${placeholder}"
-      onmousedown="docTextBlockMousedown(event,'${block.id}')"
       onfocus="docFocusBlock('${block.id}')"
       onblur="docBlurBlock('${block.id}')"
       oninput="docInputBlock('${block.id}')"
       onkeydown="docKeydownBlock(event,'${block.id}')"
-      onclick="docSelectBlock('${block.id}',event)">
+      onclick="docTextBlockClick(event,'${block.id}')">
       <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder" contenteditable="false">⠿</div>${renderBlockContent(block)}</div>`;
   }).join('\n');
 
@@ -5168,23 +5166,26 @@ function renderBlockContent(block){
 
 let docLastClickedBlock=null;
 let docClickTimer=null;
-// First click on text block → select only (no edit). Second click → enter edit mode.
-function docTextBlockMousedown(event, blockId){
+// Click on text block: first click → select, second click → edit.
+// Uses onclick (not onmousedown) so mobile scroll gestures are never blocked.
+function docTextBlockClick(event, blockId){
   if(event.target.closest('.doc-block-handle')) return;
   if(docSelectedBlockId!==blockId){
-    // First click: just select, block is contenteditable=false so no focus happens naturally
+    // First click: select only
     docSelectBlock(blockId, event);
     return;
   }
-  // Second click: block already selected → make editable and focus
-  if(!docEditingBlockId||docEditingBlockId!==blockId){
+  // Already selected → enter edit mode
+  if(docEditingBlockId!==blockId){
     const el=event.currentTarget;
     if(el){
       el.contentEditable='true';
-      // Focus after a microtask so the browser picks up the contenteditable change
       setTimeout(()=>el.focus(),0);
     }
+    return;
   }
+  // Already editing → normal click behavior (cursor placement handled by browser)
+  docSelectBlock(blockId, event);
 }
 
 function docSelectBlock(blockId, e){
