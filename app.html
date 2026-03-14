@@ -1125,6 +1125,34 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       </div>
 
     </div>
+
+    <!-- Workspace card (full width below the three) -->
+    <div class="mode-card mode-card-wide" onclick="pickMode('workspace')">
+      <div class="mode-card-demo">
+        <span class="mode-card-badge soon">Coming Soon</span>
+        <div class="mc-ws-preview">
+          <div class="mc-ws-sidebar">
+            <div class="mc-ws-dot active"></div>
+            <div class="mc-ws-dot"></div>
+            <div class="mc-ws-dot"></div>
+            <div class="mc-ws-dot dim"></div>
+          </div>
+          <div class="mc-ws-main">
+            <div class="mc-ws-row"><div class="mc-ws-thumb slide"></div><div class="mc-ws-meta"><div class="mc-ws-name"></div><div class="mc-ws-date"></div></div></div>
+            <div class="mc-ws-row"><div class="mc-ws-thumb doc"></div><div class="mc-ws-meta"><div class="mc-ws-name w60"></div><div class="mc-ws-date"></div></div></div>
+            <div class="mc-ws-row"><div class="mc-ws-thumb sheet"></div><div class="mc-ws-meta"><div class="mc-ws-name w80"></div><div class="mc-ws-date"></div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="mode-card-info">
+        <div class="mode-card-icon" style="background:linear-gradient(135deg,#8B7BA8,#A899C4);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="mode-card-name">Workspace</div>
+        <div class="mode-card-desc">Your project hub. Manage all docs, slides, and sheets in one place. Cross-file AI, split view, activity timeline.</div>
+      </div>
+    </div>
+
     <button class="mp-back" onclick="showWelcomeFromPicker()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
       Settings
