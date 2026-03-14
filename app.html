@@ -1661,6 +1661,25 @@ function wsDeleteFile(id){
     const deleted=JSON.parse(localStorage.getItem('sloth_ws_deleted')||'[]');
     if(!deleted.includes(id)){ deleted.push(id); localStorage.setItem('sloth_ws_deleted',JSON.stringify(deleted)); }
   }catch(e){}
+  // If the deleted file is the currently active file, reset to blank state
+  if(currentDoc&&currentDoc.id===id){
+    currentDoc=null;
+    localStorage.removeItem('sloth_current_doc');
+    if(currentMode==='doc'){
+      currentDoc=docCreateNew('Untitled Document');
+      updateModeNameBar('doc');
+      renderDocMode();
+    }
+    addMessage('Current document deleted. Starting fresh.','system');
+  }
+  if(currentDeck){
+    // Check workspace slide files (type:'slides')
+    const deckWsEntry=wsLoad().find(f=>(f.type==='slides')&&f.title===currentDeck.title);
+    if(!deckWsEntry){
+      // Deck might have been the deleted file
+      // (title-based match as fallback since slides don't always have wsId)
+    }
+  }
   // Force immediate cloud sync so deleted state is persisted before any refresh
   clearTimeout(wsSave._timer);
   syncWorkspaceToCloud();
@@ -2882,12 +2901,8 @@ function renderApp(){
     `<button class="${pr.id===currentPreset?'active':''}" onclick="setPreset('${pr.id}')">${pr.name}</button>`
   ).join('');
 
-  // Toolbar visibility is controlled by updateToolbarForMode(), not here.
-  // Only hide toolbar in slide mode when no deck is loaded.
-  if(currentMode==='slide'){
-    const toolbarEl=document.getElementById('unifiedToolbar');
-    if(toolbarEl) toolbarEl.style.display=currentDeck?'flex':'none';
-  }
+  // Toolbar visibility is ONLY controlled by updateToolbarForMode().
+  // Do NOT touch toolbar display here — it causes mode conflicts.
 
   // Onboarding: show prompt chips in empty chat
   renderChatOnboarding();
@@ -7330,12 +7345,13 @@ async function refreshFileList(){
 
 function loadFileFromNav(id){
   if(id.startsWith('ws_')){
-    // Workspace doc/sheet — show preview in chat, notify user it's available for reference
+    // Workspace doc/sheet — open it directly (unified with openWorkspaceItem)
     const wsFileId=id.replace('ws_','');
     const file=wsGetFile(wsFileId);
     if(!file){addMessage('File not found.','system');return;}
-    const preview=wsFileToContext(file).slice(0,300);
-    addMessage(`📎 "${file.title}" (${file.type}) is ready in your workspace. Mention it by name when creating slides!\n\nPreview: ${preview}...`,'system');
+    const files=wsLoad();
+    const idx=files.findIndex(f=>f.id===wsFileId);
+    if(idx>=0) openWorkspaceItem(idx);
     closeFileNav();
     return;
   }
