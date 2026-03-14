@@ -416,11 +416,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .wb-config { position:fixed; top:5vh; left:5vw; right:5vw; bottom:5vh; background:rgba(18,18,18,0.97); border-radius:14px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); opacity:0; pointer-events:none; padding:22px 20px; overflow-y:auto; }
   .wb-config.active { opacity:1; pointer-events:auto; }
   /* Mobile splash: show demo first */
-  .wb-mobile-splash { display:flex; flex-direction:column; width:100%; height:85vh; }
+  .wb-mobile-splash { display:flex; flex-direction:column; width:100%; height:92vh; }
   .wb-mobile-splash .splash-content { height:100%; }
   .wb-mobile-splash .demo-panel { flex:1; min-height:0; display:flex; flex-direction:column; padding:14px; gap:8px; }
-  .wb-mobile-splash .demo-slide-area { flex:none; height:32vh; min-height:160px; }
-  .wb-mobile-splash .demo-chat-area { flex:none; height:22vh; min-height:120px; }
+  .wb-mobile-splash .demo-slide-area { flex:3; min-height:140px; }
+  .wb-mobile-splash .demo-chat-area { flex:3; min-height:130px; }
   .wb-mobile-splash .splash-cta { padding:16px 20px; text-align:center; flex-shrink:0; }
   .wb-mobile-splash .splash-cta-btn { width:100%; padding:14px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; font-family:Arial; box-shadow:0 4px 16px rgba(120,134,165,0.4); }
   .wb-mobile-splash .splash-skip { font-size:11px; color:#666; margin-top:10px; cursor:pointer; }
@@ -582,9 +582,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .wb-right { display:none; }
   .wb-config { position:fixed; top:3vh; left:3vw; right:3vw; bottom:3vh; background:rgba(18,18,18,0.97); border-radius:12px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); padding:20px 16px; overflow-y:auto; }
   .wb-config.active { opacity:1; pointer-events:auto; }
-  .wb-mobile-splash { height:80vh; }
-  .wb-mobile-splash .demo-slide-area { height:28vh; }
-  .wb-mobile-splash .demo-chat-area { height:18vh; }
+  .wb-mobile-splash { height:90vh; }
+  .wb-mobile-splash .demo-slide-area { flex:3; min-height:120px; }
+  .wb-mobile-splash .demo-chat-area { flex:3; min-height:110px; }
   .welcome-box .wb-logo { font-size:32px; }
   .wb-provider-row { flex-direction:column; gap:8px; }
   .wb-products { gap:12px; }
@@ -2147,7 +2147,7 @@ function finishWelcome() {
 function _commitWelcomeConfig(defaults, isCloud){
   saveConfig();
   syncConfigToCloud();
-  document.getElementById('welcomeOverlay').classList.add('hidden');
+  enterSlides();
 }
 
 // ═══════════════════════════════════════════
@@ -2242,15 +2242,20 @@ function restoreConfigFromCloud(user){
 }
 
 function skipWelcome() {
-  document.getElementById('welcomeOverlay').classList.add('hidden');
+  enterSlides();
 }
 
+function enterSlides(){
+  document.getElementById('welcomeOverlay').classList.add('hidden');
+  sessionStorage.setItem('sloth_active','1');
+}
 function checkWelcomeScreen() {
   const hasConfig = loadConfig();
-  if (hasConfig && isConfigured()) {
-    document.getElementById('welcomeOverlay').classList.add('hidden');
+  // Only skip welcome if user was actively on slides (refresh), not fresh tab/URL entry
+  if (hasConfig && isConfigured() && sessionStorage.getItem('sloth_active')) {
+    enterSlides();
   }
-  // Otherwise welcome stays visible — on mobile, CSS handles showing splash vs form
+  // Otherwise welcome/demo stays visible
 }
 
 // ═══════════════════════════════════════════
@@ -2503,7 +2508,7 @@ function setAuthUser(user){
       saveConfig();
     }
     if(restored&&isConfigured()){
-      document.getElementById('welcomeOverlay').classList.add('hidden');
+      enterSlides();
       addMessage('☁️ Settings synced from cloud.','system');
     }
     // Also sync workspace files from cloud
@@ -2558,8 +2563,8 @@ document.addEventListener('click',function(e){
 function showWelcome(){
   const overlay=document.getElementById('welcomeOverlay');
   overlay.classList.remove('hidden');
-  // On mobile: not logged in → show demo splash (CSS handles display)
-  // Reset to splash view (remove form-active so demo shows)
+  sessionStorage.removeItem('sloth_active');
+  // On mobile: reset to splash view (demo first)
   const box=document.getElementById('welcomeBox');
   if(box) box.classList.remove('mobile-form-active');
   // Make sure config panel is hidden
@@ -4255,7 +4260,7 @@ function checkShareLink(){
       document.getElementById('chatMessages').innerHTML='';
       addMessage(`✓ Loaded shared deck: "${currentDeck.title||'Untitled'}" (${currentDeck.slides.length} slides)`,'system');
       // Hide welcome if showing
-      document.getElementById('welcomeOverlay').classList.add('hidden');
+      enterSlides();
       renderApp();
     }
   }).catch(e=>{
