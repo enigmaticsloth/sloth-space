@@ -165,6 +165,24 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .send-btn { background:#c0c0c0; color:#333; border:none; border-radius:4px; padding:0 18px; cursor:pointer; font-size:11px; font-family:Arial; font-weight:600; align-self:flex-end; height:34px; }
 .send-btn:hover { background:#d0d0d0; color:#222; }
 
+/* ─── Image staging area ─── */
+.img-attach-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text2); width:34px; height:34px; border-radius:4px; cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; flex-shrink:0; align-self:flex-end; transition:all 0.15s; }
+.img-attach-btn:hover { color:var(--text); border-color:#555; background:var(--surface); }
+.img-staging { display:none; padding:4px 10px 0; gap:6px; flex-wrap:wrap; align-items:center; }
+.img-staging.has-images { display:flex; }
+.img-thumb { position:relative; width:48px; height:48px; border-radius:4px; overflow:hidden; border:1px solid var(--border); flex-shrink:0; }
+.img-thumb img { width:100%; height:100%; object-fit:cover; }
+.img-thumb-remove { position:absolute; top:-2px; right:-2px; background:#333; color:#ccc; border:none; width:16px; height:16px; border-radius:50%; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; }
+.img-thumb-remove:hover { background:#e74c3c; color:#fff; }
+.img-staging-label { font-size:10px; color:var(--text2); font-family:Arial; }
+/* Drag-drop overlay */
+.drop-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(91,155,213,0.15); z-index:999; align-items:center; justify-content:center; pointer-events:none; }
+.drop-overlay.show { display:flex; }
+.drop-overlay-inner { background:var(--surface); border:3px dashed #5B9BD5; border-radius:16px; padding:40px 60px; text-align:center; }
+.drop-overlay-inner .drop-icon { font-size:48px; margin-bottom:12px; }
+.drop-overlay-inner .drop-text { font-size:16px; color:var(--text); font-family:Arial; font-weight:600; }
+.drop-overlay-inner .drop-hint { font-size:11px; color:var(--text2); font-family:Arial; margin-top:6px; }
+
 /* Region selection */
 .region-box { cursor:pointer; transition:outline 0.15s,box-shadow 0.15s; }
 .region-box:hover { outline:2px dashed rgba(255,255,255,0.25); outline-offset:2px; }
@@ -494,6 +512,12 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     border-radius:8px;
     flex-shrink:0; align-self:flex-end;
   }
+
+  /* --- Image staging: compact on mobile --- */
+  .img-staging { padding:2px 8px 0; gap:4px; }
+  .img-thumb { width:36px; height:36px; }
+  .img-staging-label { font-size:9px; }
+  .img-attach-btn { width:30px; height:30px; font-size:16px; }
 
   /* --- Overlay panels: full-width --- */
   .file-nav { width:85vw; max-width:320px; }
@@ -907,10 +931,23 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       <button class="undo-redo-btn" id="redoBtn" onclick="redo()" disabled title="Redo (Ctrl+Shift+Z)">&#8631;<span class="undo-label">Redo</span></button>
     </div>
   </div>
+  <div class="img-staging" id="imgStaging">
+    <span class="img-staging-label">📎 Attached:</span>
+  </div>
   <div class="input-area" id="inputArea">
     <button class="input-toggle" id="inputToggle" onclick="toggleInputSize()" title="Expand / Collapse">&#9650;</button>
+    <button class="img-attach-btn" onclick="document.getElementById('imgFileInput').click()" title="Attach image">+</button>
+    <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleImageFiles(this.files)">
     <textarea id="chatInput" placeholder="Tell Sloth what you need — a pitch deck, quarterly report, project proposal... Press Enter and your slides will appear."></textarea>
     <button class="send-btn" onclick="sendMessage()">Send</button>
+  </div>
+</div>
+<!-- Drag-drop overlay -->
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-overlay-inner">
+    <div class="drop-icon">🖼️</div>
+    <div class="drop-text">Drop images here</div>
+    <div class="drop-hint">They'll be staged for your next command</div>
   </div>
 </div>
 
@@ -1243,7 +1280,19 @@ function rc(content,role,p,region,colorOv,fontSizeOv){
   const fs=fontSizeOv||p.typography.scale[SC[sk]]||16;
 
   if(role==='image'){
+    if(typeof content==='object'&&content.type==='image'&&content.dataUrl){
+      // Real image with data URL — render actual image
+      const imgStyle=content.fit||'contain'; // contain, cover, or fill
+      const imgW=content.displayW?content.displayW+'px':'100%';
+      const imgH=content.displayH?content.displayH+'px':'100%';
+      const offX=content.offsetX||0;
+      const offY=content.offsetY||0;
+      return `<div style="width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+        <img src="${content.dataUrl}" alt="${content.alt||content.name||'Image'}" style="width:${imgW};height:${imgH};object-fit:${imgStyle};transform:translate(${offX}px,${offY}px);pointer-events:none;">
+      </div>`;
+    }
     if(typeof content==='object'&&content.type==='image'){
+      // Placeholder (no image data yet)
       return `<div style="width:100%;height:100%;border:2px dashed ${p.colors.border};border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${p.colors.surface};">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${p.colors.secondary}" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
         <span style="font-family:Arial;font-size:12px;color:${p.colors.secondary};">${content.alt||content.src||'Image'}</span>
@@ -2665,6 +2714,157 @@ async function callLLM(systemContent,messages,opts={}){
   return data.choices?.[0]?.message?.content||'';
 }
 
+// ═══════════════════════════════════════════
+// IMAGE COMMANDS (local, no LLM needed)
+// ═══════════════════════════════════════════
+function isImageCommand(text){
+  return /圖片|圖|image|img|photo|照片|加[到入].*[頁張]|放[到入].*[頁張]|insert|縮小|放大|等比|寬一點|窄一點|高一點|低一點|向左|向右|向上|向下|左移|右移|上移|下移|move.*left|move.*right|bigger|smaller|resize|scale/i.test(text);
+}
+
+function handleImageCommand(text,images){
+  if(!currentDeck){
+    if(images.length>0){
+      addMessage('Please create a deck first, then I can place images into slides.','system');
+    }
+    return null;
+  }
+
+  // ── Place new images into a slide ──
+  if(images.length>0){
+    pushUndo();
+    // Parse target slide number
+    let targetSlide=currentSlide;
+    const slideMatch=text.match(/(?:第|slide\s*)([一二三四五六七八九十\d]+)/i);
+    if(slideMatch){
+      const numMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+      targetSlide=(numMap[slideMatch[1]]||parseInt(slideMatch[1])||1)-1;
+    }
+    targetSlide=Math.max(0,Math.min(targetSlide,currentDeck.slides.length-1));
+    const slide=currentDeck.slides[targetSlide];
+
+    // Determine position: left, right, or auto (image region if exists)
+    const wantLeft=/左[邊半]?|left/i.test(text);
+    const wantRight=/右[邊半]?|right/i.test(text);
+
+    // Check if current layout has an image region
+    const L=LAYOUTS[slide.layout];
+    const hasImageRegion=L&&L.regions.some(r=>r.role==='image');
+
+    if(hasImageRegion){
+      // Place into the existing image region
+      const img=images[0];
+      slide.content['image']={type:'image',dataUrl:img.dataUrl,name:img.name,
+        width:img.width,height:img.height,alt:img.name,fit:'contain'};
+      currentSlide=targetSlide;
+      return `✓ Placed "${img.name}" into slide ${targetSlide+1} image area`;
+    }
+
+    // No image region — switch layout to accommodate
+    const img=images[0];
+    const prevLayout=slide.layout;
+    if(wantLeft){
+      slide.layout='image-left';
+    }else if(wantRight){
+      slide.layout='image-right';
+    }else{
+      // Default: image-right if body exists, image-top otherwise
+      slide.layout=slide.content['body']?'image-right':'image-top';
+    }
+    slide.content['image']={type:'image',dataUrl:img.dataUrl,name:img.name,
+      width:img.width,height:img.height,alt:img.name,fit:'contain'};
+    currentSlide=targetSlide;
+
+    let msg=`✓ Placed "${img.name}" into slide ${targetSlide+1}`;
+    if(prevLayout!==slide.layout) msg+=` (layout → ${slide.layout})`;
+    if(images.length>1) msg+=`. ${images.length-1} more image(s) still staged — send another command to place them.`;
+    // Re-stage remaining images
+    if(images.length>1){
+      stagedImages=images.slice(1);
+      renderStagedImages();
+    }
+    return msg;
+  }
+
+  // ── Manipulate existing image on current slide ──
+  const slide=currentDeck.slides[currentSlide];
+  if(!slide)return null;
+  const imgContent=slide.content['image'];
+  if(!imgContent||imgContent.type!=='image'||!imgContent.dataUrl){
+    return '⚠ No image on current slide. Attach an image first with the + button.';
+  }
+
+  pushUndo();
+
+  // Parse resize/move commands
+  const t=text.toLowerCase();
+
+  // Resize: 縮小/放大/等比例
+  if(/縮小|smaller|shrink|小一點/i.test(t)){
+    imgContent.displayW=(imgContent.displayW||imgContent.width)*0.85;
+    imgContent.displayH=(imgContent.displayH||imgContent.height)*0.85;
+    return `✓ Image scaled down to ${Math.round((imgContent.displayW/imgContent.width)*100)}%`;
+  }
+  if(/放大|bigger|larger|enlarge|大一點/i.test(t)){
+    imgContent.displayW=(imgContent.displayW||imgContent.width)*1.15;
+    imgContent.displayH=(imgContent.displayH||imgContent.height)*1.15;
+    return `✓ Image scaled up to ${Math.round((imgContent.displayW/imgContent.width)*100)}%`;
+  }
+
+  // Aspect: wider/narrower/taller/shorter
+  if(/寬一點|wider/i.test(t)){
+    imgContent.displayW=(imgContent.displayW||imgContent.width)*1.1;
+    return '✓ Image widened';
+  }
+  if(/窄一點|narrower/i.test(t)){
+    imgContent.displayW=(imgContent.displayW||imgContent.width)*0.9;
+    return '✓ Image narrowed';
+  }
+  if(/高一點|taller/i.test(t)){
+    imgContent.displayH=(imgContent.displayH||imgContent.height)*1.1;
+    return '✓ Image made taller';
+  }
+  if(/低一點|矮一點|shorter/i.test(t)){
+    imgContent.displayH=(imgContent.displayH||imgContent.height)*0.9;
+    return '✓ Image made shorter';
+  }
+
+  // Move: directional nudge (20px per command)
+  const nudge=20;
+  if(/向左|左移|move.*left/i.test(t)){
+    imgContent.offsetX=(imgContent.offsetX||0)-nudge;
+    return '✓ Image moved left';
+  }
+  if(/向右|右移|move.*right/i.test(t)){
+    imgContent.offsetX=(imgContent.offsetX||0)+nudge;
+    return '✓ Image moved right';
+  }
+  if(/向上|上移|move.*up/i.test(t)){
+    imgContent.offsetY=(imgContent.offsetY||0)-nudge;
+    return '✓ Image moved up';
+  }
+  if(/向下|下移|move.*down/i.test(t)){
+    imgContent.offsetY=(imgContent.offsetY||0)+nudge;
+    return '✓ Image moved down';
+  }
+
+  // Fit mode
+  if(/填滿|fill|stretch/i.test(t)){
+    imgContent.fit='fill';
+    return '✓ Image set to fill (stretch)';
+  }
+  if(/等比|contain|fit/i.test(t)){
+    imgContent.fit='contain';
+    return '✓ Image set to contain (aspect ratio preserved)';
+  }
+  if(/裁切|cover|crop/i.test(t)){
+    imgContent.fit='cover';
+    return '✓ Image set to cover (may crop)';
+  }
+
+  // If we have images but didn't match any specific command, just place them
+  return null;
+}
+
 async function sendMessage(){
   const input=document.getElementById('chatInput');
   const text=input.value.trim();
@@ -2719,6 +2919,17 @@ async function sendMessage(){
     const sheet=wsCreateSheet(title,body);
     addMessage(`✓ Created sheet "${sheet.title}" (${sheet.content.columns.length} cols, ${sheet.content.rows.length} rows). Reference it by name!`,'system');
     return;
+  }
+
+  // ── Image commands: place, resize, move staged images ──
+  const pendingImages=consumeStagedImages();
+  if(pendingImages.length>0||isImageCommand(text)){
+    const imgResult=handleImageCommand(text,pendingImages);
+    if(imgResult){
+      addMessage(imgResult,'ai');
+      renderApp();
+      return;
+    }
   }
 
   const statusDiv=addMessage('Thinking...','system');
@@ -3153,18 +3364,20 @@ function exportPPTX(){
       const vAlign=al.vertical==='middle'?'middle':al.vertical==='bottom'?'bottom':'top';
 
       if(r.role==='image'){
-        // Image placeholder — draw a dashed box
-        sl.addShape(pptx.shapes.RECTANGLE,{
-          x,y,w,h,
-          line:{color:hx(p.colors.border),dashType:'dash',width:1.5},
-          fill:{type:'none'}
-        });
-        const altText=typeof c==='object'?(c.alt||c.src||'Image'):'Image';
-        sl.addText(altText,{
-          x,y,w,h,
-          fontSize:10,color:hx(p.colors.secondary),fontFace:'Arial',
-          align:'center',valign:'middle'
-        });
+        if(typeof c==='object'&&c.type==='image'&&c.dataUrl){
+          // Real image — embed in PPTX
+          try{
+            sl.addImage({data:c.dataUrl, x,y,w,h, sizing:{type:'contain',w,h}});
+          }catch(imgErr){
+            console.warn('PPTX image embed failed:',imgErr);
+            sl.addText(c.alt||c.name||'Image',{x,y,w,h,fontSize:10,color:hx(p.colors.secondary),fontFace:'Arial',align:'center',valign:'middle'});
+          }
+        }else{
+          // Image placeholder — draw a dashed box
+          sl.addShape(pptx.shapes.RECTANGLE,{x,y,w,h,line:{color:hx(p.colors.border),dashType:'dash',width:1.5},fill:{type:'none'}});
+          const altText=typeof c==='object'?(c.alt||c.src||'Image'):'Image';
+          sl.addText(altText,{x,y,w,h,fontSize:10,color:hx(p.colors.secondary),fontFace:'Arial',align:'center',valign:'middle'});
+        }
         return;
       }
 
@@ -3692,6 +3905,100 @@ function toggleInputSize(){
   inputCollapsed=!inputCollapsed;
   area.classList.toggle('collapsed',inputCollapsed);
   btn.innerHTML=inputCollapsed?'&#9660;':'&#9650;'; // ▼ or ▲
+}
+
+// ═══════════════════════════════════════════
+// IMAGE STAGING
+// ═══════════════════════════════════════════
+let stagedImages=[]; // [{name, dataUrl, width, height}]
+
+function handleImageFiles(fileList){
+  if(!fileList||!fileList.length)return;
+  Array.from(fileList).forEach(file=>{
+    if(!file.type.startsWith('image/'))return;
+    const reader=new FileReader();
+    reader.onload=function(e){
+      const img=new Image();
+      img.onload=function(){
+        stagedImages.push({name:file.name, dataUrl:e.target.result, width:img.width, height:img.height});
+        renderStagedImages();
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  // Reset file input so same file can be re-selected
+  document.getElementById('imgFileInput').value='';
+}
+
+function removeStagedImage(idx){
+  stagedImages.splice(idx,1);
+  renderStagedImages();
+}
+
+function renderStagedImages(){
+  const staging=document.getElementById('imgStaging');
+  const thumbsHtml=stagedImages.map((img,i)=>
+    `<div class="img-thumb" title="${img.name} (${img.width}×${img.height})">
+      <img src="${img.dataUrl}" alt="${img.name}">
+      <button class="img-thumb-remove" onclick="removeStagedImage(${i})">✕</button>
+    </div>`
+  ).join('');
+  // Keep label + thumbs
+  staging.innerHTML=`<span class="img-staging-label">📎 ${stagedImages.length} image${stagedImages.length>1?'s':''}:</span>${thumbsHtml}`;
+  staging.classList.toggle('has-images',stagedImages.length>0);
+}
+
+// Drag-drop: show overlay when dragging files over the page
+let dragCounter=0;
+document.addEventListener('dragenter',function(e){
+  e.preventDefault();
+  if(e.dataTransfer.types.includes('Files')){
+    dragCounter++;
+    document.getElementById('dropOverlay').classList.add('show');
+  }
+});
+document.addEventListener('dragleave',function(e){
+  e.preventDefault();
+  dragCounter--;
+  if(dragCounter<=0){
+    dragCounter=0;
+    document.getElementById('dropOverlay').classList.remove('show');
+  }
+});
+document.addEventListener('dragover',function(e){
+  e.preventDefault(); // required to allow drop
+});
+document.addEventListener('drop',function(e){
+  e.preventDefault();
+  dragCounter=0;
+  document.getElementById('dropOverlay').classList.remove('show');
+  if(e.dataTransfer.files.length>0){
+    handleImageFiles(e.dataTransfer.files);
+  }
+});
+
+// Paste images from clipboard
+document.addEventListener('paste',function(e){
+  const items=e.clipboardData?.items;
+  if(!items)return;
+  const imageFiles=[];
+  for(let i=0;i<items.length;i++){
+    if(items[i].type.startsWith('image/')){
+      imageFiles.push(items[i].getAsFile());
+    }
+  }
+  if(imageFiles.length>0){
+    handleImageFiles(imageFiles);
+  }
+});
+
+// Consume staged images (called by sendMessage) — returns array and clears staging
+function consumeStagedImages(){
+  const imgs=[...stagedImages];
+  stagedImages=[];
+  renderStagedImages();
+  return imgs;
 }
 
 // ═══════════════════════════════════════════
