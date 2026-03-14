@@ -80,7 +80,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .deck-action-btn.primary { background:#7886A5; color:#fff; border-color:#7886A5; font-weight:600; }
 .deck-action-btn.primary:hover { background:#6775A0; }
 .slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; position:relative; touch-action:none; }
-.slide-panel { touch-action:none; /* prevent any zoom/scroll on slide area — swipe handled by JS */ }
+.slide-panel, .slide-panel *, .slide-frame *, #slideCanvas, #slideCanvas * { touch-action:none; /* lock ALL elements inside slide — no zoom/scroll/resize */ }
 /* Slide transition animations (swipe/navigate) */
 .slide-enter-left { animation:slideInLeft 0.28s ease forwards; }
 .slide-enter-right { animation:slideInRight 0.28s ease forwards; }
