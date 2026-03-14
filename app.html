@@ -101,7 +101,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 /* Chat panel (right) */
 .chat-panel { width:320px; flex-shrink:0; display:flex; flex-direction:column; border-left:1px solid var(--border); background:var(--surface); }
-.chat-header { padding:8px 14px; font-size:11px; color:#ffffff; border-bottom:1px solid var(--border); font-weight:600; letter-spacing:0.5px; text-transform:uppercase; flex-shrink:0; }
+.chat-header { padding:8px 14px; font-size:11px; color:#ffffff; border-bottom:1px solid var(--border); font-weight:600; letter-spacing:0.5px; text-transform:uppercase; flex-shrink:0; display:flex; align-items:center; }
+.chat-toggle-icon { display:none; }
 .chat-messages { flex:1; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:6px; min-height:0; }
 .msg { padding:6px 10px; border-radius:5px; font-size:12px; line-height:1.45; max-width:90%; word-wrap:break-word; }
 .msg.user { background:#1a1a2e; color:var(--text); align-self:flex-end; border-bottom-right-radius:2px; }
@@ -407,7 +408,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="table"] .table-add-row:hover { color:#aaa; border-color:#666; }
 
 /* Drag handle */
-.doc-block-handle { position:absolute; left:4px; top:50%; transform:translateY(-50%); width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#666; border-radius:4px; z-index:5; background:rgba(255,255,255,0.04); }
+.doc-block-handle { position:absolute; left:4px; top:50%; transform:translateY(-50%); width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#666; border-radius:4px; z-index:5; background:rgba(255,255,255,0.04); touch-action:none; }
 .doc-block[data-type="image"] .doc-block-handle,
 .doc-block[data-type="table"] .doc-block-handle { left:auto; right:4px; top:4px; transform:none; background:rgba(0,0,0,0.5); color:#aaa; padding:2px; }
 .doc-block:hover .doc-block-handle, .doc-block.selected .doc-block-handle { opacity:1; }
@@ -775,6 +776,20 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     overflow:hidden; /* clip, don't let content push layout */
     min-height:120px; /* minimum on tiny screens */
   }
+  /* Doc/workspace: slide-panel becomes full-height scrollable container */
+  body.mode-doc .slide-panel,
+  body.mode-workspace .slide-panel {
+    flex:1 1 0 !important; min-height:0;
+    overflow-y:auto !important; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y !important;
+    align-items:stretch; justify-content:flex-start;
+    padding:0;
+  }
+  body.mode-doc .slide-panel *,
+  body.mode-workspace .slide-panel * { touch-action:pan-y !important; }
+  /* Drag handle: always visible on mobile (no hover), and allow touch drag */
+  body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }
   .deck-name-input { font-size:12px; }
   .deck-actions { display:none; }
@@ -802,17 +817,25 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
   /* --- Chat panel: fills remaining vertical space, width locked to 100% --- */
   .chat-panel {
-    width:100% !important; /* override desktop width:320px */
+    width:100% !important;
     max-width:100vw !important;
     flex:1 1 0 !important; min-height:40px;
-    flex-shrink:1 !important; /* allow shrink, override desktop flex-shrink:0 */
+    flex-shrink:1 !important;
     border-left:none !important; border-top:1px solid var(--border);
     display:flex; flex-direction:column;
     overflow:hidden;
+    transition:flex 0.25s ease, min-height 0.25s ease;
   }
+  .chat-panel.collapsed {
+    flex:0 0 auto !important; min-height:0 !important;
+  }
+  .chat-panel.collapsed .chat-messages { display:none; }
+  .chat-toggle-icon { display:inline-block; margin-left:auto; font-size:8px; transition:transform 0.2s; }
+  .chat-panel.collapsed .chat-toggle-icon { transform:rotate(180deg); }
   .chat-header {
     padding:4px 12px; font-size:9px;
     border-bottom:1px solid var(--border);
+    cursor:pointer; user-select:none;
     flex-shrink:0;
   }
   .chat-messages {
@@ -1437,8 +1460,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       <div class="slide-info" id="slideInfo"></div>
     </div>
   </div>
-  <div class="chat-panel">
-    <div class="chat-header">Chat</div>
+  <div class="chat-panel" id="chatPanel">
+    <div class="chat-header" onclick="toggleChatPanel()"><span>Chat</span><span class="chat-toggle-icon" id="chatToggleIcon">▼</span></div>
     <div class="chat-messages" id="chatMessages"></div>
   </div>
 </div>
@@ -1896,6 +1919,8 @@ document.addEventListener('keydown',function(e){
         docEditingBlockId=null;
         docSelectedBlockId=null;
         document.querySelectorAll('.doc-block.selected').forEach(el=>el.classList.remove('selected'));
+        document.getElementById('selectionBar').style.display='none';
+        hideCtxAiMenu();
         e.preventDefault();
       }
     }
@@ -1919,6 +1944,8 @@ document.addEventListener('keydown',function(e){
         docPushUndo();
         docDeleteBlock(bid);
         docSelectedBlockId=null;
+        document.getElementById('selectionBar').style.display='none';
+        hideCtxAiMenu();
         renderDocMode();
       }
     }
@@ -2361,42 +2388,296 @@ function docBlockClickAction(blockId, e){
   // Don't show if user is selecting text
   const sel=window.getSelection();
   if(sel&&!sel.isCollapsed) return;
-  // Don't show on drag handle
   if(e.target.closest('.doc-block-handle')) return;
+  showDocCtxAiMenu(blockId, e);
+}
 
-  const block=currentDoc?.blocks?.find(b=>b.id===blockId);
+// ── Doc context AI menu (reuses ctxAiMenu popup, like slide mode) ──
+function showDocCtxAiMenu(blockId, clickEvent){
+  const block=docGetBlock(blockId);
   if(!block) return;
+  const blockIdx=currentDoc.blocks.findIndex(b=>b.id===blockId);
+  const typeLabel=block.type.charAt(0).toUpperCase()+block.type.slice(1);
   const text=blockPlainText(block);
-  if(!text.trim()) return; // empty block, no AI actions
+  const isTextBlock=['paragraph','heading1','heading2','heading3','quote','code','bullet','numbered'].includes(block.type);
+  const isImage=block.type==='image';
+  const isTable=block.type==='table';
+  const isDivider=block.type==='divider';
 
-  // Show inline AI action bar below the block
-  const blockEl=document.querySelector(`[data-block-id="${blockId}"]`);
-  if(!blockEl) return;
+  const suggestions=[];
 
-  // Remove existing doc action bars
-  document.querySelectorAll('.doc-block-actions').forEach(el=>el.remove());
+  // ════════ DIRECT ACTIONS ════════
+  if(isTextBlock&&text.trim()){
+    suggestions.push({icon:'✏️',text:'Edit text',hint:'Double-click to type',action:`__doc_edit__${blockId}`});
+  }
+  if(!isDivider){
+    suggestions.push({icon:'🗑️',text:'Delete block',hint:'Remove entirely',action:`__doc_delete__${blockId}`,danger:true});
+  }
 
-  const bar=document.createElement('div');
-  bar.className='doc-block-actions';
-  bar.dataset.blockId=blockId;
-  bar.innerHTML=`
-    <button onclick="docCtxAI('rewrite','Rewrite concisely','${blockId}');this.closest('.doc-block-actions').remove()">✨ Rewrite</button>
-    <button onclick="docCtxAI('expand','Expand with more detail','${blockId}');this.closest('.doc-block-actions').remove()">📝 Expand</button>
-    <button onclick="docCtxAI('translate','Translate to English','${blockId}');this.closest('.doc-block-actions').remove()">🌐 Translate</button>
-    <button onclick="docCtxAI('tone','Make more professional','${blockId}');this.closest('.doc-block-actions').remove()">🎯 Tone</button>
-    <button onclick="this.closest('.doc-block-actions').remove()">✕</button>
-  `;
-  blockEl.after(bar);
+  // ════════ AI SUGGESTIONS ════════
+  suggestions.push({type:'divider'});
 
-  // Auto-dismiss on click outside
-  setTimeout(()=>{
-    document.addEventListener('click',function dismissDocBar(ev){
-      if(!ev.target.closest('.doc-block-actions')){
-        bar.remove();
-        document.removeEventListener('click',dismissDocBar);
+  if(isTextBlock&&text.trim()){
+    suggestions.push({icon:'✨',text:'Rewrite concisely',hint:'Shorter, same meaning',action:`__doc_ai__rewrite__Rewrite this block concisely__${blockId}`});
+    suggestions.push({icon:'📝',text:'Expand with detail',hint:'Add more context',action:`__doc_ai__expand__Expand this block with more detail and examples__${blockId}`});
+    suggestions.push({icon:'🌐',text:'Translate',hint:'To English or any language',action:`__doc_ai__translate__Translate this block to English__${blockId}`});
+    suggestions.push({icon:'🎯',text:'More professional',hint:'Formal tone',action:`__doc_ai__tone__Make this block more professional in tone__${blockId}`});
+    if(block.type==='paragraph'&&text.length>100){
+      suggestions.push({icon:'📋',text:'Convert to bullet list',hint:'Structured format',action:`__doc_ai__bullets__Convert this block into a bullet list__${blockId}`});
+    }
+    if(block.type.startsWith('heading')){
+      suggestions.push({icon:'💡',text:'More impactful',hint:'Attention-grabbing',action:`__doc_ai__impact__Make this heading more impactful and attention-grabbing__${blockId}`});
+    }
+  }
+
+  if(isImage){
+    const hasCaption=block.meta?.showCaption===true;
+    if(!hasCaption) suggestions.push({icon:'📝',text:'Add caption',hint:'Describe the image',action:`__doc_caption_on__${blockId}`});
+    suggestions.push({icon:'🔄',text:'Change float',hint:'Left / center / right',action:`__doc_float_cycle__${blockId}`});
+  }
+
+  if(isTable){
+    suggestions.push({icon:'➕',text:'Add row',hint:'Append to bottom',action:`__doc_table_addrow__${blockId}`});
+    const hasCaption=block.meta?.showCaption===true;
+    if(!hasCaption) suggestions.push({icon:'📝',text:'Add caption',hint:'Describe the table',action:`__doc_caption_on__${blockId}`});
+    suggestions.push({icon:'🔄',text:'Change float',hint:'Left / center / right',action:`__doc_float_cycle__${blockId}`});
+  }
+
+  if(isDivider){
+    suggestions.push({icon:'🗑️',text:'Remove divider',hint:'',action:`__doc_delete__${blockId}`,danger:true});
+  }
+
+  // Build menu HTML (same structure as slide ctx menu)
+  const menu=document.getElementById('ctxAiMenu');
+  let html=`<div class="ctx-ai-header">
+    <span class="ctx-region-name">Block ${blockIdx+1}: ${typeLabel}</span>
+    <button class="ctx-close" onclick="event.stopPropagation();hideCtxAiMenu()">×</button>
+  </div>`;
+  html+=`<div class="ctx-ai-actions">`;
+  let afterFirstDivider=false;
+  suggestions.forEach(s=>{
+    if(s.type==='divider'){
+      if(!afterFirstDivider){
+        html+=`<div class="ctx-ai-divider"><span class="ctx-section-label">✦ AI Suggestions</span></div>`;
+        afterFirstDivider=true;
+      } else {
+        html+=`<div class="ctx-ai-divider"></div>`;
       }
-    });
-  },10);
+      return;
+    }
+    const cls=s.danger?'ctx-ai-btn danger':'ctx-ai-btn';
+    const dangerStyle=s.danger?'color:#D55B5B;':'';
+    html+=`<button class="${cls}" style="${dangerStyle}" onclick="event.stopPropagation();execDocCtxAction('${s.action.replace(/'/g,"\\'")}')">
+      <span class="ctx-btn-icon">${s.icon}</span>
+      <span class="ctx-btn-text">${s.text}<span class="ctx-btn-hint">${s.hint||''}</span></span>
+    </button>`;
+  });
+  html+=`</div>`;
+  // Custom AI input at bottom
+  html+=`<div class="ctx-ai-input">
+    <input type="text" id="ctxDocInput" placeholder="Ask AI to change this block..." onkeydown="if(event.key==='Enter'){event.stopPropagation();execDocCtxCustom('${blockId}');}">
+    <button onclick="event.stopPropagation();execDocCtxCustom('${blockId}')">Go</button>
+  </div>`;
+  menu.innerHTML=html;
+
+  // Position near click
+  menu.style.display='block';
+  const menuW=menu.offsetWidth;
+  const menuH=menu.offsetHeight;
+  const vw=window.innerWidth;
+  const vh=window.innerHeight;
+  let x=clickEvent.clientX+8;
+  let y=clickEvent.clientY-20;
+  if(x+menuW>vw-10) x=vw-menuW-10;
+  if(x<10) x=10;
+  if(y+menuH>vh-10) y=vh-menuH-10;
+  if(y<10) y=10;
+  menu.style.position='fixed';
+  menu.style.left=x+'px';
+  menu.style.top=y+'px';
+
+  setTimeout(()=>{
+    const inp=document.getElementById('ctxDocInput');
+    if(inp) inp.focus();
+  },100);
+}
+
+function execDocCtxAction(action){
+  hideCtxAiMenu();
+  // Direct actions
+  if(action.startsWith('__doc_edit__')){
+    const bid=action.replace('__doc_edit__','');
+    const el=document.querySelector(`[data-block-id="${bid}"]`);
+    if(el){ el.contentEditable='true'; setTimeout(()=>el.focus(),0); }
+    return;
+  }
+  if(action.startsWith('__doc_delete__')){
+    const bid=action.replace('__doc_delete__','');
+    docPushUndo();
+    docDeleteBlock(bid);
+    docSelectedBlockId=null;
+    document.getElementById('selectionBar').style.display='none';
+    renderDocMode();
+    addMessage('✓ Block deleted','system');
+    return;
+  }
+  if(action.startsWith('__doc_caption_on__')){
+    const bid=action.replace('__doc_caption_on__','');
+    const block=docGetBlock(bid);
+    if(block&&block.meta){ block.meta.showCaption=true; block.meta.caption=block.meta.caption||'Caption'; }
+    renderDocMode();
+    return;
+  }
+  if(action.startsWith('__doc_float_cycle__')){
+    const bid=action.replace('__doc_float_cycle__','');
+    const block=docGetBlock(bid);
+    if(block&&block.meta){
+      const floats=['none','left','right'];
+      const cur=block.meta.float||'none';
+      const next=floats[(floats.indexOf(cur)+1)%floats.length];
+      block.meta.float=next;
+      addMessage(`✓ Float → ${next}`,'system');
+    }
+    renderDocMode();
+    return;
+  }
+  if(action.startsWith('__doc_table_addrow__')){
+    const bid=action.replace('__doc_table_addrow__','');
+    docTableAddRow(bid);
+    return;
+  }
+  // Caption actions
+  if(action.startsWith('__doc_caption_off__')){
+    const bid=action.replace('__doc_caption_off__','');
+    const block=docGetBlock(bid);
+    if(block&&block.meta){ block.meta.showCaption=false; }
+    renderDocMode();
+    return;
+  }
+  if(action.startsWith('__doc_caption_ai__')){
+    const parts=action.replace('__doc_caption_ai__','').split('__');
+    if(parts.length>=3){
+      docCaptionAI(parts[0], parts[1], parts[2]);
+    }
+    return;
+  }
+  // AI actions: __doc_ai__action__instruction__blockId
+  if(action.startsWith('__doc_ai__')){
+    const parts=action.replace('__doc_ai__','').split('__');
+    if(parts.length>=3){
+      const aiAction=parts[0];
+      const instruction=parts[1];
+      const bid=parts[2];
+      docCtxAI(aiAction, instruction, bid);
+    }
+    return;
+  }
+  // Fallback: inject into chat
+  const input=document.getElementById('chatInput');
+  input.value=action;
+  sendMessage();
+}
+
+function execDocCtxCustom(blockId){
+  const inp=document.getElementById('ctxDocInput');
+  if(!inp||!inp.value.trim()) return;
+  hideCtxAiMenu();
+  docCtxAI('custom', inp.value.trim(), blockId);
+}
+
+// ── Caption click — select caption + show AI context menu ──
+let docSelectedCaptionBlockId=null;
+function docCaptionClick(event, blockId){
+  // Select the parent block too
+  docSelectBlock(blockId, null);
+  docSelectedCaptionBlockId=blockId;
+  const block=docGetBlock(blockId);
+  if(!block) return;
+  const blockIdx=currentDoc.blocks.findIndex(b=>b.id===blockId);
+  const caption=block.meta?.caption||'';
+  const typeLabel=block.type.charAt(0).toUpperCase()+block.type.slice(1);
+
+  // Update selection bar to show caption is selected
+  document.getElementById('selectionBar').style.display='flex';
+  document.getElementById('selectionTag').textContent=`Block ${blockIdx+1}: ${typeLabel} → Caption${caption?(` — "${caption.substring(0,40)}${caption.length>40?'...':''}"`):''}`;
+
+  // Build caption-specific AI menu
+  const menu=document.getElementById('ctxAiMenu');
+  const suggestions=[];
+  if(caption.trim()){
+    suggestions.push({icon:'✨',text:'Rewrite caption',hint:'Shorter, punchier',action:`__doc_caption_ai__rewrite__Rewrite this caption more concisely__${blockId}`});
+    suggestions.push({icon:'📝',text:'Expand caption',hint:'Add more detail',action:`__doc_caption_ai__expand__Expand this caption with more descriptive detail__${blockId}`});
+    suggestions.push({icon:'🌐',text:'Translate caption',hint:'To English',action:`__doc_caption_ai__translate__Translate this caption to English__${blockId}`});
+  }
+  suggestions.push({icon:'🗑️',text:'Hide caption',hint:'Remove caption',action:`__doc_caption_off__${blockId}`,danger:true});
+
+  let html=`<div class="ctx-ai-header">
+    <span class="ctx-region-name">${typeLabel} Caption</span>
+    <button class="ctx-close" onclick="event.stopPropagation();hideCtxAiMenu()">×</button>
+  </div>`;
+  html+=`<div class="ctx-ai-actions">`;
+  if(caption.trim()) html+=`<div class="ctx-ai-divider"><span class="ctx-section-label">✦ AI Suggestions</span></div>`;
+  suggestions.forEach(s=>{
+    const cls=s.danger?'ctx-ai-btn danger':'ctx-ai-btn';
+    const dangerStyle=s.danger?'color:#D55B5B;':'';
+    html+=`<button class="${cls}" style="${dangerStyle}" onclick="event.stopPropagation();execDocCtxAction('${s.action.replace(/'/g,"\\'")}')">
+      <span class="ctx-btn-icon">${s.icon}</span>
+      <span class="ctx-btn-text">${s.text}<span class="ctx-btn-hint">${s.hint||''}</span></span>
+    </button>`;
+  });
+  html+=`</div>`;
+  html+=`<div class="ctx-ai-input">
+    <input type="text" id="ctxDocInput" placeholder="Ask AI to change this caption..." onkeydown="if(event.key==='Enter'){event.stopPropagation();execDocCaptionCustom('${blockId}');}">
+    <button onclick="event.stopPropagation();execDocCaptionCustom('${blockId}')">Go</button>
+  </div>`;
+  menu.innerHTML=html;
+
+  menu.style.display='block';
+  const menuW=menu.offsetWidth, menuH=menu.offsetHeight;
+  const vw=window.innerWidth, vh=window.innerHeight;
+  let x=event.clientX+8, y=event.clientY-20;
+  if(x+menuW>vw-10) x=vw-menuW-10;
+  if(x<10) x=10;
+  if(y+menuH>vh-10) y=vh-menuH-10;
+  if(y<10) y=10;
+  menu.style.position='fixed';
+  menu.style.left=x+'px';
+  menu.style.top=y+'px';
+  setTimeout(()=>{ const inp=document.getElementById('ctxDocInput'); if(inp) inp.focus(); },100);
+}
+
+async function docCaptionAI(action, instruction, blockId){
+  hideCtxAiMenu();
+  const block=docGetBlock(blockId);
+  if(!block||!block.meta) return;
+  const caption=block.meta.caption||'';
+  if(!caption.trim()){ addMessage('Caption is empty.','system'); return; }
+  const statusDiv=addMessage('✦ AI processing caption...','system');
+  try{
+    const prompt=`You are a document editor AI. The user wants you to edit a figure/table caption.
+Instruction: ${instruction}
+Original caption: "${caption}"
+Output ONLY the new caption text. No quotes, no explanation.`;
+    const raw=await callLLM(prompt,[{role:'user',content:instruction}],{temperature:0.5,max_tokens:512});
+    const cleaned=raw.trim().replace(/^["']|["']$/g,'');
+    docPushUndo();
+    block.meta.caption=cleaned;
+    currentDoc.updated=new Date().toISOString();
+    statusDiv.remove();
+    addMessage(`✓ Caption updated (${action})`,'ai');
+    renderDocMode();
+    docAutoSave();
+  }catch(err){
+    statusDiv.remove();
+    addMessage(`Error: ${err.message}`,'ai');
+  }
+}
+
+function execDocCaptionCustom(blockId){
+  const inp=document.getElementById('ctxDocInput');
+  if(!inp||!inp.value.trim()) return;
+  hideCtxAiMenu();
+  docCaptionAI('custom', inp.value.trim(), blockId);
 }
 
 // Listen for text selection changes
@@ -3782,6 +4063,9 @@ function modeEnter(mode){
   // Universal mode entry — call this for all mode switches
   modeSaveCurrent();
   currentMode=mode;
+  // Set body class for mode-specific CSS (touch-action, layout, etc.)
+  document.body.classList.remove('mode-slide','mode-doc','mode-sheet','mode-workspace');
+  document.body.classList.add('mode-'+mode);
   document.getElementById('modePickerOverlay').classList.add('hidden');
   sessionStorage.setItem('sloth_active','1');
   sessionStorage.setItem('sloth_mode',mode);
@@ -4204,6 +4488,15 @@ async function docSaveToCloud(){
     addMessage(`✓ Doc saved to cloud: "${currentDoc.title||'Untitled'}"`,'system');
     refreshFileList();
   }catch(e){addMessage('Cloud save error: '+e.message,'system');}
+}
+
+// ── Toggle chat panel (mobile collapse/expand) ──
+function toggleChatPanel(){
+  const panel=document.getElementById('chatPanel');
+  if(!panel) return;
+  panel.classList.toggle('collapsed');
+  const icon=document.getElementById('chatToggleIcon');
+  if(icon) icon.textContent=panel.classList.contains('collapsed')?'▲':'▼';
 }
 
 // ── Toggle toolbar for mode ──
@@ -5049,7 +5342,7 @@ function renderDocMode(){
     // Divider is special — non-editable
     if(block.type==='divider'){
       return `<div class="doc-block${selected}" data-type="divider" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
-        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
+        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" ontouchstart="docTouchDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
       </div>`;
     }
 
@@ -5066,11 +5359,11 @@ function renderDocMode(){
       const btnR=float==='right'?' active':'';
       const capClass=hasCaption?'':'hidden-cap';
       return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
-        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
+        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" ontouchstart="docTouchDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         ${src?`<img src="${src}" alt="${escapeHtml(alt)}" draggable="false" onclick="event.stopPropagation();docShowImagePopup('${block.id}',this)" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
         <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
           onblur="docSaveFigureCaption('${block.id}',this.textContent)"
-          onclick="event.stopPropagation()"
+          onclick="event.stopPropagation();docCaptionClick(event,'${block.id}')"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(caption)}</div>
       </div>`;
     }
@@ -5096,11 +5389,11 @@ function renderDocMode(){
       tableHtml+='</table>';
       tableHtml+=`<button class="table-add-row" onclick="event.stopPropagation();docTableAddRow('${block.id}')">+ Add row</button>`;
       return `<div class="doc-block${selected} ${floatClass}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
-        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
+        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" ontouchstart="docTouchDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         <div onclick="event.stopPropagation();docShowBlockPopup('${block.id}',this)">${tableHtml}</div>
         <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
           onblur="docSaveFigureCaption('${block.id}',this.textContent)"
-          onclick="event.stopPropagation()"
+          onclick="event.stopPropagation();docCaptionClick(event,'${block.id}')"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(caption)}</div>
       </div>`;
     }
@@ -5117,12 +5410,13 @@ function renderDocMode(){
       oninput="docInputBlock('${block.id}')"
       onkeydown="docKeydownBlock(event,'${block.id}')"
       onclick="docTextBlockClick(event,'${block.id}')">
-      <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder" contenteditable="false">⠿</div>${renderBlockContent(block)}</div>`;
+      <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" ontouchstart="docTouchDragStart(event,'${block.id}')" title="Drag to reorder" contenteditable="false">⠿</div>${renderBlockContent(block)}</div>`;
   }).join('\n');
 
   canvas.innerHTML=`
     <div class="doc-page" id="docPage"
-      ondragover="docDragOver(event)" ondrop="docDrop(event)" ondragleave="docDragLeave(event)">
+      ondragover="docDragOver(event)" ondrop="docDrop(event)" ondragleave="docDragLeave(event)"
+      onclick="docPageClick(event)"
       ${blocksHtml}
     </div>`;
 
@@ -5196,10 +5490,38 @@ function docSelectBlock(blockId, e){
     el.classList.toggle('selected', el.dataset.blockId===blockId);
   });
   docUpdateToolbarState();
-  // Show AI action bar on second click (block already selected/focused)
-  if(wasSelected && e && !e.target.closest('.doc-block-handle') && !e.target.closest('.doc-block-actions')){
-    clearTimeout(docClickTimer);
-    docClickTimer=setTimeout(()=>docBlockClickAction(blockId, e), 200);
+
+  // Show selection bar with block info
+  const block=docGetBlock(blockId);
+  if(block){
+    const blockIdx=currentDoc.blocks.findIndex(b=>b.id===blockId);
+    const typeLabel=block.type.charAt(0).toUpperCase()+block.type.slice(1);
+    const preview=blockPlainText(block).substring(0,60);
+    const previewStr=preview?(` — "${preview}${blockPlainText(block).length>60?'...':''}"`):'';
+    document.getElementById('selectionBar').style.display='flex';
+    document.getElementById('selectionTag').textContent=`Block ${blockIdx+1}: ${typeLabel}${previewStr}`;
+  }
+
+  // Show context AI menu on first click (not from handle, not when entering edit)
+  if(e && !e.target.closest('.doc-block-handle') && !e.target.closest('.doc-figure-caption')){
+    if(!wasSelected){
+      showDocCtxAiMenu(blockId, e);
+    } else {
+      // Second click on already-selected block — still show menu if not editing
+      clearTimeout(docClickTimer);
+      docClickTimer=setTimeout(()=>docBlockClickAction(blockId, e), 200);
+    }
+  }
+}
+
+function docPageClick(event){
+  // If click is on the page background (not on a block), clear selection
+  if(!event.target.closest('.doc-block')){
+    docSelectedBlockId=null;
+    docSelectedCaptionBlockId=null;
+    document.querySelectorAll('.doc-block.selected').forEach(el=>el.classList.remove('selected'));
+    document.getElementById('selectionBar').style.display='none';
+    hideCtxAiMenu();
   }
 }
 
@@ -5679,6 +6001,163 @@ function docDrop(event){
   docDragBlockId=null;
   docDragLastOverId=null;
   docDragLastInsertAfter=null;
+  setTimeout(()=>{
+    renderDocMode();
+    docAutoSave();
+  },100);
+}
+
+// ── Touch-based drag for mobile ──
+let docTouchDragId=null;
+let docTouchStartY=null;
+let docTouchActivated=false;
+let docTouchLastInsertAfter=null;
+let docTouchLastOverId=null;
+
+function docTouchDragStart(event, blockId){
+  if(event.touches.length!==1) return;
+  event.preventDefault(); // prevent scroll while dragging handle
+  event.stopPropagation();
+  const touch=event.touches[0];
+  docTouchDragId=blockId;
+  docTouchStartY=touch.clientY;
+  docTouchActivated=false;
+  docTouchLastInsertAfter=null;
+  docTouchLastOverId=null;
+  docPushUndo();
+  setTimeout(()=>{
+    const el=document.querySelector(`[data-block-id="${blockId}"]`);
+    if(el) el.classList.add('drag-source');
+  },0);
+  document.addEventListener('touchmove', docTouchDragMove, {passive:false});
+  document.addEventListener('touchend', docTouchDragEnd, {passive:false});
+  document.addEventListener('touchcancel', docTouchDragEnd, {passive:false});
+}
+
+function docTouchDragMove(event){
+  if(!docTouchDragId) return;
+  event.preventDefault();
+  const touch=event.touches[0];
+  if(!docTouchActivated){
+    if(docTouchStartY!==null&&Math.abs(touch.clientY-docTouchStartY)<DOC_DRAG_DEAD_ZONE) return;
+    docTouchActivated=true;
+  }
+  const page=document.getElementById('docPage');
+  if(!page) return;
+  const blocks=[...page.querySelectorAll('.doc-block')];
+
+  let closestBlock=null, closestDist=Infinity, insertAfter=false;
+  for(const block of blocks){
+    if(block.dataset.blockId===docTouchDragId) continue;
+    const rect=block.getBoundingClientRect();
+    const midY=rect.top+rect.height/2;
+    const dist=Math.abs(touch.clientY-midY);
+    if(dist<closestDist){
+      closestDist=dist;
+      closestBlock=block;
+      insertAfter=touch.clientY>midY;
+    }
+  }
+
+  const hoverId=closestBlock?.dataset?.blockId;
+  if(hoverId===docTouchLastOverId && insertAfter!==docTouchLastInsertAfter){
+    const rect=closestBlock.getBoundingClientRect();
+    const midY=rect.top+rect.height/2;
+    const dist=Math.abs(touch.clientY-midY);
+    if(dist<DOC_DRAG_HYSTERESIS) return;
+  }
+  if(hoverId===docTouchLastOverId && insertAfter===docTouchLastInsertAfter) return;
+  docTouchLastOverId=hoverId;
+  docTouchLastInsertAfter=insertAfter;
+
+  const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docTouchDragId);
+  const srcEl=document.querySelector(`[data-block-id="${docTouchDragId}"]`);
+  const srcH=srcEl?srcEl.offsetHeight+8:40;
+
+  if(closestBlock&&closestBlock.dataset.blockId!==docTouchDragId){
+    const hoverIdx=currentDoc.blocks.findIndex(b=>b.id===hoverId);
+    let targetIdx=insertAfter?hoverIdx:hoverIdx-1;
+    if(targetIdx<0) targetIdx=0;
+    if(targetIdx>=currentDoc.blocks.length) targetIdx=currentDoc.blocks.length-1;
+    for(const block of blocks){
+      const bid=block.dataset.blockId;
+      if(bid===docTouchDragId) continue;
+      const idx=currentDoc.blocks.findIndex(b=>b.id===bid);
+      let ty=0;
+      if(srcIdx<hoverIdx||(srcIdx<hoverIdx+1&&insertAfter)){
+        if(idx>srcIdx&&(idx<hoverIdx||(idx===hoverIdx&&insertAfter))) ty=-srcH;
+      } else if(srcIdx>hoverIdx||(srcIdx>hoverIdx-1&&!insertAfter)){
+        if(idx<srcIdx&&(idx>hoverIdx||(idx===hoverIdx&&!insertAfter))) ty=srcH;
+      }
+      block.style.transform=ty?`translateY(${ty}px)`:'';
+    }
+    if(srcEl){
+      const srcRect=srcEl.getBoundingClientRect();
+      const targetRect=closestBlock.getBoundingClientRect();
+      const dy=targetRect.top-srcRect.top+(insertAfter?targetRect.height:0);
+      srcEl.style.transform=`scale(0.96) translateY(${dy}px)`;
+    }
+  }
+
+  // Drop indicator
+  page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
+  if(closestBlock){
+    const indicator=document.createElement('div');
+    indicator.className='doc-drop-indicator';
+    if(insertAfter) closestBlock.after(indicator);
+    else closestBlock.before(indicator);
+  }
+
+  // Auto-scroll when near edges
+  const canvas=document.querySelector('.doc-canvas');
+  if(canvas){
+    const canvasRect=canvas.getBoundingClientRect();
+    const edgeZone=50;
+    if(touch.clientY<canvasRect.top+edgeZone) canvas.scrollTop-=8;
+    else if(touch.clientY>canvasRect.bottom-edgeZone) canvas.scrollTop+=8;
+  }
+}
+
+function docTouchDragEnd(event){
+  document.removeEventListener('touchmove', docTouchDragMove);
+  document.removeEventListener('touchend', docTouchDragEnd);
+  document.removeEventListener('touchcancel', docTouchDragEnd);
+  if(!docTouchDragId||!currentDoc){
+    docTouchDragId=null;
+    return;
+  }
+  const page=document.getElementById('docPage');
+  if(!page){ docTouchDragId=null; return; }
+  page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
+
+  // Use last known insert position
+  if(docTouchLastOverId){
+    const hoverIdx=currentDoc.blocks.findIndex(b=>b.id===docTouchLastOverId);
+    const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docTouchDragId);
+    if(srcIdx!==-1&&hoverIdx!==-1){
+      let insertAt=docTouchLastInsertAfter?hoverIdx:(hoverIdx>0?hoverIdx-1:0);
+      if(docTouchLastInsertAfter) insertAt=hoverIdx>=srcIdx?hoverIdx:hoverIdx+1;
+      else insertAt=hoverIdx>srcIdx?hoverIdx-1:hoverIdx;
+      if(insertAt!==srcIdx){
+        const [moved]=currentDoc.blocks.splice(srcIdx,1);
+        if(insertAt>srcIdx) insertAt--;
+        currentDoc.blocks.splice(insertAt,0,moved);
+        currentDoc.updated=new Date().toISOString();
+      }
+    }
+  }
+
+  // Settling
+  const blocks=[...page.querySelectorAll('.doc-block')];
+  blocks.forEach(b=>{
+    b.classList.remove('drag-source');
+    b.style.transform='';
+    b.classList.add('drag-settling');
+  });
+
+  docTouchDragId=null;
+  docTouchLastOverId=null;
+  docTouchLastInsertAfter=null;
   setTimeout(()=>{
     renderDocMode();
     docAutoSave();
@@ -6920,6 +7399,10 @@ async function sendMessage(){
           const blockText=blockPlainText(activeBlock);
           const blockIdx=currentDoc.blocks.findIndex(b=>b.id===activeBlockId);
           ctx.push(`User has selected block #${blockIdx+1} (type: ${activeBlock.type}): "${blockText.substring(0,200)}${blockText.length>200?'...':''}". If the user asks to edit/rewrite/modify text, apply changes to THIS block.`);
+          // Caption context
+          if(docSelectedCaptionBlockId===activeBlockId && activeBlock.meta?.showCaption){
+            ctx.push(`User has specifically selected the CAPTION of this block: "${(activeBlock.meta.caption||'').substring(0,100)}". Apply changes to the caption.`);
+          }
         }
       }
     }
