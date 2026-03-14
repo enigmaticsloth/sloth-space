@@ -1424,9 +1424,10 @@ function renderApp(){
   const cv=document.getElementById('slideCanvas');
   cv.style.width=(p.slide.width*sc)+'px';
   cv.style.height=(p.slide.height*sc)+'px';
-  // Apply swipe animation class if navigating
+  // Two-layer structure: outer div = swipe animation, inner div = scale transform
+  // This prevents CSS animation from overwriting the scale (animation forwards was killing transform:scale)
   const animClass=slideAnimDir>0?'slide-enter-left':slideAnimDir<0?'slide-enter-right':'';
-  cv.innerHTML=`<div class="slide-transition-wrap ${animClass}" style="transform:scale(${sc});transform-origin:top left;width:${p.slide.width}px;height:${p.slide.height}px;">${renderSlide(s,currentSlide,p,slides.length)}</div>`;
+  cv.innerHTML=`<div class="${animClass}" style="width:${p.slide.width*sc}px;height:${p.slide.height*sc}px;overflow:hidden;"><div style="transform:scale(${sc});transform-origin:top left;width:${p.slide.width}px;height:${p.slide.height}px;">${renderSlide(s,currentSlide,p,slides.length)}</div></div>`;
 
   document.getElementById('slideNav').innerHTML=slides.map((_,i)=>
     `<button class="${i===currentSlide?'active':''}" onclick="goSlide(${i})">${i+1}</button>`
