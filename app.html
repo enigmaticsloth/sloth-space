@@ -193,12 +193,13 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .region-box.inline-editing [contenteditable=true] { outline:none; cursor:text; caret-color:#4CAF50; min-height:1em; }
 .region-box.inline-editing [contenteditable=true]:focus { background:rgba(76,175,80,0.05); border-radius:2px; }
 .region-box.inline-editing td[contenteditable=true]:focus, .region-box.inline-editing th[contenteditable=true]:focus { background:rgba(76,175,80,0.12)!important; }
-/* Free-form Canvas resize handles */
-.fc-handle { position:absolute; width:10px; height:10px; background:#5B9BD5; border:1.5px solid #fff; border-radius:2px; z-index:10; pointer-events:auto; }
-.fc-handle-se { bottom:-5px; right:-5px; cursor:se-resize; }
-.fc-handle-sw { bottom:-5px; left:-5px; cursor:sw-resize; }
-.fc-handle-ne { top:-5px; right:-5px; cursor:ne-resize; }
-.fc-handle-nw { top:-5px; left:-5px; cursor:nw-resize; }
+/* Free-form Canvas resize handles — subtle until hover */
+.fc-handle { position:absolute; width:8px; height:8px; background:#5B9BD5; border:1.5px solid #fff; border-radius:2px; z-index:10; pointer-events:auto; opacity:0.3; transition:opacity 0.15s; }
+.region-box.selected:hover .fc-handle, .fc-move-mode .fc-handle { opacity:1; }
+.fc-handle-se { bottom:-4px; right:-4px; cursor:se-resize; }
+.fc-handle-sw { bottom:-4px; left:-4px; cursor:sw-resize; }
+.fc-handle-ne { top:-4px; right:-4px; cursor:ne-resize; }
+.fc-handle-nw { top:-4px; left:-4px; cursor:nw-resize; }
 .fc-dragging * { user-select:none!important; -webkit-user-select:none!important; }
 .fc-move-mode { outline:2px dashed #FFB84D!important; outline-offset:3px!important; box-shadow:0 0 12px rgba(255,184,77,0.5)!important; cursor:move!important; animation:fc-move-pulse 1s ease-in-out infinite; }
 @keyframes fc-move-pulse { 0%,100%{outline-color:#FFB84D;} 50%{outline-color:#FF8C00;} }
@@ -226,7 +227,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .ctx-ai-btn .ctx-btn-icon { font-size:13px; flex-shrink:0; margin-top:1px; }
 .ctx-ai-btn .ctx-btn-text { flex:1; }
 .ctx-ai-btn .ctx-btn-hint { font-size:9px; color:#555; display:block; margin-top:2px; }
-.ctx-ai-divider { height:1px; background:#2a2a2a; margin:2px 4px; }
+.ctx-ai-divider { height:1px; background:#2a2a2a; margin:4px 4px; position:relative; display:flex; align-items:center; }
+.ctx-section-label { font-size:9px; color:#666; letter-spacing:0.5px; text-transform:uppercase; padding:0 8px; background:#1a1a1a; white-space:nowrap; margin-left:8px; }
 .ctx-ai-input { display:flex; gap:4px; padding:6px 8px; border-top:1px solid #2a2a2a; }
 .ctx-ai-input input { flex:1; background:#111; border:1px solid #333; border-radius:5px; padding:5px 8px; font-size:11px; color:#e0e0e0; font-family:Arial; }
 .ctx-ai-input input:focus { outline:none; border-color:#7886A5; }
@@ -1496,36 +1498,35 @@ function initFreeformCanvas(){
   const canvas=document.getElementById('slideCanvas');
   if(!canvas)return;
 
+  // ── Helper: compute scale from rendered slide to data coordinates ──
+  function getSlideScale(){
+    const slideEl=canvas.querySelector('[style*="position:relative"]');
+    if(!slideEl)return null;
+    const p=PRESETS[currentPreset];
+    return slideEl.offsetWidth/p.slide.width;
+  }
+
+  // ── MOUSE: drag only for resize handles OR when in explicit move mode ──
   canvas.addEventListener('mousedown',function(e){
-    if(!currentDeck||!selectedRegion)return;
-    // Don't start drag while inline editing
-    if(isInlineEditing())return;
+    if(!currentDeck||!selectedRegion||isInlineEditing())return;
     const handle=e.target.closest('.fc-handle');
-    const regionEl=e.target.closest('.region-box.selected');
+    // Move: ONLY when fcMoveMode is active
+    const regionEl=fcMoveMode?e.target.closest('.region-box.selected'):null;
     if(!handle&&!regionEl)return;
 
-    // Calculate scale factor (rendered size vs actual slide size)
-    const slideEl=canvas.querySelector('[style*="position:relative"]');
-    if(!slideEl)return;
-    const p=PRESETS[currentPreset];
-    const renderedW=slideEl.offsetWidth;
-    const scale=renderedW/p.slide.width;
-
+    const scale=getSlideScale();
+    if(!scale)return;
     const slideIdx=selectedRegion.slideIdx;
     const regionId=selectedRegion.regionId;
     const origBounds=getRegionBounds(slideIdx,regionId);
     if(!origBounds)return;
 
+    e.preventDefault();e.stopPropagation();
+    document.body.classList.add('fc-dragging');
     if(handle){
-      // RESIZE
-      e.preventDefault();e.stopPropagation();
       fcDrag={type:'resize',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,dir:handle.dataset.dir,scale};
-      document.body.classList.add('fc-dragging');
-    }else if(regionEl&&!e.target.closest('.fc-handle')){
-      // MOVE — only if not clicking a handle
-      e.preventDefault();e.stopPropagation();
+    }else{
       fcDrag={type:'move',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,scale};
-      document.body.classList.add('fc-dragging');
     }
   });
 
@@ -1535,16 +1536,15 @@ function initFreeformCanvas(){
     const dx=(e.clientX-fcDrag.startX)/fcDrag.scale;
     const dy=(e.clientY-fcDrag.startY)/fcDrag.scale;
     const ob=fcDrag.origBounds;
-
     if(fcDrag.type==='move'){
       setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:ob.x+dx,y:ob.y+dy,w:ob.w,h:ob.h});
       renderApp();
     }else if(fcDrag.type==='resize'){
       let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
       const d=fcDrag.dir;
-      if(d.includes('e')){nw=Math.max(60,ob.w+dx);}
+      if(d.includes('e'))nw=Math.max(60,ob.w+dx);
       if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
-      if(d.includes('s')){nh=Math.max(30,ob.h+dy);}
+      if(d.includes('s'))nh=Math.max(30,ob.h+dy);
       if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
       setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
       renderApp();
@@ -1554,34 +1554,40 @@ function initFreeformCanvas(){
   document.addEventListener('mouseup',function(e){
     if(!fcDrag)return;
     const moved=Math.abs(e.clientX-fcDrag.startX)>2||Math.abs(e.clientY-fcDrag.startY)>2;
-    if(moved){ pushUndo(); autoSave(); fcJustDragged=true; setTimeout(()=>{fcJustDragged=false;},100); }
+    if(moved){
+      pushUndo(); autoSave();
+      fcJustDragged=true; setTimeout(()=>{fcJustDragged=false;},100);
+    }
+    const wasMoveMode=fcDrag.type==='move';
     fcDrag=null;
     document.body.classList.remove('fc-dragging');
+    // Auto-exit move mode after a successful move-and-place
+    if(wasMoveMode&&moved&&fcMoveMode){
+      exitMoveMode();
+      addMessage('✓ Region placed.','system');
+    }
   });
 
-  // Touch support for mobile
+  // ── TOUCH: same logic — resize handles always, move only in move mode ──
   canvas.addEventListener('touchstart',function(e){
-    if(!currentDeck||!selectedRegion)return;
-    if(isInlineEditing())return;
+    if(!currentDeck||!selectedRegion||isInlineEditing())return;
     const t=e.touches[0];
-    const handle=t.target.closest?.('.fc-handle')||document.elementFromPoint(t.clientX,t.clientY)?.closest('.fc-handle');
-    const regionEl=document.elementFromPoint(t.clientX,t.clientY)?.closest('.region-box.selected');
+    const el=document.elementFromPoint(t.clientX,t.clientY);
+    const handle=el?.closest('.fc-handle');
+    const regionEl=fcMoveMode?el?.closest('.region-box.selected'):null;
     if(!handle&&!regionEl)return;
 
-    const slideEl=canvas.querySelector('[style*="position:relative"]');
-    if(!slideEl)return;
-    const p=PRESETS[currentPreset];
-    const scale=slideEl.offsetWidth/p.slide.width;
+    const scale=getSlideScale();
+    if(!scale)return;
     const slideIdx=selectedRegion.slideIdx;
     const regionId=selectedRegion.regionId;
     const origBounds=getRegionBounds(slideIdx,regionId);
     if(!origBounds)return;
 
+    e.preventDefault();
     if(handle){
-      e.preventDefault();
       fcDrag={type:'resize',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,dir:handle.dataset.dir,scale};
-    }else if(regionEl){
-      e.preventDefault();
+    }else{
       fcDrag={type:'move',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,scale};
     }
   },{passive:false});
@@ -1593,16 +1599,15 @@ function initFreeformCanvas(){
     const dx=(t.clientX-fcDrag.startX)/fcDrag.scale;
     const dy=(t.clientY-fcDrag.startY)/fcDrag.scale;
     const ob=fcDrag.origBounds;
-
     if(fcDrag.type==='move'){
       setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:ob.x+dx,y:ob.y+dy,w:ob.w,h:ob.h});
       renderApp();
     }else if(fcDrag.type==='resize'){
       let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
       const d=fcDrag.dir;
-      if(d.includes('e')){nw=Math.max(60,ob.w+dx);}
+      if(d.includes('e'))nw=Math.max(60,ob.w+dx);
       if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
-      if(d.includes('s')){nh=Math.max(30,ob.h+dy);}
+      if(d.includes('s'))nh=Math.max(30,ob.h+dy);
       if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
       setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
       renderApp();
@@ -1611,9 +1616,13 @@ function initFreeformCanvas(){
 
   document.addEventListener('touchend',function(e){
     if(!fcDrag)return;
-    const moved=true; // simplified for touch
-    if(moved){ pushUndo(); autoSave(); }
+    pushUndo(); autoSave();
+    const wasMoveMode=fcDrag.type==='move';
     fcDrag=null;
+    if(wasMoveMode&&fcMoveMode){
+      exitMoveMode();
+      addMessage('✓ Region placed.','system');
+    }
   });
 }
 
@@ -1736,66 +1745,63 @@ function generateCtxSuggestions(role,regionId,content){
   const isImage=typeof content==='object'&&content?.type==='image';
   const textLen=isText?content.length:0;
 
-  // ── Universal actions ──
+  // ════════ DIRECT ACTIONS (non-AI, at top) ════════
+  if(!isImage){
+    suggestions.push({icon:'✏️',text:'Edit text directly',hint:'Or double-click',action:`__edit__${regionId}`});
+  }
+  suggestions.push({icon:'✥',text:'Move / reposition',hint:'Drag to new location',action:`__move__${regionId}`});
+  // Reset position if customized
+  if(currentDeck&&currentDeck.slides[selectedRegion?.slideIdx]){
+    const slide=currentDeck.slides[selectedRegion.slideIdx];
+    if(slide.style_overrides?.regions?.[regionId]?.bounds){
+      suggestions.push({icon:'📍',text:'Reset position',hint:'Back to default layout',action:`__reset_bounds__${regionId}`});
+    }
+  }
+  suggestions.push({icon:'🔀',text:'Change layout',hint:'Try a different arrangement',action:`Suggest a better layout for this slide and change it`});
+
+  // ════════ AI SUGGESTIONS (below divider) ════════
+  suggestions.push({type:'divider'});
+
   if(isText&&textLen>0){
-    suggestions.push({icon:'✨',text:'Rewrite to be more concise',hint:'Shorten while keeping key points',action:`Rewrite the ${regionId} region to be more concise`});
-    suggestions.push({icon:'🌐',text:'Translate to English',hint:'Or any language',action:`Translate the ${regionId} region to English`});
+    suggestions.push({icon:'✨',text:'Rewrite concisely',hint:'Shorter, same meaning',action:`Rewrite the ${regionId} region to be more concise`});
+    suggestions.push({icon:'🌐',text:'Translate',hint:'To English or any language',action:`Translate the ${regionId} region to English`});
   }
 
-  // ── Role-specific suggestions ──
   if(role==='title'||role==='heading'){
-    suggestions.push({icon:'💡',text:'Make it more impactful',hint:'Punchy, attention-grabbing',action:`Make the ${regionId} more impactful and attention-grabbing`});
-    suggestions.push({icon:'📐',text:'Make it shorter',hint:'Max 5 words',action:`Shorten the ${regionId} to 5 words or fewer`});
+    suggestions.push({icon:'💡',text:'More impactful',hint:'Punchy, attention-grabbing',action:`Make the ${regionId} more impactful and attention-grabbing`});
+    suggestions.push({icon:'📐',text:'Shorten title',hint:'Max 5 words',action:`Shorten the ${regionId} to 5 words or fewer`});
   }
 
   if(role==='body'){
     if(isText&&textLen>100){
-      suggestions.push({icon:'📊',text:'Convert to key data points',hint:'Extract 3-4 bullet stats',action:`Convert the ${regionId} into 3-4 key data points with numbers`});
-      suggestions.push({icon:'📋',text:'Turn into a bullet list',hint:'Structured, scannable',action:`Convert the ${regionId} text into a structured bullet list`});
+      suggestions.push({icon:'📊',text:'Key data points',hint:'Extract 3-4 bullet stats',action:`Convert the ${regionId} into 3-4 key data points with numbers`});
+      suggestions.push({icon:'📋',text:'Bullet list',hint:'Structured, scannable',action:`Convert the ${regionId} text into a structured bullet list`});
     }
     if(isText&&textLen>0){
-      suggestions.push({icon:'📈',text:'Add concrete numbers',hint:'Statistics, metrics, data',action:`Enhance the ${regionId} by adding concrete numbers, statistics, or metrics`});
-      suggestions.push({icon:'🎯',text:'Make it more persuasive',hint:'Stronger call-to-action',action:`Make the ${regionId} more persuasive with stronger language`});
+      suggestions.push({icon:'📈',text:'Add numbers',hint:'Statistics, metrics',action:`Enhance the ${regionId} by adding concrete numbers, statistics, or metrics`});
+      suggestions.push({icon:'🎯',text:'More persuasive',hint:'Stronger language',action:`Make the ${regionId} more persuasive with stronger language`});
     }
-    suggestions.push({icon:'📊',text:'Convert to comparison table',hint:'Side-by-side pros/cons',action:`Convert this slide's content into a data-table layout with a comparison table`});
+    suggestions.push({icon:'📊',text:'Comparison table',hint:'Side-by-side layout',action:`Convert this slide's content into a data-table layout with a comparison table`});
   }
 
   if(role==='subtitle'||role==='caption'){
-    suggestions.push({icon:'✏️',text:'Expand with more detail',hint:'Add context',action:`Expand the ${regionId} with more detail and context`});
+    suggestions.push({icon:'✏️',text:'Expand with detail',hint:'Add context',action:`Expand the ${regionId} with more detail and context`});
   }
 
   if(role==='quote'){
-    suggestions.push({icon:'🔄',text:'Find a better quote',hint:'More relevant, impactful',action:`Replace the quote with a more impactful one on the same topic`});
+    suggestions.push({icon:'🔄',text:'Better quote',hint:'More relevant',action:`Replace the quote with a more impactful one on the same topic`});
   }
 
   if(isTable){
-    suggestions.push({icon:'📈',text:'Add a trends column',hint:'Growth %, YoY change',action:`Add a growth/trends column to the table on this slide`});
-    suggestions.push({icon:'🔢',text:'Sort by highest value',hint:'Reorder rows',action:`Sort the table rows by the main numeric column, highest first`});
+    suggestions.push({icon:'📈',text:'Add trends column',hint:'Growth %, YoY',action:`Add a growth/trends column to the table on this slide`});
+    suggestions.push({icon:'🔢',text:'Sort by value',hint:'Reorder rows',action:`Sort the table rows by the main numeric column, highest first`});
   }
 
   if(isList){
-    suggestions.push({icon:'✨',text:'Make each point stronger',hint:'More specific, data-driven',action:`Rewrite each bullet point in the ${regionId} to be more specific and data-driven`});
+    suggestions.push({icon:'✨',text:'Strengthen points',hint:'More specific',action:`Rewrite each bullet point in the ${regionId} to be more specific and data-driven`});
   }
 
-  // ── Direct edit & move ──
-  if(!isImage){
-    suggestions.push({icon:'✏️',text:'Edit text directly',hint:'Double-click or tap here',action:`__edit__${regionId}`});
-  }
-  suggestions.push({icon:'✥',text:'Move this region',hint:'Drag to reposition',action:`__move__${regionId}`});
-
-  // ── Layout change suggestions ──
-  suggestions.push({icon:'🔀',text:'Change this slide\'s layout',hint:'Try a different arrangement',action:`Suggest a better layout for this slide and change it`});
-
-  // ── Free-form Canvas: reset position if customized ──
-  if(currentDeck&&currentDeck.slides[selectedRegion?.slideIdx]){
-    const slide=currentDeck.slides[selectedRegion.slideIdx];
-    const hasCustomBounds=slide.style_overrides?.regions?.[regionId]?.bounds;
-    if(hasCustomBounds){
-      suggestions.push({icon:'📍',text:'Reset to default position',hint:'Undo drag/resize',action:`__reset_bounds__${regionId}`,danger:false});
-    }
-  }
-
-  // ── Danger zone ──
+  // ════════ DANGER ZONE ════════
   suggestions.push({type:'divider'});
   suggestions.push({icon:'🗑️',text:'Clear this region',hint:'Remove content',action:`__clear__${regionId}`,danger:true});
 
@@ -1810,15 +1816,20 @@ function showCtxAiMenu(slideIdx,regionId,role,label,clickEvent){
 
   // Build menu HTML
   let html=`<div class="ctx-ai-header">
-    <span class="ctx-icon">✦</span>
-    <span class="ctx-label">AI Actions</span>
     <span class="ctx-region-name">${label}</span>
     <button class="ctx-close" onclick="event.stopPropagation();hideCtxAiMenu()">×</button>
   </div>`;
   html+=`<div class="ctx-ai-actions">`;
+  let afterFirstDivider=false;
   suggestions.forEach((s,i)=>{
     if(s.type==='divider'){
-      html+=`<div class="ctx-ai-divider"></div>`;
+      if(!afterFirstDivider){
+        // First divider: label the AI section
+        html+=`<div class="ctx-ai-divider"><span class="ctx-section-label">✦ AI Suggestions</span></div>`;
+        afterFirstDivider=true;
+      }else{
+        html+=`<div class="ctx-ai-divider"></div>`;
+      }
       return;
     }
     const cls=s.danger?'ctx-ai-btn danger':'ctx-ai-btn';
@@ -1829,9 +1840,9 @@ function showCtxAiMenu(slideIdx,regionId,role,label,clickEvent){
     </button>`;
   });
   html+=`</div>`;
-  // Custom input at bottom
+  // Custom AI input at bottom
   html+=`<div class="ctx-ai-input">
-    <input type="text" id="ctxCustomInput" placeholder="Or type your own instruction..." onkeydown="if(event.key==='Enter'){event.stopPropagation();execCtxCustom();}">
+    <input type="text" id="ctxCustomInput" placeholder="Ask AI to change this..." onkeydown="if(event.key==='Enter'){event.stopPropagation();execCtxCustom();}">
     <button onclick="event.stopPropagation();execCtxCustom()">Go</button>
   </div>`;
   menu.innerHTML=html;
