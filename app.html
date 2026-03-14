@@ -186,7 +186,14 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 /* Region selection */
 .region-box { cursor:pointer; transition:outline 0.15s,box-shadow 0.15s; }
 .region-box:hover { outline:2px dashed rgba(255,255,255,0.25); outline-offset:2px; }
-.region-box.selected { outline:2px solid #5B9BD5; outline-offset:2px; box-shadow:0 0 8px rgba(91,155,213,0.4); }
+.region-box.selected { outline:2px solid #5B9BD5; outline-offset:2px; box-shadow:0 0 8px rgba(91,155,213,0.4); cursor:move; }
+/* Free-form Canvas resize handles */
+.fc-handle { position:absolute; width:10px; height:10px; background:#5B9BD5; border:1.5px solid #fff; border-radius:2px; z-index:10; pointer-events:auto; }
+.fc-handle-se { bottom:-5px; right:-5px; cursor:se-resize; }
+.fc-handle-sw { bottom:-5px; left:-5px; cursor:sw-resize; }
+.fc-handle-ne { top:-5px; right:-5px; cursor:ne-resize; }
+.fc-handle-nw { top:-5px; left:-5px; cursor:nw-resize; }
+.fc-dragging * { user-select:none!important; -webkit-user-select:none!important; }
 .selection-bar { display:flex; align-items:center; gap:8px; padding:2px 10px; font-size:10px; color:#666; font-family:Arial; }
 .selection-tag { background:#1a1a2e; color:#5B9BD5; border:1px solid #2a3a5e; padding:1px 8px; border-radius:3px; font-size:10px; font-weight:600; }
 .selection-clear { background:transparent; border:none; color:#555; cursor:pointer; font-size:10px; padding:1px 4px; }
@@ -1395,8 +1402,8 @@ function selectRegion(slideIdx,regionId,role,label,clickEvent){
   // Re-render to show highlight
   renderApp();
   updateFontSizeIndicator();
-  // Show contextual AI menu near the click
-  if(clickEvent) showCtxAiMenu(slideIdx,regionId,role,label,clickEvent);
+  // Show contextual AI menu near the click (not when dragging via fc)
+  if(clickEvent&&!fcDrag&&!fcJustDragged) showCtxAiMenu(slideIdx,regionId,role,label,clickEvent);
 }
 function clearSelection(){
   selectedRegion=null;
@@ -1404,6 +1411,164 @@ function clearSelection(){
   hideCtxAiMenu();
   updateFontSizeIndicator();
   renderApp();
+}
+
+// ═══════════════════════════════════════════
+// FREE-FORM CANVAS — Drag-to-move & resize regions
+// ═══════════════════════════════════════════
+let fcDrag=null; // {type:'move'|'resize', regionId, slideIdx, startX, startY, origBounds, dir}
+let fcJustDragged=false; // suppress ctx menu after drag
+
+function getRegionBounds(slideIdx,regionId){
+  const slide=currentDeck.slides[slideIdx];
+  if(!slide)return null;
+  const ov=(slide.style_overrides||{}).regions||{};
+  const rOv=ov[regionId]||{};
+  const L=LAYOUTS[slide.layout];
+  if(!L)return null;
+  const r=L.regions.find(r=>r.id===regionId);
+  if(!r)return null;
+  return rOv.bounds?{...rOv.bounds}:{...r.bounds};
+}
+
+function setRegionBounds(slideIdx,regionId,bounds){
+  const slide=currentDeck.slides[slideIdx];
+  if(!slide)return;
+  if(!slide.style_overrides) slide.style_overrides={};
+  if(!slide.style_overrides.regions) slide.style_overrides.regions={};
+  if(!slide.style_overrides.regions[regionId]) slide.style_overrides.regions[regionId]={};
+  slide.style_overrides.regions[regionId].bounds={x:Math.round(bounds.x),y:Math.round(bounds.y),w:Math.round(bounds.w),h:Math.round(bounds.h)};
+}
+
+function resetRegionBounds(slideIdx,regionId){
+  const slide=currentDeck?.slides[slideIdx];
+  if(!slide?.style_overrides?.regions?.[regionId]?.bounds)return;
+  delete slide.style_overrides.regions[regionId].bounds;
+  addMessage(`✓ Reset "${regionId}" to default position.`,'system');
+  pushUndo();
+  renderApp();
+}
+
+function initFreeformCanvas(){
+  const canvas=document.getElementById('slideCanvas');
+  if(!canvas)return;
+
+  canvas.addEventListener('mousedown',function(e){
+    if(!currentDeck||!selectedRegion)return;
+    const handle=e.target.closest('.fc-handle');
+    const regionEl=e.target.closest('.region-box.selected');
+    if(!handle&&!regionEl)return;
+
+    // Calculate scale factor (rendered size vs actual slide size)
+    const slideEl=canvas.querySelector('[style*="position:relative"]');
+    if(!slideEl)return;
+    const p=PRESETS[currentPreset];
+    const renderedW=slideEl.offsetWidth;
+    const scale=renderedW/p.slide.width;
+
+    const slideIdx=selectedRegion.slideIdx;
+    const regionId=selectedRegion.regionId;
+    const origBounds=getRegionBounds(slideIdx,regionId);
+    if(!origBounds)return;
+
+    if(handle){
+      // RESIZE
+      e.preventDefault();e.stopPropagation();
+      fcDrag={type:'resize',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,dir:handle.dataset.dir,scale};
+      document.body.classList.add('fc-dragging');
+    }else if(regionEl&&!e.target.closest('.fc-handle')){
+      // MOVE — only if not clicking a handle
+      e.preventDefault();e.stopPropagation();
+      fcDrag={type:'move',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,scale};
+      document.body.classList.add('fc-dragging');
+    }
+  });
+
+  document.addEventListener('mousemove',function(e){
+    if(!fcDrag)return;
+    e.preventDefault();
+    const dx=(e.clientX-fcDrag.startX)/fcDrag.scale;
+    const dy=(e.clientY-fcDrag.startY)/fcDrag.scale;
+    const ob=fcDrag.origBounds;
+
+    if(fcDrag.type==='move'){
+      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:ob.x+dx,y:ob.y+dy,w:ob.w,h:ob.h});
+      renderApp();
+    }else if(fcDrag.type==='resize'){
+      let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
+      const d=fcDrag.dir;
+      if(d.includes('e')){nw=Math.max(60,ob.w+dx);}
+      if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
+      if(d.includes('s')){nh=Math.max(30,ob.h+dy);}
+      if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
+      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
+      renderApp();
+    }
+  });
+
+  document.addEventListener('mouseup',function(e){
+    if(!fcDrag)return;
+    const moved=Math.abs(e.clientX-fcDrag.startX)>2||Math.abs(e.clientY-fcDrag.startY)>2;
+    if(moved){ pushUndo(); autoSave(); fcJustDragged=true; setTimeout(()=>{fcJustDragged=false;},100); }
+    fcDrag=null;
+    document.body.classList.remove('fc-dragging');
+  });
+
+  // Touch support for mobile
+  canvas.addEventListener('touchstart',function(e){
+    if(!currentDeck||!selectedRegion)return;
+    const t=e.touches[0];
+    const handle=t.target.closest?.('.fc-handle')||document.elementFromPoint(t.clientX,t.clientY)?.closest('.fc-handle');
+    const regionEl=document.elementFromPoint(t.clientX,t.clientY)?.closest('.region-box.selected');
+    if(!handle&&!regionEl)return;
+
+    const slideEl=canvas.querySelector('[style*="position:relative"]');
+    if(!slideEl)return;
+    const p=PRESETS[currentPreset];
+    const scale=slideEl.offsetWidth/p.slide.width;
+    const slideIdx=selectedRegion.slideIdx;
+    const regionId=selectedRegion.regionId;
+    const origBounds=getRegionBounds(slideIdx,regionId);
+    if(!origBounds)return;
+
+    if(handle){
+      e.preventDefault();
+      fcDrag={type:'resize',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,dir:handle.dataset.dir,scale};
+    }else if(regionEl){
+      e.preventDefault();
+      fcDrag={type:'move',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,scale};
+    }
+  },{passive:false});
+
+  document.addEventListener('touchmove',function(e){
+    if(!fcDrag)return;
+    e.preventDefault();
+    const t=e.touches[0];
+    const dx=(t.clientX-fcDrag.startX)/fcDrag.scale;
+    const dy=(t.clientY-fcDrag.startY)/fcDrag.scale;
+    const ob=fcDrag.origBounds;
+
+    if(fcDrag.type==='move'){
+      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:ob.x+dx,y:ob.y+dy,w:ob.w,h:ob.h});
+      renderApp();
+    }else if(fcDrag.type==='resize'){
+      let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
+      const d=fcDrag.dir;
+      if(d.includes('e')){nw=Math.max(60,ob.w+dx);}
+      if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
+      if(d.includes('s')){nh=Math.max(30,ob.h+dy);}
+      if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
+      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
+      renderApp();
+    }
+  },{passive:false});
+
+  document.addEventListener('touchend',function(e){
+    if(!fcDrag)return;
+    const moved=true; // simplified for touch
+    if(moved){ pushUndo(); autoSave(); }
+    fcDrag=null;
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -1477,6 +1642,15 @@ function generateCtxSuggestions(role,regionId,content){
 
   // ── Layout change suggestions ──
   suggestions.push({icon:'🔀',text:'Change this slide\'s layout',hint:'Try a different arrangement',action:`Suggest a better layout for this slide and change it`});
+
+  // ── Free-form Canvas: reset position if customized ──
+  if(currentDeck&&currentDeck.slides[selectedRegion?.slideIdx]){
+    const slide=currentDeck.slides[selectedRegion.slideIdx];
+    const hasCustomBounds=slide.style_overrides?.regions?.[regionId]?.bounds;
+    if(hasCustomBounds){
+      suggestions.push({icon:'📍',text:'Reset to default position',hint:'Undo drag/resize',action:`__reset_bounds__${regionId}`,danger:false});
+    }
+  }
 
   // ── Danger zone ──
   suggestions.push({type:'divider'});
@@ -1559,6 +1733,11 @@ function execCtxAction(action){
     addMessage(`✓ Cleared ${regionId} on slide ${currentSlide+1}`,'system');
     clearSelection();
     renderApp();
+    return;
+  }
+  if(action.startsWith('__reset_bounds__')){
+    const regionId=action.replace('__reset_bounds__','');
+    resetRegionBounds(currentSlide,regionId);
     return;
   }
   // Normal AI actions: inject into chat input and send
@@ -1693,11 +1872,14 @@ function renderSlide(slide,idx,p,total){
     const c=slide.content[r.id];
     if(!c&&r.optional)return;
     if(!c)return;
-    const ax=m.left+r.bounds.x,ay=m.top+r.bounds.y;
+    // FREE-FORM CANVAS: per-region bounds override
+    const rOv=regionOv[r.id]||{};
+    const b=rOv.bounds||r.bounds; // custom position > layout default
+    const ax=m.left+b.x,ay=m.top+b.y;
+    const bw=b.w||r.bounds.w, bh=b.h||r.bounds.h;
     const al=r.align||{};
     const jc=al.vertical==='middle'?'center':al.vertical==='bottom'?'flex-end':'flex-start';
     // Per-region overrides: region-specific > global > null (use preset)
-    const rOv=regionOv[r.id]||{};
     const regionColor=rOv.color||globalColor||null;
     const regionFont=rOv.font||fontOv||null;
     // Text decorations: region-specific > global
@@ -1718,8 +1900,15 @@ function renderSlide(slide,idx,p,total){
     const isSel=selectedRegion&&selectedRegion.slideIdx===idx&&selectedRegion.regionId===r.id;
     const selClass=isSel?'region-box selected':'region-box';
     const roleLabel=r.role.charAt(0).toUpperCase()+r.role.slice(1);
-    html+=`<div class="${selClass}" onclick="event.stopPropagation();selectRegion(${idx},'${r.id}','${r.role}','${roleLabel}',event)" style="position:absolute;left:${ax}px;top:${ay}px;width:${r.bounds.w}px;height:${r.bounds.h}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
+    html+=`<div class="${selClass}" data-region="${r.id}" data-slide="${idx}" onclick="event.stopPropagation();selectRegion(${idx},'${r.id}','${r.role}','${roleLabel}',event)" style="position:absolute;left:${ax}px;top:${ay}px;width:${bw}px;height:${bh}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
     html+=rc(c,r.role,p,r,regionColor,regionFontSize);
+    // Resize handles on selected region
+    if(isSel){
+      html+=`<div class="fc-handle fc-handle-se" data-dir="se"></div>`;
+      html+=`<div class="fc-handle fc-handle-sw" data-dir="sw"></div>`;
+      html+=`<div class="fc-handle fc-handle-ne" data-dir="ne"></div>`;
+      html+=`<div class="fc-handle fc-handle-nw" data-dir="nw"></div>`;
+    }
     html+='</div>';
   });
   // Render floating images (overlays on top of content)
@@ -2886,6 +3075,8 @@ Output ONLY a JSON object. Possible keys:
 - "underline": true/false — add/remove underline
 - "bold": true/false — add/remove bold
 - "italic": true/false — add/remove italic
+- "region_bounds": {x,y,w,h} — reposition/resize a region (use WITH "region"). Slide is 1280×720, margins 72/60. x,y are relative to margins.
+- "reset_bounds": true — reset a region to its default layout position (use WITH "region")
 - "slides": "all" or a number (default "all")
 
 If the message is NOT about visual style (colors, fonts, bold, underline, italic, background, size), output {"none":true}.
@@ -2923,6 +3114,9 @@ Examples:
 "標題加粗" → {"region":"title","bold":true}
 "副標題加斜體底線" → {"region":"subtitle","italic":true,"underline":true}
 "取消底線" → {"underline":false}
+"把標題移到中間" → {"region":"title","region_bounds":{"x":200,"y":280,"w":736,"h":100}}
+"body放大一點寬一點" → {"region":"body","region_bounds":{"x":0,"y":64,"w":1136,"h":560}}
+"標題復位" → {"region":"title","reset_bounds":true}
 "內容豐富一點" → {"none":true}
 "改寫這段" → {"none":true}
 
@@ -3009,6 +3203,18 @@ function applyStyleOverrides(styleObj){
     if(styleObj.bold!==undefined)s.style_overrides.bold=styleObj.bold;
     if(styleObj.italic!==undefined)s.style_overrides.italic=styleObj.italic;
 
+    // Per-region bounds (Free-form Canvas via AI)
+    if(regionId&&styleObj.region_bounds){
+      if(!s.style_overrides.regions)s.style_overrides.regions={};
+      if(!s.style_overrides.regions[regionId])s.style_overrides.regions[regionId]={};
+      s.style_overrides.regions[regionId].bounds=styleObj.region_bounds;
+    }
+    if(regionId&&styleObj.reset_bounds){
+      if(s.style_overrides?.regions?.[regionId]?.bounds){
+        delete s.style_overrides.regions[regionId].bounds;
+      }
+    }
+
     // Per-region overrides
     const hasRegionStyle=styleObj.region_color||styleObj.region_font||styleObj.region_font_size||
       (regionId&&(styleObj.underline!==undefined||styleObj.bold!==undefined||styleObj.italic!==undefined));
@@ -3041,6 +3247,8 @@ function applyStyleOverrides(styleObj){
   if(styleObj.underline===false)msgs.push(`${regionId||'全部'} -底線`);
   if(styleObj.bold===true)msgs.push(`${regionId||'全部'} +粗體`);
   if(styleObj.italic===true)msgs.push(`${regionId||'全部'} +斜體`);
+  if(regionId&&styleObj.region_bounds)msgs.push(`${regionId} 移動/調整大小`);
+  if(regionId&&styleObj.reset_bounds)msgs.push(`${regionId} 復位`);
   return msgs;
 }
 
@@ -3052,8 +3260,8 @@ Output ONLY a JSON object with "intent" and optional fields.
 
 INTENTS (pick one):
 
-"style" — visual style changes: colors, fonts, font sizes, backgrounds, bold, italic, underline, spacing. NOT content changes.
-Examples: "背景改藍色", "字型改Georgia", "標題加粗", "字大一點", "change background to dark blue", "make title red"
+"style" — visual style changes: colors, fonts, font sizes, backgrounds, bold, italic, underline, spacing, moving/resizing regions. NOT content changes.
+Examples: "背景改藍色", "字型改Georgia", "標題加粗", "字大一點", "change background to dark blue", "make title red", "把標題移到中間", "body放大", "標題復位"
 
 "image" — anything about images on slides: place, move, resize, delete, scale, crop, fit.
 Examples: "放到第3頁右邊", "圖片大一點", "刪除這張圖片", "move image left", "remove the photo"
@@ -3275,6 +3483,77 @@ Examples:
 
 Output ONLY the JSON object.`;
 
+// ═══════════════════════════════════════════
+// AUTO-DESIGNER — Smart image placement
+// ═══════════════════════════════════════════
+
+// Analyze image aspect ratio and slide content to pick optimal placement
+function autoDesignImagePlacement(img,slide,p){
+  const W=p.slide.width, H=p.slide.height;
+  const ar=img.width/img.height; // aspect ratio: >1 = landscape, <1 = portrait, ~1 = square
+  const layout=slide.layout;
+  const hasTitle=!!(slide.content.title||slide.content.heading);
+  const hasBody=!!(slide.content.body||slide.content.left||slide.content.right);
+  const hasExistingImages=slide.images&&slide.images.length>0;
+
+  // Smart sizing based on aspect ratio
+  let imgW, imgH, x, y, position;
+
+  if(ar>=2.5){
+    // Ultra-wide / panoramic → full-width banner at top or bottom
+    imgW=W*0.85;
+    imgH=imgW/ar;
+    x=Math.round((W-imgW)/2);
+    if(!hasBody){ y=H*0.35; position='center'; }
+    else{ y=hasTitle?60:20; position='top'; }
+  }else if(ar>=1.4){
+    // Landscape → top banner or bottom half
+    imgW=W*0.65;
+    imgH=imgW/ar;
+    x=Math.round((W-imgW)/2);
+    if(hasTitle&&hasBody){ y=H-imgH-50; position='bottom'; }
+    else if(hasTitle){ y=Math.round(H*0.3); position='center'; }
+    else{ y=40; position='top'; }
+  }else if(ar>=0.7){
+    // Square-ish → flexible, depends on content density
+    imgW=Math.min(W*0.4, H*0.5);
+    imgH=imgW/ar;
+    if(!hasBody){
+      // Sparse slide → center-right, larger
+      imgW=W*0.45; imgH=imgW/ar;
+      x=W-imgW-60; y=Math.round((H-imgH)/2);
+      position='right';
+    }else{
+      // Content-heavy → smaller, tucked into corner
+      x=W-imgW-50; y=H-imgH-50;
+      position='bottom-right';
+    }
+  }else{
+    // Portrait → side placement
+    imgH=Math.min(H*0.7, img.height);
+    imgW=imgH*ar;
+    y=Math.round((H-imgH)/2);
+    // If two-column layout, place on the emptier side
+    if(layout==='two-column'){
+      const leftLen=JSON.stringify(slide.content.left||'').length;
+      const rightLen=JSON.stringify(slide.content.right||'').length;
+      if(leftLen<=rightLen){ x=50; position='left'; }
+      else{ x=W-imgW-50; position='right'; }
+    }else{
+      x=W-imgW-50; position='right';
+    }
+  }
+
+  // Avoid overlap with existing images
+  if(hasExistingImages){
+    const offset=slide.images.length*30;
+    x=Math.min(x+offset, W-imgW-20);
+    y=Math.min(y+offset, H-imgH-20);
+  }
+
+  return { imgW:Math.round(imgW), imgH:Math.round(imgH), x:Math.round(x), y:Math.round(y), position };
+}
+
 // Place staged images into a slide as a floating overlay (preserves existing content & layout)
 function placeImageOnSlide(images,targetSlide,position){
   if(!currentDeck||images.length===0)return null;
@@ -3285,21 +3564,28 @@ function placeImageOnSlide(images,targetSlide,position){
   const p=PRESETS[currentPreset];
   const W=p.slide.width, H=p.slide.height;
 
-  // Calculate default position based on user intent
-  // Image is placed as a floating overlay — never changes the layout
-  const imgW=Math.min(img.width, W*0.4); // max 40% of slide width
-  const imgH=imgW*(img.height/img.width); // keep aspect ratio
-  let x,y;
-  if(position==='left'){ x=40; y=Math.round((H-imgH)/2); }
-  else if(position==='right'){ x=W-imgW-40; y=Math.round((H-imgH)/2); }
-  else if(position==='top'){ x=Math.round((W-imgW)/2); y=40; }
-  else if(position==='bottom'){ x=Math.round((W-imgW)/2); y=H-imgH-40; }
-  else{
-    // Auto: find an empty-ish spot — default to bottom-right corner
-    x=W-imgW-60; y=H-imgH-60;
+  let x, y, imgW, imgH;
+
+  if(position!=='auto'&&position){
+    // User explicitly specified position — respect it
+    imgW=Math.min(img.width, W*0.4);
+    imgH=imgW*(img.height/img.width);
+    if(position==='left'){ x=40; y=Math.round((H-imgH)/2); }
+    else if(position==='right'){ x=W-imgW-40; y=Math.round((H-imgH)/2); }
+    else if(position==='top'){ x=Math.round((W-imgW)/2); y=40; }
+    else if(position==='bottom'){ x=Math.round((W-imgW)/2); y=H-imgH-40; }
+    else if(position==='center'){ x=Math.round((W-imgW)/2); y=Math.round((H-imgH)/2); }
+    else if(position==='full'){ imgW=W; imgH=H; x=0; y=0; }
+    else{ x=W-imgW-60; y=H-imgH-60; }
+  }else{
+    // AUTO-DESIGNER: Analyze image + slide content for smart placement
+    const auto=autoDesignImagePlacement(img,slide,p);
+    imgW=auto.imgW; imgH=auto.imgH;
+    x=auto.x; y=auto.y;
+    position=auto.position;
   }
 
-  // Store as floating image overlay (not tied to a layout region)
+  // Store as floating image overlay
   if(!slide.images) slide.images=[];
   slide.images.push({
     id:'img_'+Date.now(),
@@ -3311,7 +3597,9 @@ function placeImageOnSlide(images,targetSlide,position){
   });
   currentSlide=targetSlide;
 
-  let msg=`✓ Placed "${img.name}" into slide ${targetSlide+1}`;
+  const ar=img.width/img.height;
+  const arLabel=ar>=1.4?'landscape':ar<=0.7?'portrait':'square';
+  let msg=`✓ Auto-placed "${img.name}" (${arLabel}) → ${position} on slide ${targetSlide+1}`;
   if(images.length>1){
     msg+=`. ${images.length-1} more image(s) still staged.`;
     stagedImages=images.slice(1);
@@ -3371,10 +3659,11 @@ function applyImageAction(actionObj){
 async function sendMessage(){
   const input=document.getElementById('chatInput');
   const text=input.value.trim();
-  if(!text)return;
+  const hasImages=stagedImages.length>0;
+  // Allow empty text if images are staged (Auto-Designer: skip LLM)
+  if(!text&&!hasImages)return;
   input.value='';
-  addMessage(text,'user');
-  chatHistory.push({role:'user',content:text});
+  if(text){ addMessage(text,'user'); chatHistory.push({role:'user',content:text}); }
 
   // ── PASS -1: Local UI commands (no LLM needed) ──
   const trimText=text.trim();
@@ -3445,8 +3734,20 @@ async function sendMessage(){
   }
 
   try{
-    // ── If user attached images, go straight to image path (no router needed) ──
+    // ── If user attached images, go to image path ──
     if(pendingImages.length>0){
+      // AUTO-DESIGNER: No text / minimal text → skip LLM entirely, use smart auto-placement
+      const isMinimalText=!text||text.length<3||/^(放|加|貼|drop|add|place|put|image|圖|img|pic|photo|ok|go|here|這|好)$/i.test(text);
+      if(isMinimalText){
+        statusDiv.remove();
+        const msg=placeImageOnSlide(pendingImages,currentSlide,'auto');
+        if(msg) addMessage(msg,'ai');
+        renderApp();
+        sendBtn.disabled=false; sendBtn.textContent='Send';
+        autoSave();
+        return;
+      }
+      // User gave specific instructions → use LLM to parse intent
       statusDiv.textContent='Processing image...';
       try{
         const imgRaw=await callLLM(IMAGE_PROMPT,[{role:'user',content:text}],{temperature:0,max_tokens:128,json:true});
@@ -4609,6 +4910,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowLeft'&&currentDeck){goSlide(Math.max(currentSlide-1,0));e.preventDefault();}
 });
 initToolbar();
+initFreeformCanvas();
 // Deck name input — update title on change
 document.getElementById('deckNameInput').addEventListener('input',function(){
   if(currentDeck){
