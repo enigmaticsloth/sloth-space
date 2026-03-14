@@ -776,18 +776,15 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     overflow:hidden; /* clip, don't let content push layout */
     min-height:120px; /* minimum on tiny screens */
   }
-  /* Doc/workspace: slide-panel becomes full-height scrollable container */
-  body.mode-doc .slide-panel,
-  body.mode-workspace .slide-panel {
+  /* Doc/workspace canvas: now in .middle directly (not inside slide-panel) */
+  body.mode-doc .doc-canvas,
+  body.mode-workspace .workspace-canvas {
     flex:1 1 0 !important; min-height:0;
     overflow-y:auto !important; overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     touch-action:pan-y !important;
-    align-items:stretch; justify-content:flex-start;
-    padding:0;
+    padding:16px 8px;
   }
-  body.mode-doc .slide-panel *,
-  body.mode-workspace .slide-panel * { touch-action:pan-y !important; }
   /* Drag handle: always visible on mobile (no hover), and allow touch drag */
   body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }
@@ -1882,58 +1879,46 @@ document.addEventListener('keydown',function(e){
   const isCE=e.target.isContentEditable;
   const isInput=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||isCE);
 
-  // ── Undo/Redo — always intercept in both slide and doc modes ──
-  if((e.ctrlKey||e.metaKey)&&!e.altKey){
-    if(e.key==='z'&&!e.shiftKey){
-      if(isInlineEditing()) return; // slide inline edit: let browser handle
-      e.preventDefault();
-      if(currentMode==='doc'){
-        // Flush any pending undo snapshot from typing
-        clearTimeout(docUndoPushTimer);
-        if(docEditingBlockId){
-          const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
-          if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
-        }
-        docPushUndo();
-        docUndo();
-      } else { undo(); }
-      return;
-    }
-    if((e.key==='z'&&e.shiftKey)||e.key==='y'){
-      if(isInlineEditing()) return; // slide inline edit: let browser handle
-      e.preventDefault();
+  // ── Undo/Redo ──
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z'||e.key==='y'||e.key==='Y')){
+    // ANY input/textarea/contenteditable → let browser handle natively (undo & redo)
+    if(isInput) return;
+    // Slide inline edit → let browser handle contenteditable undo
+    if(isInlineEditing()) return;
+    // Not editing anything → use our block/slide-level undo system
+    e.preventDefault();
+    const isUndo=(e.key==='z'||e.key==='Z')&&!e.shiftKey;
+    const isRedo=(e.key==='y'||e.key==='Y')||((e.key==='z'||e.key==='Z')&&e.shiftKey);
+    if(isUndo){
+      if(currentMode==='doc'){ docPushUndo(); docUndo(); }
+      else { undo(); }
+    } else if(isRedo){
       if(currentMode==='doc') docRedo(); else redo();
-      return;
     }
+    return;
   }
 
   if(isInlineEditing()) return; // let browser handle other keys in slide inline edit
 
   // ── Escape — deselect in both modes ──
   if(e.key==='Escape'){
-    if(currentMode==='slide'){
-      if(selectedRegion){ clearSelection(); e.preventDefault(); }
-    } else if(currentMode==='doc'){
-      // Close image popup if open
+    if(currentMode==='doc'){
       docHideImagePopup();
-      // If actively editing a contenteditable (block or table cell), blur it first
+      // If actively editing a contenteditable, blur it first
       const ae=document.activeElement;
       if(ae&&ae.isContentEditable){
         ae.blur();
-        // Lock text block back to non-editable
         if(ae.classList.contains('doc-block')) ae.contentEditable='false';
         if(docEditingBlockId) docEditingBlockId=null;
         e.preventDefault();
         return;
       }
-      if(docEditingBlockId||docSelectedBlockId){
-        docEditingBlockId=null;
-        docSelectedBlockId=null;
-        document.querySelectorAll('.doc-block.selected').forEach(el=>el.classList.remove('selected'));
-        document.getElementById('selectionBar').style.display='none';
-        hideCtxAiMenu();
-        e.preventDefault();
-      }
+    }
+    // Unified deselect for both slide and doc
+    if(selectedRegion||docEditingBlockId||docSelectedBlockId){
+      docEditingBlockId=null;
+      clearSelection(); // handles both slide region + doc block + selection bar + ctx menu
+      e.preventDefault();
     }
     return;
   }
@@ -1954,9 +1939,7 @@ document.addEventListener('keydown',function(e){
         e.preventDefault();
         docPushUndo();
         docDeleteBlock(bid);
-        docSelectedBlockId=null;
-        document.getElementById('selectionBar').style.display='none';
-        hideCtxAiMenu();
+        clearSelection();
         renderDocMode();
       }
     }
@@ -2000,11 +1983,16 @@ function selectRegion(slideIdx,regionId,role,label,clickEvent){
 function clearSelection(){
   if(isInlineEditing()) commitInlineEdit();
   selectedRegion=null;
+  // Doc selection
+  docSelectedBlockId=null;
+  docSelectedCaptionBlockId=null;
+  document.querySelectorAll('.doc-block.selected').forEach(el=>el.classList.remove('selected'));
+  // Shared UI
   document.getElementById('selectionBar').style.display='none';
   hideCtxAiMenu();
   exitMoveMode();
   updateFontSizeIndicator();
-  renderApp();
+  if(currentMode==='slide') renderApp();
 }
 
 // ═══════════════════════════════════════════
@@ -3455,6 +3443,11 @@ function initToolbar(){
   if(fontListEl) fontListEl.innerHTML=FONTS.map(f=>
     `<div class="font-item" style="font-family:'${f}';" onclick="insertTag('[font: ${f}]')">${f}</div>`
   ).join('');
+  // Prevent toolbar buttons from stealing focus from contenteditable
+  // This ensures execCommand works on the current selection
+  document.querySelectorAll('.dt-btn, .dt-select, .color-swatch, .font-item').forEach(el=>{
+    el.addEventListener('mousedown', ev=>ev.preventDefault());
+  });
   // Set initial toolbar mode
   updateToolbarForMode(currentMode||'slide');
 }
@@ -3989,12 +3982,18 @@ function modeShowUI(mode){
   if(slideBar) slideBar.style.display='none';
   if(docCanvas) docCanvas.style.display='none';
   if(wsCanvas) wsCanvas.style.display='none';
+  // Always restore slide-panel visibility (doc mode hides it)
+  const sp=document.querySelector('.slide-panel');
+  if(sp) sp.style.display='';
 
   // Name bar always visible
   if(nameBar) nameBar.style.display='';
 
   // Show mode-specific panels
   if(mode==='slide'){
+    // Move name bar back into slide-panel
+    const spForName=document.querySelector('.slide-panel');
+    if(nameBar&&spForName) spForName.prepend(nameBar);
     if(slideCanvas) slideCanvas.style.display='';
     if(slideBar) slideBar.style.display='';
   } else if(mode==='doc'){
@@ -4003,8 +4002,20 @@ function modeShowUI(mode){
       dc=document.createElement('div');
       dc.id='docCanvas';
       dc.className='doc-canvas';
-      document.querySelector('.slide-panel').appendChild(dc);
+      // Click on canvas padding → deselect
+      dc.addEventListener('click',function(ev){
+        if(ev.target===dc) clearSelection();
+      });
+      // Insert into .middle before chat-panel (NOT inside .slide-panel) to avoid touch-action:none
+      const middle=document.querySelector('.middle');
+      const chatPanel=document.getElementById('chatPanel');
+      middle.insertBefore(dc, chatPanel);
     }
+    // Move name bar into doc-canvas (before content)
+    if(nameBar) dc.prepend(nameBar);
+    // Hide slide-panel entirely
+    const spDoc=document.querySelector('.slide-panel');
+    if(spDoc) spDoc.style.display='none';
     dc.style.display='';
   } else if(mode==='workspace'){
     let wc=wsCanvas;
@@ -4012,8 +4023,14 @@ function modeShowUI(mode){
       wc=document.createElement('div');
       wc.id='workspaceCanvas';
       wc.className='workspace-canvas';
-      document.getElementById('slideCanvas').parentElement.insertBefore(wc,document.getElementById('slideCanvas'));
+      const middle2=document.querySelector('.middle');
+      const chatPanel2=document.getElementById('chatPanel');
+      middle2.insertBefore(wc, chatPanel2);
     }
+    // Move name bar into workspace-canvas
+    if(nameBar) wc.prepend(nameBar);
+    const spWs=document.querySelector('.slide-panel');
+    if(spWs) spWs.style.display='none';
     wc.style.display='';
   }
 }
@@ -4610,8 +4627,11 @@ function modeRedo(){
 function modeExecCmd(cmd){
   if(currentMode==='doc'){
     docExecCmd(cmd);
+  } else if(isInlineEditing()){
+    // Slide inline edit: apply formatting directly via execCommand
+    document.execCommand(cmd);
   } else {
-    // Slide mode: insert tag into chat input
+    // Slide mode (not inline editing): insert tag into chat input
     insertTag(`[${cmd}]`);
   }
 }
@@ -5482,13 +5502,9 @@ function docSelectBlock(blockId, e){
 }
 
 function docPageClick(event){
-  // If click is on the page background (not on a block), clear selection
+  // Click on blank area (not on a block) → clear selection (shared with slide)
   if(!event.target.closest('.doc-block')){
-    docSelectedBlockId=null;
-    docSelectedCaptionBlockId=null;
-    document.querySelectorAll('.doc-block.selected').forEach(el=>el.classList.remove('selected'));
-    document.getElementById('selectionBar').style.display='none';
-    hideCtxAiMenu();
+    clearSelection();
   }
 }
 
@@ -5640,8 +5656,8 @@ function docKeydownBlock(event, blockId){
     }
   }
 
-  // Arrow Up at start: focus previous block
-  if(event.key==='ArrowUp'){
+  // Arrow Up at start: focus previous block (but not when Shift is held — that's text selection)
+  if(event.key==='ArrowUp'&&!event.shiftKey){
     const sel=window.getSelection();
     if(sel&&sel.rangeCount>0){
       const range=sel.getRangeAt(0);
@@ -5666,8 +5682,8 @@ function docKeydownBlock(event, blockId){
     }
   }
 
-  // Arrow Down at end: focus next block
-  if(event.key==='ArrowDown'){
+  // Arrow Down at end: focus next block (but not when Shift is held — that's text selection)
+  if(event.key==='ArrowDown'&&!event.shiftKey){
     const sel=window.getSelection();
     if(sel&&sel.rangeCount>0){
       const el=document.querySelector(`[data-block-id="${blockId}"]`);
@@ -8662,6 +8678,12 @@ chatInput.addEventListener('keydown',e=>{
 document.addEventListener('keydown',e=>{
   if(document.activeElement===chatInput)return;
   if(isInlineEditing())return; // don't hijack arrow keys during inline edit
+  // Don't hijack arrow keys when editing in contenteditable or any input
+  const aTag=document.activeElement.tagName;
+  if(document.activeElement.isContentEditable||aTag==='INPUT'||aTag==='TEXTAREA'||aTag==='SELECT') return;
+  // Don't hijack when Shift is held (text selection) or in doc mode (doc has its own arrow key handling)
+  if(e.shiftKey) return;
+  if(currentMode==='doc') return;
   if(e.key==='ArrowRight'&&currentDeck){goSlide(Math.min(currentSlide+1,currentDeck.slides.length-1));e.preventDefault();}
   if(e.key==='ArrowLeft'&&currentDeck){goSlide(Math.max(currentSlide-1,0));e.preventDefault();}
 });
