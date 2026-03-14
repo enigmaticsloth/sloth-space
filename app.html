@@ -1872,8 +1872,10 @@ function redo(){
 function updateUndoRedoUI(){
   const ub=document.getElementById('undoBtn');
   const rb=document.getElementById('redoBtn');
-  if(ub)ub.disabled=undoStack.length===0;
-  if(rb)rb.disabled=redoStack.length===0;
+  const uOk=undoStack.length>0;
+  const rOk=redoStack.length>0;
+  if(ub){ ub.disabled=!uOk; ub.style.opacity=uOk?'1':'0.35'; ub.style.color=uOk?'#fff':'#555'; ub.style.pointerEvents=uOk?'auto':'none'; }
+  if(rb){ rb.disabled=!rOk; rb.style.opacity=rOk?'1':'0.35'; rb.style.color=rOk?'#fff':'#555'; rb.style.pointerEvents=rOk?'auto':'none'; }
 }
 // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
 document.addEventListener('keydown',function(e){
@@ -4674,17 +4676,10 @@ function modeToolbarBgColor(color){
   }
 }
 function modeUpdateUndoUI(){
-  const ub=document.getElementById('undoBtn');
-  const rb=document.getElementById('redoBtn');
-  if(!ub||!rb) return;
   if(currentMode==='doc'){
-    ub.style.opacity=docUndoStack.length?'1':'0.3';
-    rb.style.opacity=docRedoStack.length?'1':'0.3';
+    docUpdateUndoUI();
   } else {
-    ub.disabled=undoStack.length===0;
-    rb.disabled=redoStack.length===0;
-    ub.style.opacity='';
-    rb.style.opacity='';
+    updateUndoRedoUI();
   }
 }
 
@@ -4808,9 +4803,16 @@ function docSnapshotDoc(){
   if(!currentDoc) return null;
   return JSON.parse(JSON.stringify(currentDoc));
 }
+let docUndoRedoInProgress=false;
 function docPushUndo(){
+  if(docUndoRedoInProgress) return; // don't push during undo/redo render cycle
   const snap=docSnapshotDoc();
   if(!snap) return;
+  // Skip if identical to top of stack (avoid duplicate snapshots)
+  if(docUndoStack.length>0){
+    const top=docUndoStack[docUndoStack.length-1];
+    if(JSON.stringify(top)===JSON.stringify(snap)) return;
+  }
   docUndoStack.push(snap);
   if(docUndoStack.length>DOC_MAX_UNDO) docUndoStack.shift();
   docRedoStack=[];
@@ -4818,32 +4820,36 @@ function docPushUndo(){
 }
 function docUndo(){
   if(!docUndoStack.length) return;
+  docUndoRedoInProgress=true;
   const current=docSnapshotDoc();
   if(current) docRedoStack.push(current);
   const snap=docUndoStack.pop();
   currentDoc=snap;
+  docEditingBlockId=null; // exit edit mode so renderDocMode won't re-focus and re-push
   docUpdateUndoUI();
   renderDocMode();
   docAutoSave();
-  addMessage('↩ Undo','system');
+  docUndoRedoInProgress=false;
 }
 function docRedo(){
   if(!docRedoStack.length) return;
+  docUndoRedoInProgress=true;
   const current=docSnapshotDoc();
   if(current) docUndoStack.push(current);
   const snap=docRedoStack.pop();
   currentDoc=snap;
+  docEditingBlockId=null;
   docUpdateUndoUI();
   renderDocMode();
   docAutoSave();
-  addMessage('↪ Redo','system');
+  docUndoRedoInProgress=false;
 }
 function docUpdateUndoUI(){
-  // Use unified toolbar buttons
+  // Use unified toolbar buttons — white when enabled, dark gray when disabled
   const ub=document.getElementById('undoBtn');
   const rb=document.getElementById('redoBtn');
-  if(ub) ub.style.opacity=docUndoStack.length?'1':'0.3';
-  if(rb) rb.style.opacity=docRedoStack.length?'1':'0.3';
+  if(ub){ ub.style.opacity=docUndoStack.length?'1':'0.35'; ub.style.color=docUndoStack.length?'#fff':'#555'; ub.style.pointerEvents=docUndoStack.length?'auto':'none'; }
+  if(rb){ rb.style.opacity=docRedoStack.length?'1':'0.35'; rb.style.color=docRedoStack.length?'#fff':'#555'; rb.style.pointerEvents=docRedoStack.length?'auto':'none'; }
 }
 
 // ── Doc toolbar action functions ──
