@@ -4076,7 +4076,9 @@ function modeEnter(mode){
       }catch(e){}
       if(!currentDoc) currentDoc=docCreateNew('Untitled Document');
     }
+    docRestoreUndoStacks();
     updateModeNameBar('doc');
+    docUpdateUndoUI();
     renderDocMode();
   } else if(mode==='workspace'){
     updateModeNameBar('workspace');
@@ -4798,6 +4800,20 @@ function handleInsertedFiles(files){
 const DOC_MAX_UNDO=50;
 let docUndoStack=[];
 let docRedoStack=[];
+function docSaveUndoStacks(){
+  try{
+    sessionStorage.setItem('sloth_doc_undo',JSON.stringify(docUndoStack));
+    sessionStorage.setItem('sloth_doc_redo',JSON.stringify(docRedoStack));
+  }catch(e){}
+}
+function docRestoreUndoStacks(){
+  try{
+    const u=sessionStorage.getItem('sloth_doc_undo');
+    const r=sessionStorage.getItem('sloth_doc_redo');
+    if(u) docUndoStack=JSON.parse(u);
+    if(r) docRedoStack=JSON.parse(r);
+  }catch(e){}
+}
 
 function docSnapshotDoc(){
   if(!currentDoc) return null;
@@ -4822,6 +4838,7 @@ function docPushUndo(){
   if(docUndoStack.length>DOC_MAX_UNDO) docUndoStack.shift();
   docRedoStack=[];
   docUpdateUndoUI();
+  docSaveUndoStacks();
 }
 function docUndo(){
   if(!docUndoStack.length) return;
@@ -4833,7 +4850,7 @@ function docUndo(){
     const candidate=docUndoStack.pop();
     if(docContentKey(candidate)!==curKey){ snap=candidate; break; }
   }
-  if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); return; }
+  if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); docSaveUndoStacks(); return; }
   const current=docSnapshotDoc();
   if(current) docRedoStack.push(current);
   currentDoc=snap;
@@ -4842,6 +4859,7 @@ function docUndo(){
   renderDocMode();
   docAutoSave();
   docUndoRedoInProgress=false;
+  docSaveUndoStacks();
 }
 function docRedo(){
   if(!docRedoStack.length) return;
@@ -4852,7 +4870,7 @@ function docRedo(){
     const candidate=docRedoStack.pop();
     if(docContentKey(candidate)!==curKey){ snap=candidate; break; }
   }
-  if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); return; }
+  if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); docSaveUndoStacks(); return; }
   const current=docSnapshotDoc();
   if(current) docUndoStack.push(current);
   currentDoc=snap;
@@ -4861,6 +4879,7 @@ function docRedo(){
   renderDocMode();
   docAutoSave();
   docUndoRedoInProgress=false;
+  docSaveUndoStacks();
 }
 function docUpdateUndoUI(){
   // Use unified toolbar buttons — white when enabled, dark gray when disabled
