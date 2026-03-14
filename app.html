@@ -224,11 +224,16 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 @keyframes monet-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
 .welcome-overlay.hidden { display:none; }
 .welcome-box { text-align:center; width:96%; max-width:1280px; max-height:92vh; overflow-y:auto; padding:0; background:rgba(22,22,22,0.88); backdrop-filter:blur(16px); border:1px solid #2a2a2a; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,0.5); display:flex; }
-.wb-left { flex:1; min-width:0; padding:28px 32px; overflow-y:auto; }
+/* Left glow column — always present, transparent to show gradient */
+.wb-glow { width:280px; flex-shrink:0; border-radius:16px 0 0 16px; background:transparent; position:relative; overflow:hidden; }
+/* Config panel — fills into the glow column */
+.wb-config { position:absolute; inset:0; background:rgba(18,18,18,0.95); backdrop-filter:blur(12px); opacity:0; pointer-events:none; transition:opacity 0.35s ease; padding:22px 20px; overflow-y:auto; border-radius:16px 0 0 16px; }
+.wb-config.active { opacity:1; pointer-events:auto; }
+.wb-left { flex:1; min-width:0; padding:28px 32px; overflow-y:auto; border-left:1px solid #2a2a2a; }
 .wb-right { width:380px; flex-shrink:0; border-left:1px solid #2a2a2a; border-radius:0 16px 16px 0; overflow:hidden; display:flex; flex-direction:column; background:rgba(16,16,16,0.6); }
-/* Config panel — slides in from the left */
-.wb-config { width:0; overflow:hidden; flex-shrink:0; border-right:0 solid #2a2a2a; border-radius:16px 0 0 16px; background:rgba(18,18,18,0.92); transition:width 0.35s ease, padding 0.35s ease, border-right-width 0.35s ease; padding:0; }
-.wb-config.active { width:360px; min-width:360px; padding:22px 20px; border-right-width:1px; overflow-y:auto; }
+/* Mobile demo splash */
+.wb-mobile-splash { display:none; }
+.wb-mobile-splash .splash-content { display:flex; flex-direction:column; align-items:center; height:100%; }
 .wb-config .wrc-title { font-size:13px; color:#e0e0e0; font-weight:600; margin-bottom:14px; text-align:center; white-space:nowrap; }
 .wb-config .wrc-done-btn { width:100%; padding:10px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:Arial; margin-top:12px; transition:transform 0.15s; white-space:nowrap; }
 .wb-config .wrc-done-btn:hover { transform:translateY(-1px); }
@@ -403,10 +408,21 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .preset-pills { display:none; }
   .deck-actions { gap:3px; }
   .deck-action-btn { padding:3px 7px; font-size:9px; }
-  .welcome-box { flex-direction:column; max-width:740px; }
+  .welcome-box { flex-direction:column; max-width:740px; max-height:90vh; }
+  .wb-glow { display:none; }
+  .wb-left { border-left:none; }
   .wb-right { display:none; }
-  .wb-config { width:0; min-width:0; border-right:0; border-radius:0; }
-  .wb-config.active { position:fixed; top:5vh; left:5vw; right:5vw; bottom:5vh; width:auto; min-width:0; padding:22px 20px; overflow-y:auto; border-radius:14px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); background:rgba(18,18,18,0.97); }
+  .wb-config { position:fixed; top:5vh; left:5vw; right:5vw; bottom:5vh; background:rgba(18,18,18,0.97); border-radius:14px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); opacity:0; pointer-events:none; padding:22px 20px; overflow-y:auto; }
+  .wb-config.active { opacity:1; pointer-events:auto; }
+  /* Mobile splash: show demo first */
+  .wb-mobile-splash { display:flex; flex-direction:column; width:100%; min-height:70vh; }
+  .wb-mobile-splash .demo-panel { flex:1; min-height:0; display:flex; flex-direction:column; padding:14px; gap:8px; }
+  .wb-mobile-splash .splash-cta { padding:16px 20px; text-align:center; flex-shrink:0; }
+  .wb-mobile-splash .splash-cta-btn { width:100%; padding:14px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; font-family:Arial; box-shadow:0 4px 16px rgba(120,134,165,0.4); }
+  .wb-mobile-splash .splash-skip { font-size:11px; color:#666; margin-top:10px; cursor:pointer; }
+  .welcome-box.mobile-form-active .wb-mobile-splash { display:none; }
+  .welcome-box.mobile-form-active .wb-left { display:block; }
+  .welcome-box:not(.mobile-form-active) .wb-left { display:none; }
 }
 
 /* ═══════════════════════════════════════════════════ */
@@ -557,9 +573,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .file-nav { width:85vw; max-width:320px; }
   .settings-panel { width:92vw; padding:20px 18px; }
   .welcome-box { width:96%; padding:0; flex-direction:column; }
-  .wb-left { padding:20px 16px; }
+  .wb-left { padding:20px 16px; border-left:none; }
+  .wb-glow { display:none; }
   .wb-right { display:none; }
-  .wb-config.active { position:fixed; top:3vh; left:3vw; right:3vw; bottom:3vh; width:auto; min-width:0; padding:20px 16px; overflow-y:auto; border-radius:12px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); background:rgba(18,18,18,0.97); }
+  .wb-config { position:fixed; top:3vh; left:3vw; right:3vw; bottom:3vh; background:rgba(18,18,18,0.97); border-radius:12px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); }
+  .wb-config.active { opacity:1; pointer-events:auto; }
   .welcome-box .wb-logo { font-size:32px; }
   .wb-provider-row { flex-direction:column; gap:8px; }
   .wb-products { gap:12px; }
@@ -719,9 +737,44 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 <!-- Welcome screen (first-time setup, Monet theme) -->
 <div class="welcome-overlay" id="welcomeOverlay">
-  <div class="welcome-box">
-    <!-- Config panel (left side, slides in when Connect is clicked) -->
-    <div class="wb-config" id="wbConfigPanel">
+  <div class="welcome-box" id="welcomeBox">
+    <!-- Mobile splash: demo preview shown first on mobile -->
+    <div class="wb-mobile-splash" id="wbMobileSplash">
+      <div class="splash-content">
+        <div style="text-align:center;padding:20px 16px 8px;">
+          <div style="font-size:36px;font-weight:700;color:#e0e0e0;letter-spacing:-1px;">Sloth Space</div>
+          <div style="font-size:12px;color:#9BA8C4;font-style:italic;margin-top:4px;">Type what you want. Sloth will design it.</div>
+        </div>
+        <div class="demo-panel" id="demoPanelMobile" style="flex:1;min-height:0;">
+          <div class="demo-label">Live Preview</div>
+          <div class="demo-slide-area" id="demoSlideAreaMobile">
+            <div class="demo-slide-inner" id="demoSlideInnerMobile">
+              <div class="ds-icon" id="demoSlideIconMobile"></div>
+              <div class="ds-title" id="demoSlideTitleMobile"></div>
+              <div class="ds-subtitle" id="demoSlideSubtitleMobile"></div>
+              <div class="ds-body" id="demoSlideBodyMobile"></div>
+            </div>
+            <div class="demo-page-dots" id="demoPageDotsMobile"></div>
+          </div>
+          <div class="demo-chat-area">
+            <div class="demo-messages" id="demoMessagesMobile"></div>
+            <div class="demo-prompt-bar">
+              <span class="demo-prompt-text" id="demoPromptTextMobile"></span>
+              <span class="demo-prompt-cursor"></span>
+            </div>
+          </div>
+        </div>
+        <div class="splash-cta">
+          <button class="splash-cta-btn" onclick="showMobileForm()">Get Started</button>
+          <div class="splash-skip" onclick="skipWelcome()">Skip setup</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Left glow column (transparent, shows gradient behind) -->
+    <div class="wb-glow">
+      <!-- Config panel fills into this space -->
+      <div class="wb-config" id="wbConfigPanel">
       <div class="wrc-title">Choose your AI provider</div>
       <div class="wb-provider-grid" id="welcomeProviderGrid"></div>
 
@@ -776,7 +829,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       </div>
 
       <button class="wrc-done-btn" onclick="confirmWelcomeProvider()">Confirm</button>
-    </div>
+    </div><!-- end wb-config -->
+    </div><!-- end wb-glow -->
 
     <div class="wb-left">
     <div class="wb-logo">Sloth Space</div>
@@ -1949,6 +2003,11 @@ async function testConnection() {
 let welcomeProvider = 'groq';
 const CLOUD_PROVIDERS=['groq','openai','claude','grok']; // providers that need API key
 
+function showMobileForm(){
+  const box=document.getElementById('welcomeBox');
+  if(box) box.classList.add('mobile-form-active');
+  try{ localStorage.setItem('sloth_splash_seen','1'); }catch(e){}
+}
 function toggleWelcomeProviders(){
   const configPanel=document.getElementById('wbConfigPanel');
   const btn=document.getElementById('wbConnectBtn');
@@ -2083,6 +2142,7 @@ function _commitWelcomeConfig(defaults, isCloud){
   saveConfig();
   syncConfigToCloud();
   document.getElementById('welcomeOverlay').classList.add('hidden');
+  try{ sessionStorage.removeItem('sloth_on_welcome'); }catch(e){}
 }
 
 // ═══════════════════════════════════════════
@@ -2178,10 +2238,16 @@ function restoreConfigFromCloud(user){
 
 function skipWelcome() {
   document.getElementById('welcomeOverlay').classList.add('hidden');
+  try{ sessionStorage.removeItem('sloth_on_welcome'); }catch(e){}
 }
 
 function checkWelcomeScreen() {
   const hasConfig = loadConfig();
+  // If user was on welcome page before refresh, stay there
+  if(sessionStorage.getItem('sloth_on_welcome')){
+    showWelcome(true);
+    return;
+  }
   if (hasConfig && isConfigured()) {
     document.getElementById('welcomeOverlay').classList.add('hidden');
   }
@@ -2437,7 +2503,7 @@ function setAuthUser(user){
   if(!_authSyncDone){
     _authSyncDone=true;
     const restored=restoreConfigFromCloud(user);
-    if(restored&&isConfigured()){
+    if(restored&&isConfigured()&&!sessionStorage.getItem('sloth_on_welcome')){
       document.getElementById('welcomeOverlay').classList.add('hidden');
       addMessage('☁️ Settings synced from cloud.','system');
     }
@@ -2490,9 +2556,14 @@ document.addEventListener('click',function(e){
   if(!e.target.closest('.user-menu-wrap'))closeUserMenu();
 });
 
-function showWelcome(){
+function showWelcome(fromInit){
   const overlay=document.getElementById('welcomeOverlay');
   overlay.classList.remove('hidden');
+  // Remember user is on welcome page so refresh stays here
+  if(!fromInit) try{ sessionStorage.setItem('sloth_on_welcome','1'); }catch(e){}
+  // On mobile, if user already passed splash, skip straight to form
+  const box=document.getElementById('welcomeBox');
+  if(box && localStorage.getItem('sloth_splash_seen')) box.classList.add('mobile-form-active');
   // Make sure config panel is hidden (show demo)
   const configPanel=document.getElementById('wbConfigPanel');
   if(configPanel)configPanel.classList.remove('active');
@@ -4497,40 +4568,59 @@ renderApp();
   let demoIdx=0;
   let animTimer=null;
 
-  function renderSlide(s,area,inner){
-    area.style.background=s.bg;
-    const iconEl=document.getElementById('demoSlideIcon');
-    if(iconEl) iconEl.innerHTML=s.icon||'';
-    document.getElementById('demoSlideTitle').textContent=s.title;
-    document.getElementById('demoSlideTitle').style.color=s.titleColor;
-    document.getElementById('demoSlideSubtitle').textContent=s.subtitle;
-    document.getElementById('demoSlideSubtitle').style.color=s.subtitleColor;
-    document.getElementById('demoSlideBody').textContent=s.body;
-    document.getElementById('demoSlideBody').style.color=s.bodyColor;
+  // Get both desktop and mobile targets (mobile may not exist on desktop, that's ok)
+  function getTargets(suffix){
+    const desktop={
+      prompt:document.getElementById('demoPromptText'),
+      msgs:document.getElementById('demoMessages'),
+      inner:document.getElementById('demoSlideInner'),
+      area:document.getElementById('demoSlideArea'),
+      icon:document.getElementById('demoSlideIcon'),
+      title:document.getElementById('demoSlideTitle'),
+      subtitle:document.getElementById('demoSlideSubtitle'),
+      body:document.getElementById('demoSlideBody'),
+      dots:document.getElementById('demoPageDots')
+    };
+    const mobile={
+      prompt:document.getElementById('demoPromptTextMobile'),
+      msgs:document.getElementById('demoMessagesMobile'),
+      inner:document.getElementById('demoSlideInnerMobile'),
+      area:document.getElementById('demoSlideAreaMobile'),
+      icon:document.getElementById('demoSlideIconMobile'),
+      title:document.getElementById('demoSlideTitleMobile'),
+      subtitle:document.getElementById('demoSlideSubtitleMobile'),
+      body:document.getElementById('demoSlideBodyMobile'),
+      dots:document.getElementById('demoPageDotsMobile')
+    };
+    return [desktop,mobile].filter(t=>t.prompt&&t.inner);
   }
 
-  function updateDots(total,current){
-    const dots=document.getElementById('demoPageDots');
-    if(!dots)return;
-    dots.innerHTML=Array.from({length:total},(_,i)=>`<span class="${i===current?'active':''}"></span>`).join('');
+  function renderSlideT(s,t){
+    t.area.style.background=s.bg;
+    if(t.icon) t.icon.innerHTML=s.icon||'';
+    t.title.textContent=s.title; t.title.style.color=s.titleColor;
+    t.subtitle.textContent=s.subtitle; t.subtitle.style.color=s.subtitleColor;
+    t.body.textContent=s.body; t.body.style.color=s.bodyColor;
   }
 
-  function flipToSlide(s,area,inner,cb){
-    // Slide out left
-    inner.classList.remove('visible');
-    inner.classList.add('slide-out');
+  function updateDotsT(total,current,t){
+    if(!t.dots)return;
+    t.dots.innerHTML=Array.from({length:total},(_,i)=>`<span class="${i===current?'active':''}"></span>`).join('');
+  }
+
+  function flipToSlideT(s,t,cb){
+    t.inner.classList.remove('visible');
+    t.inner.classList.add('slide-out');
     setTimeout(()=>{
-      // Prep new content off-screen right
-      inner.classList.remove('slide-out');
-      inner.classList.add('slide-in');
-      renderSlide(s,area,inner);
-      // Force reflow then animate in
-      inner.offsetHeight;
-      inner.classList.remove('slide-in');
-      inner.style.transition='opacity 0.5s ease, transform 0.5s ease';
-      inner.style.transform='translateX(0)';
-      inner.classList.add('visible');
-      if(cb) animTimer=setTimeout(cb,2200);
+      t.inner.classList.remove('slide-out');
+      t.inner.classList.add('slide-in');
+      renderSlideT(s,t);
+      t.inner.offsetHeight;
+      t.inner.classList.remove('slide-in');
+      t.inner.style.transition='opacity 0.5s ease, transform 0.5s ease';
+      t.inner.style.transform='translateX(0)';
+      t.inner.classList.add('visible');
+      if(cb) cb();
     },380);
   }
 
@@ -4540,26 +4630,25 @@ renderApp();
       animTimer=setTimeout(runDemo,2000);
       return;
     }
+    const targets=getTargets();
+    if(targets.length===0){ animTimer=setTimeout(runDemo,2000); return; }
     const demo=DEMOS[demoIdx%DEMOS.length];
     demoIdx++;
-    const promptEl=document.getElementById('demoPromptText');
-    const msgsEl=document.getElementById('demoMessages');
-    const slideInner=document.getElementById('demoSlideInner');
-    const slideArea=document.getElementById('demoSlideArea');
-    if(!promptEl||!msgsEl)return;
-    // Reset
-    promptEl.textContent='';
-    msgsEl.innerHTML='';
-    slideInner.classList.remove('visible','slide-out','slide-in');
-    slideInner.style.transform='';
-    slideInner.style.transition='';
-    slideArea.style.background='#1a1a1a';
-    updateDots(demo.slides.length,0);
+    // Reset all targets
+    targets.forEach(t=>{
+      t.prompt.textContent='';
+      t.msgs.innerHTML='';
+      t.inner.classList.remove('visible','slide-out','slide-in');
+      t.inner.style.transform='';
+      t.inner.style.transition='';
+      t.area.style.background='#1a1a1a';
+      updateDotsT(demo.slides.length,0,t);
+    });
     // Phase 1: Type prompt
     let pi=0;
     function typePrompt(){
       if(pi<=demo.prompt.length){
-        promptEl.textContent=demo.prompt.slice(0,pi);
+        targets.forEach(t=>{ t.prompt.textContent=demo.prompt.slice(0,pi); });
         pi++;
         animTimer=setTimeout(typePrompt,18+Math.random()*12);
       }else{
@@ -4567,37 +4656,44 @@ renderApp();
       }
     }
     function showUserMsg(){
-      promptEl.textContent='';
-      const um=document.createElement('div');
-      um.className='demo-msg user';
-      um.textContent=demo.prompt;
-      msgsEl.appendChild(um);
-      requestAnimationFrame(()=>{ um.classList.add('visible'); });
+      targets.forEach(t=>{
+        t.prompt.textContent='';
+        const um=document.createElement('div');
+        um.className='demo-msg user';
+        um.textContent=demo.prompt;
+        t.msgs.appendChild(um);
+        requestAnimationFrame(()=>{ um.classList.add('visible'); });
+      });
       animTimer=setTimeout(showAiReply,800);
     }
     function showAiReply(){
-      const am=document.createElement('div');
-      am.className='demo-msg ai';
-      am.textContent=demo.aiReply;
-      msgsEl.appendChild(am);
-      requestAnimationFrame(()=>{ am.classList.add('visible'); });
+      targets.forEach(t=>{
+        const am=document.createElement('div');
+        am.className='demo-msg ai';
+        am.textContent=demo.aiReply;
+        t.msgs.appendChild(am);
+        requestAnimationFrame(()=>{ am.classList.add('visible'); });
+      });
       animTimer=setTimeout(showFirstSlide,1000);
     }
     function showFirstSlide(){
-      renderSlide(demo.slides[0],slideArea,slideInner);
-      updateDots(demo.slides.length,0);
-      slideInner.classList.add('visible');
-      // Flip through remaining slides
+      targets.forEach(t=>{
+        renderSlideT(demo.slides[0],t);
+        updateDotsT(demo.slides.length,0,t);
+        t.inner.classList.add('visible');
+      });
       let si=1;
       function nextSlide(){
         if(si<demo.slides.length){
-          updateDots(demo.slides.length,si);
-          flipToSlide(demo.slides[si],slideArea,slideInner,()=>{
-            si++;
-            nextSlide();
+          targets.forEach(t=>updateDotsT(demo.slides.length,si,t));
+          let done=0;
+          targets.forEach(t=>{
+            flipToSlideT(demo.slides[si],t,()=>{
+              done++;
+              if(done>=targets.length){ animTimer=setTimeout(()=>{ si++; nextSlide(); },2200); }
+            });
           });
         }else{
-          // Done with all slides, move to next demo
           animTimer=setTimeout(runDemo,2500);
         }
       }
