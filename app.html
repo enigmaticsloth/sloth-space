@@ -370,17 +370,22 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="list"]::before { content:'•'; position:absolute; left:8px; color:#7886A5; font-weight:700; }
 .doc-block[data-type="numbered"] { font-size:15px; padding-left:24px; counter-increment:doc-ol; }
 .doc-block[data-type="numbered"]::before { content:attr(data-number) '.'; position:absolute; left:4px; color:#7886A5; font-weight:600; font-size:13px; min-width:16px; text-align:right; }
-.doc-block[data-type="image"] { padding:8px; min-height:80px; }
-.doc-block[data-type="image"].float-none { text-align:center; }
-.doc-block[data-type="image"].float-left { float:left; width:45%; margin:0 20px 12px 0; clear:left; }
-.doc-block[data-type="image"].float-right { float:right; width:45%; margin:0 0 12px 20px; clear:right; }
-.doc-block[data-type="image"] img { max-width:100%; border-radius:4px; display:block; }
-.doc-block[data-type="image"] .img-float-bar { display:flex; gap:4px; justify-content:center; margin-top:6px; }
-.doc-block[data-type="image"] .img-float-bar button { font-size:10px; padding:2px 8px; background:#2a2a2a; border:1px solid #444; color:#aaa; border-radius:4px; cursor:pointer; }
-.doc-block[data-type="image"] .img-float-bar button.active { background:#7886A5; color:#fff; border-color:#7886A5; }
+.doc-block[data-type="image"] { padding:8px; min-height:40px; width:fit-content; max-width:100%; position:relative; }
+.doc-block[data-type="image"].float-none { margin-left:auto; margin-right:auto; }
+.doc-block[data-type="image"].float-left { float:left; max-width:45%; margin:0 20px 12px 0; clear:left; }
+.doc-block[data-type="image"].float-right { float:right; max-width:45%; margin:0 0 12px 20px; clear:right; }
+.doc-block[data-type="image"] img { max-width:100%; border-radius:4px; display:block; cursor:pointer; }
+.doc-block[data-type="image"] .img-edit-overlay { display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.45); border-radius:4px; z-index:10; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+.doc-block[data-type="image"].img-editing .img-edit-overlay { display:flex; }
+.doc-block[data-type="image"] .img-edit-overlay .img-float-bar { display:flex; gap:6px; }
+.doc-block[data-type="image"] .img-edit-overlay button { font-size:12px; padding:4px 12px; background:rgba(30,30,30,0.85); border:1px solid #666; color:#ccc; border-radius:6px; cursor:pointer; backdrop-filter:blur(4px); }
+.doc-block[data-type="image"] .img-edit-overlay button:hover { background:rgba(60,60,60,0.9); color:#fff; }
+.doc-block[data-type="image"] .img-edit-overlay button.active { background:#7886A5; color:#fff; border-color:#7886A5; }
 .doc-figure { margin:0 0 8px 0; padding:0; }
-.doc-figure .doc-figure-caption { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:4px; padding:2px 8px; min-height:18px; outline:none; }
-.doc-figure .doc-figure-caption:empty::before { content:'Add caption...'; color:#555; }
+.doc-figure .doc-figure-caption { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:4px; padding:2px 8px; min-height:18px; outline:none; border:1px dashed transparent; border-radius:3px; }
+.doc-figure .doc-figure-caption:focus { border-color:#555; }
+.doc-figure .doc-figure-caption:empty::before { content:'Add caption...'; color:#444; }
+.doc-figure .doc-figure-caption.hidden-cap { display:none; }
 .doc-block[data-type="caption"] { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:-2px; margin-bottom:12px; }
 .doc-clear-float { clear:both; height:0; margin:0; padding:0; }
 /* Table block */
@@ -1840,7 +1845,14 @@ function updateUndoRedoUI(){
 }
 // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
 document.addEventListener('keydown',function(e){
+  // Don't intercept when typing in inputs/textareas/contenteditable
+  const tag=e.target.tagName;
+  const isCE=e.target.isContentEditable;
+  const isInput=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||isCE);
+
   if(isInlineEditing()) return; // let browser handle undo/redo in contenteditable
+
+  // ── Undo/Redo ──
   if((e.ctrlKey||e.metaKey)&&!e.altKey){
     if(e.key==='z'&&!e.shiftKey){
       e.preventDefault();
@@ -1852,6 +1864,51 @@ document.addEventListener('keydown',function(e){
       if(currentMode==='doc') docRedo(); else redo();
       return;
     }
+  }
+
+  // ── Escape — deselect in both modes ──
+  if(e.key==='Escape'){
+    if(currentMode==='slide'){
+      if(selectedRegion){ clearSelection(); e.preventDefault(); }
+    } else if(currentMode==='doc'){
+      if(docEditingBlockId||docSelectedBlockId){
+        // If editing, blur first; if just selected, deselect
+        if(docEditingBlockId){
+          const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
+          if(el) el.blur();
+          docEditingBlockId=null;
+        }
+        docSelectedBlockId=null;
+        document.querySelectorAll('.doc-block.selected').forEach(el=>el.classList.remove('selected'));
+        // Close any image edit overlay
+        document.querySelectorAll('.doc-block.img-editing').forEach(el=>el.classList.remove('img-editing'));
+        e.preventDefault();
+      }
+    }
+    return;
+  }
+
+  // ── Delete/Backspace — delete selected object (only when not in input) ──
+  if((e.key==='Delete'||e.key==='Backspace')&&!isInput){
+    if(currentMode==='slide'&&selectedRegion){
+      e.preventDefault();
+      pushUndo();
+      const slide=currentDeck.slides[selectedRegion.slideIdx];
+      if(slide) slide.content[selectedRegion.regionId]='';
+      addMessage(`✓ Cleared ${selectedRegion.regionId} on slide ${selectedRegion.slideIdx+1}`,'system');
+      clearSelection();
+      renderApp();
+    } else if(currentMode==='doc'){
+      const bid=docSelectedBlockId;
+      if(bid&&!docEditingBlockId){
+        e.preventDefault();
+        docPushUndo();
+        docDeleteBlock(bid);
+        docSelectedBlockId=null;
+        renderDocMode();
+      }
+    }
+    return;
   }
 });
 
@@ -4405,7 +4462,7 @@ function triggerUrlImageInsert(){
     const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
     docPushUndo();
     const blk=docInsertBlock(afterId,'image','');
-    blk.meta={src:url.trim(), alt:'', float:'none', caption:''};
+    blk.meta={src:url.trim(), alt:'', float:'right', caption:'', showCaption:false};
     currentDoc.updated=new Date().toISOString();
     renderDocMode();
   } else {
@@ -4423,7 +4480,7 @@ function handleInsertedFiles(files){
         const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
         docPushUndo();
         const blk=docInsertBlock(afterId,'image','');
-        blk.meta={src:e.target.result, alt:file.name, float:'none', caption:''};
+        blk.meta={src:e.target.result, alt:file.name, float:'right', caption:'', showCaption:false};
         currentDoc.updated=new Date().toISOString();
         renderDocMode();
       };
@@ -4527,30 +4584,37 @@ function docInsertImageBlock(){
   triggerLocalImageInsert();
 }
 function docInsertTablePrompt(){
-  const cols=prompt('Number of columns:','3');
-  const rows=prompt('Number of rows (excluding header):','3');
-  if(!cols||!rows) return;
-  const c=parseInt(cols)||3, r=parseInt(rows)||3;
-  const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
-  docPushUndo();
-  // Build markdown-style table as a code block for now
-  let header='| '+Array.from({length:c},(_,i)=>'Column '+(i+1)).join(' | ')+' |';
-  let sep='| '+Array.from({length:c},()=>'---').join(' | ')+' |';
-  let body=Array.from({length:r},()=>'| '+Array.from({length:c},()=>'   ').join(' | ')+' |').join('\n');
-  const tableText=header+'\n'+sep+'\n'+body;
-  // Insert as a table block type
-  const blk=docInsertBlock(afterId,'table','');
-  blk.meta={cols:c, rows:r, cells:[]};
-  // Initialize cells: row 0 = header
-  for(let ri=0;ri<=r;ri++){
-    const row=[];
-    for(let ci=0;ci<c;ci++){
-      row.push(ri===0?'Column '+(ci+1):'');
-    }
-    blk.meta.cells.push(row);
+  // Let the LLM handle table creation — prefill chat with instruction
+  const input=document.getElementById('chatInput');
+  if(input){
+    input.value='Insert a table with 3 columns and 3 rows about ';
+    input.focus();
+    // Place cursor at end
+    input.setSelectionRange(input.value.length, input.value.length);
   }
-  currentDoc.updated=new Date().toISOString();
-  renderDocMode();
+  addMessage('Describe the table you want in chat — AI will generate the columns, rows, and content for you.','system');
+}
+
+// Toggle image edit overlay on click
+function docToggleImageEdit(blockId){
+  // Close any other open overlays first
+  document.querySelectorAll('.doc-block[data-type="image"].img-editing').forEach(el=>{
+    if(el.dataset.blockId!==blockId) el.classList.remove('img-editing');
+  });
+  const el=document.querySelector(`[data-block-id="${blockId}"]`);
+  if(el) el.classList.toggle('img-editing');
+  // Close on outside click
+  setTimeout(()=>{
+    const closer=function(e){
+      const imgBlock=e.target.closest(`[data-block-id="${blockId}"]`);
+      if(!imgBlock){
+        const el2=document.querySelector(`[data-block-id="${blockId}"]`);
+        if(el2) el2.classList.remove('img-editing');
+        document.removeEventListener('click',closer);
+      }
+    };
+    document.addEventListener('click',closer);
+  },0);
 }
 
 // Image float control
@@ -4560,6 +4624,17 @@ function docSetImageFloat(blockId, float){
   docPushUndo();
   if(!block.meta) block.meta={};
   block.meta.float=float;
+  currentDoc.updated=new Date().toISOString();
+  renderDocMode();
+}
+
+// Toggle caption visibility
+function docToggleCaption(blockId){
+  const block=docGetBlock(blockId);
+  if(!block||block.type!=='image') return;
+  if(!block.meta) block.meta={};
+  block.meta.showCaption=!(block.meta.showCaption!==false);
+  if(!block.meta.showCaption) block.meta.caption='';
   currentDoc.updated=new Date().toISOString();
   renderDocMode();
 }
@@ -4934,28 +5009,34 @@ function renderDocMode(){
       </div>`;
     }
 
-    // Image block with float + figure legend
+    // Image block with click-to-edit overlay (float + caption toggle)
     if(block.type==='image'){
       const src=block.meta?.src||'';
       const alt=block.meta?.alt||'';
-      const float=block.meta?.float||'none';
+      const float=block.meta?.float||'right';
       const caption=block.meta?.caption||'';
+      const hasCaption=block.meta?.showCaption!==false;
       const floatClass='float-'+float;
       const btnL=float==='left'?' active':'';
       const btnC=float==='none'?' active':'';
       const btnR=float==='right'?' active':'';
+      const capClass=hasCaption?'':'hidden-cap';
       return `<figure class="doc-figure"><div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
-        ${src?`<img src="${src}" alt="${escapeHtml(alt)}" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
-        ${src?`<div class="img-float-bar" contenteditable="false">
-          <button class="${btnL}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','left')" title="Float left">◧</button>
-          <button class="${btnC}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','none')" title="Center">▣</button>
-          <button class="${btnR}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','right')" title="Float right">◨</button>
+        ${src?`<img src="${src}" alt="${escapeHtml(alt)}" onclick="event.stopPropagation();docToggleImageEdit('${block.id}')" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
+        ${src?`<div class="img-edit-overlay" contenteditable="false">
+          <div class="img-float-bar">
+            <button class="${btnL}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','left')">◧ Left</button>
+            <button class="${btnC}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','none')">▣ Center</button>
+            <button class="${btnR}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','right')">◨ Right</button>
+          </div>
+          <button onclick="event.stopPropagation();docToggleCaption('${block.id}')">${hasCaption?'Remove caption':'Add caption'}</button>
         </div>`:''}
-        <div class="doc-figure-caption" contenteditable="true" data-caption-for="${block.id}"
+        <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
           onblur="docSaveFigureCaption('${block.id}',this.textContent)"
+          onclick="event.stopPropagation()"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(caption)}</div>
-      </div>${float!=='none'?'':'<div class="doc-clear-float"></div>'}</figure>`;
+      </div><div class="doc-clear-float"></div></figure>`;
     }
 
     // Table block
@@ -6234,10 +6315,11 @@ Examples: "放到第3頁右邊", "圖片大一點", "刪除這張圖片", "move 
 "deck_edit" — edit content across ALL slides at once OR edit entire doc content. (Slide: batch edit; Doc: rewrite/restructure)
 Examples: "全部翻成英文", "所有頁面加上公司logo文字", "translate to English", "重新整理這篇文章"
 
-"content_edit" — edit content of a SPECIFIC region/slide or specific doc block.
+"content_edit" — edit content of a SPECIFIC region/slide or specific doc block, including deleting.
 For slides: {"intent":"content_edit","slide":N or null,"region":"regionId" or null,"delete":true/false}
-For docs: {"intent":"content_edit"}
-Examples: "改標題", "第三頁的內容豐富一點", "rewrite the body text"
+For docs: {"intent":"content_edit","delete":true/false}
+When the user says "delete this", "刪除這個", "remove this block", "把這個刪掉" → set delete:true.
+Examples: "改標題", "第三頁的內容豐富一點", "rewrite the body text", "刪除這個block", "delete this"
 
 "generate" — create new content: slides/deck, doc/article, add new content. Also when user gives a TOPIC they want written about.
 Examples: "做一份AI簡報", "加三頁", "寫一篇文章", "generate an article about stem cells", "做吧", "make a 5-page pitch deck", "寫一篇幹細胞的文章", "生成海膽的介紹", "介紹量子力學", "寫關於咖啡的文章", "生成XX介紹", "XX的介紹"
@@ -6254,6 +6336,8 @@ RULES:
 - When in doubt between "chat" and "generate": if the user mentions ANY topic or subject they want created/written → ALWAYS choose "generate".
 - When in doubt between "content_edit" and "generate": if editing existing content→content_edit, if creating new→generate.
 - "image" and "style" only apply in slide mode. In doc mode, route to "generate" or "content_edit" instead.
+- In DOC mode: requests to insert tables, add dividers, move/position images, add figure captions → "content_edit".
+  Examples: "插入一個表格", "加一條分隔線", "把圖片移到左邊", "add a table comparing X and Y", "insert a divider"
 - NEVER choose "chat" when the user is clearly asking for content creation in doc mode.
 
 Output ONLY the JSON object.`;
@@ -6792,6 +6876,12 @@ async function sendMessage(){
         intent='generate';
         console.log('Router override: chat→generate for doc mode topic request');
       }
+      // Catch table/divider/image edit commands
+      const docEditPattern=/(插入|加入|新增|insert|add|移動|移到|move|放到|刪除|remove)(.*)(表格|table|分隔|divider|圖片|image|圖)/i;
+      if(docEditPattern.test(trimText)){
+        intent='content_edit';
+        console.log('Router override: chat→content_edit for doc mode edit command');
+      }
     }
 
     // ── Dispatch based on router intent ──
@@ -6948,8 +7038,25 @@ async function sendMessage(){
       await doGenerate(statusDiv,wsContext);
 
     }else if(currentMode==='doc'&&(intent==='content_edit'||intent==='deck_edit')){
-      // ── DOC EDIT: edit doc blocks via AI ──
-      await doDocGenerate(statusDiv,text,wsContext);
+      // ── DOC EDIT ──
+      if(routerData.delete){
+        // Delete the currently selected doc block
+        const bid=docEditingBlockId||docSelectedBlockId;
+        if(bid){
+          docPushUndo();
+          docDeleteBlock(bid);
+          docSelectedBlockId=null;
+          docEditingBlockId=null;
+          statusDiv.remove();
+          addMessage('✓ Block deleted.','ai');
+          renderDocMode();
+        } else {
+          statusDiv.remove();
+          addMessage('Please select a block first, then ask me to delete it.','ai');
+        }
+      } else {
+        await doDocGenerate(statusDiv,text,wsContext);
+      }
 
     }else{
       // ── CHAT: general conversation ──
@@ -7034,9 +7141,20 @@ const DOC_GEN_PROMPT=`You are Sloth Space Doc Mode, an AI document writer.
 You MUST output ONLY a valid JSON object. No markdown, no code fences, no explanation before or after.
 
 The JSON object must have exactly this structure:
-{"title":"string","blocks":[{"type":"string","text":"string"}]}
+{"title":"string","blocks":[...]}
 
-Each block has "type" (one of: heading1, heading2, heading3, paragraph, quote, code, list, numbered, divider, caption) and "text" (the block content as a string).
+Block types and their JSON format:
+
+1. Text blocks — {"type":"<type>","text":"string"}
+   Types: heading1, heading2, heading3, paragraph, quote, code, list, numbered, caption
+
+2. Divider — {"type":"divider","text":""}
+
+3. Table — {"type":"table","text":"","meta":{"cols":N,"rows":N,"cells":[["Header1","Header2",...],["row1col1","row1col2",...],...]}}
+   "cells" is a 2D array. First row = headers. "rows" = number of data rows (excluding header). "cols" = number of columns.
+
+4. Image — {"type":"image","text":"","meta":{"src":"<url>","alt":"description","float":"none|left|right","caption":"Figure legend text","showCaption":true}}
+   Use float "left" or "right" to wrap text around the image. Use "none" for centered full-width. Default float is "right". Set showCaption to true if providing a caption.
 
 Rules:
 - heading1 for main title and major sections
@@ -7045,10 +7163,12 @@ Rules:
 - Use list/numbered for enumerations
 - quote for key insights
 - divider to separate major sections
+- Use TABLE blocks when data is naturally tabular (comparisons, statistics, timelines, specs)
 - Write in the SAME LANGUAGE as the user
 - For scientific content, use proper structure: introduction, background, methods, results, discussion
 - Generate real, detailed, substantive content — NOT placeholder text
-- Minimum 15 blocks for a full article`;
+- Minimum 15 blocks for a full article
+- When user asks to insert a divider, add a table, or move/add an image, do it`;
 
 async function doDocGenerate(statusDiv,userText,wsContext){
   statusDiv.textContent='Writing document...';
@@ -7058,8 +7178,12 @@ async function doDocGenerate(statusDiv,userText,wsContext){
   if(currentDoc&&currentDoc.blocks.length>2){
     const hasContent=currentDoc.blocks.some(b=>blockPlainText(b).trim().length>10);
     if(hasContent){
-      const currentBlocks=currentDoc.blocks.map(b=>({type:b.type,text:blockPlainText(b)}));
-      editContext=`\n\nEDITING MODE: The user has an existing document. Modify based on their instruction. Keep existing content unless told to change.\n\n[CURRENT DOC]\n${JSON.stringify({title:currentDoc.title,blocks:currentBlocks})}`;
+      const currentBlocks=currentDoc.blocks.map(b=>{
+        const obj={type:b.type, text:blockPlainText(b)};
+        if(b.meta&&Object.keys(b.meta).length>0) obj.meta=b.meta;
+        return obj;
+      });
+      editContext=`\n\nEDITING MODE: The user has an existing document. Modify based on their instruction. Keep existing content unless told to change. Preserve all block meta (table cells, image float/caption, etc.) unless the user asks to change them.\n\n[CURRENT DOC]\n${JSON.stringify({title:currentDoc.title,blocks:currentBlocks})}`;
     }
   }
 
