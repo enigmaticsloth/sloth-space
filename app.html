@@ -365,29 +365,29 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="paragraph"] { font-size:15px; }
 .doc-block[data-type="quote"] { font-size:15px; font-style:italic; border-left:3px solid #7886A5; padding-left:16px; margin:8px 0; color:#bbb; }
 .doc-block[data-type="code"] { font-family:'Courier New',monospace; font-size:13px; background:#1a1a1a; padding:10px 12px; border-radius:6px; white-space:pre-wrap; color:#c8d0dc; border:1px solid #2a2a2a; }
-.doc-block[data-type="divider"] { min-height:1px; height:1px; background:#2a2a2a; margin:16px 0; cursor:default; padding:0; border:none; pointer-events:none; }
+.doc-block[data-type="divider"] { min-height:12px; height:12px; background:transparent; margin:8px 0; cursor:pointer; padding:0; border:none; display:flex; align-items:center; }
+.doc-block[data-type="divider"]::before { content:''; display:block; width:100%; height:1px; background:#2a2a2a; }
 .doc-block[data-type="list"] { font-size:15px; padding-left:24px; }
 .doc-block[data-type="list"]::before { content:'•'; position:absolute; left:8px; color:#7886A5; font-weight:700; }
 .doc-block[data-type="numbered"] { font-size:15px; padding-left:24px; counter-increment:doc-ol; }
 .doc-block[data-type="numbered"]::before { content:attr(data-number) '.'; position:absolute; left:4px; color:#7886A5; font-weight:600; font-size:13px; min-width:16px; text-align:right; }
 .doc-block[data-type="image"] { padding:8px; min-height:40px; width:fit-content; max-width:100%; position:relative; }
-.doc-block[data-type="image"].float-none { margin-left:auto; margin-right:auto; }
-.doc-block[data-type="image"].float-left { float:left; max-width:45%; margin:0 20px 12px 0; clear:left; }
-.doc-block[data-type="image"].float-right { float:right; max-width:45%; margin:0 0 12px 20px; clear:right; }
+.doc-block[data-type="image"].float-none { margin-left:auto; margin-right:auto; clear:both; }
+.doc-block[data-type="image"].float-left { float:left; max-width:45%; margin:0 20px 12px 0; }
+.doc-block[data-type="image"].float-right { float:right; max-width:45%; margin:0 0 12px 20px; }
 .doc-block[data-type="image"] img { max-width:100%; border-radius:4px; display:block; cursor:pointer; }
-.doc-block[data-type="image"] .img-edit-overlay { display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.45); border-radius:4px; z-index:10; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
-.doc-block[data-type="image"].img-editing .img-edit-overlay { display:flex; }
-.doc-block[data-type="image"] .img-edit-overlay .img-float-bar { display:flex; gap:6px; }
-.doc-block[data-type="image"] .img-edit-overlay button { font-size:12px; padding:4px 12px; background:rgba(30,30,30,0.85); border:1px solid #666; color:#ccc; border-radius:6px; cursor:pointer; backdrop-filter:blur(4px); }
-.doc-block[data-type="image"] .img-edit-overlay button:hover { background:rgba(60,60,60,0.9); color:#fff; }
-.doc-block[data-type="image"] .img-edit-overlay button.active { background:#7886A5; color:#fff; border-color:#7886A5; }
-.doc-figure { margin:0 0 8px 0; padding:0; }
-.doc-figure .doc-figure-caption { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:4px; padding:2px 8px; min-height:18px; outline:none; border:1px dashed transparent; border-radius:3px; }
-.doc-figure .doc-figure-caption:focus { border-color:#555; }
-.doc-figure .doc-figure-caption:empty::before { content:'Add caption...'; color:#444; }
-.doc-figure .doc-figure-caption.hidden-cap { display:none; }
+.doc-block[data-type="image"] .doc-figure-caption { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:4px; padding:2px 8px; min-height:18px; outline:none; border:1px dashed transparent; border-radius:3px; }
+.doc-block[data-type="image"] .doc-figure-caption:focus { border-color:#555; }
+.doc-block[data-type="image"] .doc-figure-caption:empty::before { content:'Add caption...'; color:#444; }
+.doc-block[data-type="image"] .doc-figure-caption.hidden-cap { display:none; }
+/* Image edit popup — small bar above image */
+.img-edit-popup { display:none; position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#1a1a1a; border:1px solid #444; border-radius:8px; padding:6px 8px; z-index:50; white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+.img-edit-popup::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:6px solid transparent; border-top-color:#444; }
+.img-edit-popup .img-popup-row { display:flex; gap:4px; align-items:center; }
+.img-edit-popup button { font-size:11px; padding:3px 10px; background:#2a2a2a; border:1px solid #555; color:#bbb; border-radius:5px; cursor:pointer; }
+.img-edit-popup button:hover { background:#3a3a3a; color:#fff; }
+.img-edit-popup button.active { background:#7886A5; color:#fff; border-color:#7886A5; }
 .doc-block[data-type="caption"] { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:-2px; margin-bottom:12px; }
-.doc-clear-float { clear:both; height:0; margin:0; padding:0; }
 /* Table block */
 .doc-block[data-type="table"] { padding:4px; overflow-x:auto; }
 .doc-block[data-type="table"] table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -1871,17 +1871,20 @@ document.addEventListener('keydown',function(e){
     if(currentMode==='slide'){
       if(selectedRegion){ clearSelection(); e.preventDefault(); }
     } else if(currentMode==='doc'){
+      // Close image popup if open
+      docHideImagePopup();
+      // If actively editing a contenteditable (block or table cell), blur it first
+      const ae=document.activeElement;
+      if(ae&&ae.isContentEditable){
+        ae.blur();
+        if(docEditingBlockId) docEditingBlockId=null;
+        e.preventDefault();
+        return;
+      }
       if(docEditingBlockId||docSelectedBlockId){
-        // If editing, blur first; if just selected, deselect
-        if(docEditingBlockId){
-          const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
-          if(el) el.blur();
-          docEditingBlockId=null;
-        }
+        docEditingBlockId=null;
         docSelectedBlockId=null;
         document.querySelectorAll('.doc-block.selected').forEach(el=>el.classList.remove('selected'));
-        // Close any image edit overlay
-        document.querySelectorAll('.doc-block.img-editing').forEach(el=>el.classList.remove('img-editing'));
         e.preventDefault();
       }
     }
@@ -4595,26 +4598,45 @@ function docInsertTablePrompt(){
   addMessage('Describe the table you want in chat — AI will generate the columns, rows, and content for you.','system');
 }
 
-// Toggle image edit overlay on click
-function docToggleImageEdit(blockId){
-  // Close any other open overlays first
-  document.querySelectorAll('.doc-block[data-type="image"].img-editing').forEach(el=>{
-    if(el.dataset.blockId!==blockId) el.classList.remove('img-editing');
-  });
-  const el=document.querySelector(`[data-block-id="${blockId}"]`);
-  if(el) el.classList.toggle('img-editing');
+// Show image edit popup above the clicked image
+function docShowImagePopup(blockId, imgEl){
+  // Remove any existing popup
+  docHideImagePopup();
+  const block=docGetBlock(blockId);
+  if(!block||block.type!=='image') return;
+  const float=block.meta?.float||'right';
+  const hasCaption=block.meta?.showCaption===true;
+
+  const popup=document.createElement('div');
+  popup.id='imgEditPopup';
+  popup.className='img-edit-popup';
+  popup.style.display='block';
+  popup.innerHTML=`
+    <div class="img-popup-row">
+      <button class="${float==='left'?'active':''}" onclick="event.stopPropagation();docSetImageFloat('${blockId}','left')">◧ Left</button>
+      <button class="${float==='none'?'active':''}" onclick="event.stopPropagation();docSetImageFloat('${blockId}','none')">▣ Center</button>
+      <button class="${float==='right'?'active':''}" onclick="event.stopPropagation();docSetImageFloat('${blockId}','right')">◨ Right</button>
+      <span style="width:1px;height:16px;background:#444;margin:0 4px;"></span>
+      <button onclick="event.stopPropagation();docToggleCaption('${blockId}')">${hasCaption?'− Caption':'+ Caption'}</button>
+    </div>`;
+
+  // Append to the block itself (positioned absolute inside relative block)
+  const blockEl=document.querySelector(`[data-block-id="${blockId}"]`);
+  if(blockEl) blockEl.appendChild(popup);
+
   // Close on outside click
   setTimeout(()=>{
-    const closer=function(e){
-      const imgBlock=e.target.closest(`[data-block-id="${blockId}"]`);
-      if(!imgBlock){
-        const el2=document.querySelector(`[data-block-id="${blockId}"]`);
-        if(el2) el2.classList.remove('img-editing');
+    document.addEventListener('click', function closer(e){
+      if(!e.target.closest('#imgEditPopup')&&!e.target.closest(`img`)){
+        docHideImagePopup();
         document.removeEventListener('click',closer);
       }
-    };
-    document.addEventListener('click',closer);
+    });
   },0);
+}
+function docHideImagePopup(){
+  const p=document.getElementById('imgEditPopup');
+  if(p) p.remove();
 }
 
 // Image float control
@@ -4633,7 +4655,7 @@ function docToggleCaption(blockId){
   const block=docGetBlock(blockId);
   if(!block||block.type!=='image') return;
   if(!block.meta) block.meta={};
-  block.meta.showCaption=!(block.meta.showCaption!==false);
+  block.meta.showCaption=!block.meta.showCaption;
   if(!block.meta.showCaption) block.meta.caption='';
   currentDoc.updated=new Date().toISOString();
   renderDocMode();
@@ -5009,34 +5031,26 @@ function renderDocMode(){
       </div>`;
     }
 
-    // Image block with click-to-edit overlay (float + caption toggle)
+    // Image block with popup edit menu
     if(block.type==='image'){
       const src=block.meta?.src||'';
       const alt=block.meta?.alt||'';
       const float=block.meta?.float||'right';
       const caption=block.meta?.caption||'';
-      const hasCaption=block.meta?.showCaption!==false;
+      const hasCaption=block.meta?.showCaption===true;
       const floatClass='float-'+float;
       const btnL=float==='left'?' active':'';
       const btnC=float==='none'?' active':'';
       const btnR=float==='right'?' active':'';
       const capClass=hasCaption?'':'hidden-cap';
-      return `<figure class="doc-figure"><div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
+      return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
-        ${src?`<img src="${src}" alt="${escapeHtml(alt)}" onclick="event.stopPropagation();docToggleImageEdit('${block.id}')" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
-        ${src?`<div class="img-edit-overlay" contenteditable="false">
-          <div class="img-float-bar">
-            <button class="${btnL}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','left')">◧ Left</button>
-            <button class="${btnC}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','none')">▣ Center</button>
-            <button class="${btnR}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','right')">◨ Right</button>
-          </div>
-          <button onclick="event.stopPropagation();docToggleCaption('${block.id}')">${hasCaption?'Remove caption':'Add caption'}</button>
-        </div>`:''}
+        ${src?`<img src="${src}" alt="${escapeHtml(alt)}" onclick="event.stopPropagation();docShowImagePopup('${block.id}',this)" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
         <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
           onblur="docSaveFigureCaption('${block.id}',this.textContent)"
           onclick="event.stopPropagation()"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(caption)}</div>
-      </div><div class="doc-clear-float"></div></figure>`;
+      </div>`;
     }
 
     // Table block
@@ -5054,7 +5068,7 @@ function renderDocMode(){
       });
       tableHtml+='</table>';
       tableHtml+=`<button class="table-add-row" onclick="docTableAddRow('${block.id}')">+ Add row</button>`;
-      return `<div class="doc-block${selected}" data-type="table" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
+      return `<div class="doc-block${selected}" data-type="table" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)" onfocusin="docSelectBlock('${block.id}')">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         ${tableHtml}
       </div>`;
