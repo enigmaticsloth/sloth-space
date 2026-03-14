@@ -4802,9 +4802,18 @@ let docUndoStack=[];
 let docRedoStack=[];
 function docSaveUndoStacks(){
   try{
-    sessionStorage.setItem('sloth_doc_undo',JSON.stringify(docUndoStack));
-    sessionStorage.setItem('sloth_doc_redo',JSON.stringify(docRedoStack));
-  }catch(e){}
+    // Limit persisted stacks to last 20 entries to avoid sessionStorage quota
+    const u=docUndoStack.slice(-20);
+    const r=docRedoStack.slice(-20);
+    sessionStorage.setItem('sloth_doc_undo',JSON.stringify(u));
+    sessionStorage.setItem('sloth_doc_redo',JSON.stringify(r));
+  }catch(e){
+    // Quota exceeded — try smaller
+    try{
+      sessionStorage.setItem('sloth_doc_undo',JSON.stringify(docUndoStack.slice(-5)));
+      sessionStorage.setItem('sloth_doc_redo',JSON.stringify(docRedoStack.slice(-5)));
+    }catch(e2){}
+  }
 }
 function docRestoreUndoStacks(){
   try{
@@ -8821,6 +8830,13 @@ renderApp();
 // ── Save doc on page unload/tab close ──
 window.addEventListener('beforeunload',function(){
   if(currentMode==='doc'&&currentDoc){
+    // Flush editing state and push final undo snapshot
+    if(docEditingBlockId){
+      const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
+      if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
+    }
+    docPushUndo();
+    docSaveUndoStacks();
     docSaveNow();
   }
 });
