@@ -371,7 +371,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="list"]::before { content:'•'; position:absolute; left:8px; color:#7886A5; font-weight:700; }
 .doc-block[data-type="numbered"] { font-size:15px; padding-left:24px; counter-increment:doc-ol; }
 .doc-block[data-type="numbered"]::before { content:attr(data-number) '.'; position:absolute; left:4px; color:#7886A5; font-weight:600; font-size:13px; min-width:16px; text-align:right; }
-.doc-block[data-type="image"] { padding:8px; min-height:40px; width:fit-content; max-width:100%; position:relative; }
+.doc-block[data-type="image"] { padding:8px; min-height:40px; width:fit-content; max-width:100%; position:relative; z-index:2; }
 .doc-block[data-type="image"].float-none { margin-left:auto; margin-right:auto; clear:both; }
 .doc-block[data-type="image"].float-left { float:left; max-width:45%; margin:0 20px 12px 0; }
 .doc-block[data-type="image"].float-right { float:right; max-width:45%; margin:0 0 12px 20px; }
@@ -380,8 +380,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="image"] .doc-figure-caption:focus { border-color:#555; }
 .doc-block[data-type="image"] .doc-figure-caption:empty::before { content:'Add caption...'; color:#444; }
 .doc-block[data-type="image"] .doc-figure-caption.hidden-cap { display:none; }
-/* Image edit popup — small bar above image */
-.img-edit-popup { display:none; position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#1a1a1a; border:1px solid #444; border-radius:8px; padding:6px 8px; z-index:50; white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+/* Image edit popup — fixed positioned above image, never clipped */
+.img-edit-popup { position:fixed; background:#1a1a1a; border:1px solid #444; border-radius:8px; padding:6px 8px; z-index:9999; white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
 .img-edit-popup::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:6px solid transparent; border-top-color:#444; }
 .img-edit-popup .img-popup-row { display:flex; gap:4px; align-items:center; }
 .img-edit-popup button { font-size:11px; padding:3px 10px; background:#2a2a2a; border:1px solid #555; color:#bbb; border-radius:5px; cursor:pointer; }
@@ -389,7 +389,14 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .img-edit-popup button.active { background:#7886A5; color:#fff; border-color:#7886A5; }
 .doc-block[data-type="caption"] { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:-2px; margin-bottom:12px; }
 /* Table block */
-.doc-block[data-type="table"] { padding:4px; overflow-x:auto; }
+.doc-block[data-type="table"] { padding:4px; overflow-x:auto; position:relative; z-index:2; width:fit-content; max-width:100%; }
+.doc-block[data-type="table"].float-none { margin-left:auto; margin-right:auto; clear:both; }
+.doc-block[data-type="table"].float-left { float:left; max-width:55%; margin:0 20px 12px 0; }
+.doc-block[data-type="table"].float-right { float:right; max-width:55%; margin:0 0 12px 20px; }
+.doc-block[data-type="table"] .doc-figure-caption { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:4px; padding:2px 8px; min-height:18px; outline:none; border:1px dashed transparent; border-radius:3px; }
+.doc-block[data-type="table"] .doc-figure-caption:focus { border-color:#555; }
+.doc-block[data-type="table"] .doc-figure-caption:empty::before { content:'Add caption...'; color:#444; }
+.doc-block[data-type="table"] .doc-figure-caption.hidden-cap { display:none; }
 .doc-block[data-type="table"] table { width:100%; border-collapse:collapse; font-size:13px; }
 .doc-block[data-type="table"] th, .doc-block[data-type="table"] td { border:1px solid #444; padding:6px 10px; text-align:left; min-width:60px; }
 .doc-block[data-type="table"] th { background:#2a2a2a; color:#ccc; font-weight:600; font-size:12px; }
@@ -4601,62 +4608,72 @@ function docInsertTablePrompt(){
   addMessage('Describe the table you want in chat — AI will generate the columns, rows, and content for you.','system');
 }
 
-// Show image edit popup above the clicked image
-function docShowImagePopup(blockId, imgEl){
-  // Remove any existing popup
-  docHideImagePopup();
+// ── Shared block popup for float/caption (image + table) ──
+function docShowBlockPopup(blockId, anchorEl){
+  docHideBlockPopup();
   const block=docGetBlock(blockId);
-  if(!block||block.type!=='image') return;
+  if(!block) return;
   const float=block.meta?.float||'right';
   const hasCaption=block.meta?.showCaption===true;
 
   const popup=document.createElement('div');
-  popup.id='imgEditPopup';
+  popup.id='blockEditPopup';
   popup.className='img-edit-popup';
-  popup.style.display='block';
   popup.innerHTML=`
     <div class="img-popup-row">
-      <button class="${float==='left'?'active':''}" onclick="event.stopPropagation();docSetImageFloat('${blockId}','left')">◧ Left</button>
-      <button class="${float==='none'?'active':''}" onclick="event.stopPropagation();docSetImageFloat('${blockId}','none')">▣ Center</button>
-      <button class="${float==='right'?'active':''}" onclick="event.stopPropagation();docSetImageFloat('${blockId}','right')">◨ Right</button>
+      <button class="${float==='left'?'active':''}" onclick="event.stopPropagation();docSetBlockFloat('${blockId}','left')">◧ Left</button>
+      <button class="${float==='none'?'active':''}" onclick="event.stopPropagation();docSetBlockFloat('${blockId}','none')">▣ Center</button>
+      <button class="${float==='right'?'active':''}" onclick="event.stopPropagation();docSetBlockFloat('${blockId}','right')">◨ Right</button>
       <span style="width:1px;height:16px;background:#444;margin:0 4px;"></span>
-      <button onclick="event.stopPropagation();docToggleCaption('${blockId}')">${hasCaption?'− Caption':'+ Caption'}</button>
+      <button onclick="event.stopPropagation();docToggleBlockCaption('${blockId}')">${hasCaption?'− Caption':'+ Caption'}</button>
     </div>`;
 
-  // Append to the block itself (positioned absolute inside relative block)
-  const blockEl=document.querySelector(`[data-block-id="${blockId}"]`);
-  if(blockEl) blockEl.appendChild(popup);
+  document.body.appendChild(popup);
 
-  // Close on outside click
+  // Position above anchor using getBoundingClientRect
+  const rect=anchorEl.getBoundingClientRect();
+  const popupW=popup.offsetWidth;
+  let left=rect.left+(rect.width/2)-(popupW/2);
+  if(left<8) left=8;
+  if(left+popupW>window.innerWidth-8) left=window.innerWidth-8-popupW;
+  let top=rect.top-popup.offsetHeight-8;
+  if(top<8) top=rect.bottom+8;
+  popup.style.left=left+'px';
+  popup.style.top=top+'px';
+
   setTimeout(()=>{
     document.addEventListener('click', function closer(e){
-      if(!e.target.closest('#imgEditPopup')&&!e.target.closest(`img`)){
-        docHideImagePopup();
+      if(!e.target.closest('#blockEditPopup')&&!e.target.closest(`[data-block-id="${blockId}"]`)){
+        docHideBlockPopup();
         document.removeEventListener('click',closer);
       }
     });
   },0);
 }
-function docHideImagePopup(){
-  const p=document.getElementById('imgEditPopup');
+function docHideBlockPopup(){
+  const p=document.getElementById('blockEditPopup');
   if(p) p.remove();
 }
+// Aliases for backward compat
+function docShowImagePopup(blockId, el){ docShowBlockPopup(blockId, el); }
+function docHideImagePopup(){ docHideBlockPopup(); }
 
-// Image float control
-function docSetImageFloat(blockId, float){
+// Shared float control (works for image + table)
+function docSetBlockFloat(blockId, float){
   const block=docGetBlock(blockId);
-  if(!block||block.type!=='image') return;
+  if(!block) return;
   docPushUndo();
   if(!block.meta) block.meta={};
   block.meta.float=float;
   currentDoc.updated=new Date().toISOString();
   renderDocMode();
 }
+function docSetImageFloat(bid,f){ docSetBlockFloat(bid,f); }
 
-// Toggle caption visibility
-function docToggleCaption(blockId){
+// Shared caption toggle (works for image + table)
+function docToggleBlockCaption(blockId){
   const block=docGetBlock(blockId);
-  if(!block||block.type!=='image') return;
+  if(!block) return;
   if(!block.meta) block.meta={};
   block.meta.showCaption=!block.meta.showCaption;
   if(!block.meta.showCaption) block.meta.caption='';
@@ -4664,14 +4681,15 @@ function docToggleCaption(blockId){
   renderDocMode();
 }
 
-// Save figure caption
+// Save figure/table caption (shared)
 function docSaveFigureCaption(blockId, text){
   const block=docGetBlock(blockId);
-  if(!block||block.type!=='image') return;
+  if(!block) return;
   if(!block.meta) block.meta={};
   block.meta.caption=text.trim();
   currentDoc.updated=new Date().toISOString();
 }
+function docToggleCaption(bid){ docToggleBlockCaption(bid); }
 
 // Table cell editing
 function docSaveTableCell(blockId, row, col, text){
@@ -5060,6 +5078,11 @@ function renderDocMode(){
     if(block.type==='table'){
       const cells=block.meta?.cells||[];
       const cols=block.meta?.cols||3;
+      const float=block.meta?.float||'none';
+      const hasCaption=block.meta?.showCaption===true;
+      const caption=block.meta?.caption||'';
+      const floatClass='float-'+float;
+      const capClass=hasCaption?'':'hidden-cap';
       let tableHtml='<table>';
       cells.forEach((row,ri)=>{
         tableHtml+='<tr>';
@@ -5070,10 +5093,14 @@ function renderDocMode(){
         tableHtml+='</tr>';
       });
       tableHtml+='</table>';
-      tableHtml+=`<button class="table-add-row" onclick="docTableAddRow('${block.id}')">+ Add row</button>`;
-      return `<div class="doc-block${selected}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
+      tableHtml+=`<button class="table-add-row" onclick="event.stopPropagation();docTableAddRow('${block.id}')">+ Add row</button>`;
+      return `<div class="doc-block${selected} ${floatClass}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
-        ${tableHtml}
+        <div onclick="event.stopPropagation();docShowBlockPopup('${block.id}',this)">${tableHtml}</div>
+        <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
+          onblur="docSaveFigureCaption('${block.id}',this.textContent)"
+          onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(caption)}</div>
       </div>`;
     }
 
@@ -7177,8 +7204,8 @@ Block types and their JSON format:
 
 2. Divider — {"type":"divider","text":""}
 
-3. Table — {"type":"table","text":"","meta":{"cols":N,"rows":N,"cells":[["Header1","Header2",...],["row1col1","row1col2",...],...]}}
-   "cells" is a 2D array. First row = headers. "rows" = number of data rows (excluding header). "cols" = number of columns.
+3. Table — {"type":"table","text":"","meta":{"cols":N,"rows":N,"cells":[["Header1","Header2",...],["row1col1","row1col2",...],...],"float":"none|left|right","caption":"Table legend text","showCaption":true}}
+   "cells" is a 2D array. First row = headers. "rows" = number of data rows (excluding header). "cols" = number of columns. Use float "left" or "right" to wrap text around the table. Use "none" for centered. Default float is "none". Set showCaption to true if providing a caption.
 
 4. Image — {"type":"image","text":"","meta":{"src":"<url>","alt":"description","float":"none|left|right","caption":"Figure legend text","showCaption":true}}
    Use float "left" or "right" to wrap text around the image. Use "none" for centered full-width. Default float is "right". Set showCaption to true if providing a caption.
