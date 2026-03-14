@@ -2013,7 +2013,6 @@ const CLOUD_PROVIDERS=['groq','openai','claude','grok']; // providers that need 
 function showMobileForm(){
   const box=document.getElementById('welcomeBox');
   if(box) box.classList.add('mobile-form-active');
-  try{ localStorage.setItem('sloth_splash_seen','1'); }catch(e){}
 }
 function toggleWelcomeProviders(){
   const configPanel=document.getElementById('wbConfigPanel');
@@ -2148,9 +2147,7 @@ function finishWelcome() {
 function _commitWelcomeConfig(defaults, isCloud){
   saveConfig();
   syncConfigToCloud();
-  localStorage.removeItem('sloth_signed_out');
   document.getElementById('welcomeOverlay').classList.add('hidden');
-  try{ sessionStorage.removeItem('sloth_on_welcome'); }catch(e){}
 }
 
 // ═══════════════════════════════════════════
@@ -2246,28 +2243,14 @@ function restoreConfigFromCloud(user){
 
 function skipWelcome() {
   document.getElementById('welcomeOverlay').classList.add('hidden');
-  try{ sessionStorage.removeItem('sloth_on_welcome'); }catch(e){}
 }
 
 function checkWelcomeScreen() {
   const hasConfig = loadConfig();
-  // If user explicitly signed out, don't auto-enter slides
-  const signedOut = localStorage.getItem('sloth_signed_out');
-  // If user was on welcome page before refresh, stay there
-  if(sessionStorage.getItem('sloth_on_welcome')){
-    showWelcome(true);
-    return;
-  }
-  if (hasConfig && isConfigured() && !signedOut) {
+  if (hasConfig && isConfigured()) {
     document.getElementById('welcomeOverlay').classList.add('hidden');
   }
-  // Welcome screen stays visible — handle mobile splash state
-  if(!document.getElementById('welcomeOverlay').classList.contains('hidden')){
-    const box=document.getElementById('welcomeBox');
-    if(box && localStorage.getItem('sloth_splash_seen')){
-      box.classList.add('mobile-form-active');
-    }
-  }
+  // Otherwise welcome stays visible — on mobile, CSS handles showing splash vs form
 }
 
 // ═══════════════════════════════════════════
@@ -2513,14 +2496,13 @@ function setAuthUser(user){
   // This ensures API keys sync across devices — but only show message once
   if(!_authSyncDone){
     _authSyncDone=true;
-    localStorage.removeItem('sloth_signed_out'); // clear sign-out flag on login
     const restored=restoreConfigFromCloud(user);
     // Set display name from GitHub if not already set from cloud
     if(!llmConfig.displayName){
       llmConfig.displayName=name;
       saveConfig();
     }
-    if(restored&&isConfigured()&&!sessionStorage.getItem('sloth_on_welcome')){
+    if(restored&&isConfigured()){
       document.getElementById('welcomeOverlay').classList.add('hidden');
       addMessage('☁️ Settings synced from cloud.','system');
     }
@@ -2573,21 +2555,14 @@ document.addEventListener('click',function(e){
   if(!e.target.closest('.user-menu-wrap'))closeUserMenu();
 });
 
-function showWelcome(fromInit){
+function showWelcome(){
   const overlay=document.getElementById('welcomeOverlay');
   overlay.classList.remove('hidden');
-  // Remember user is on welcome page so refresh stays here
-  if(!fromInit) try{ sessionStorage.setItem('sloth_on_welcome','1'); }catch(e){}
-  // On mobile: show splash if never seen, otherwise skip to form
+  // On mobile: not logged in → show demo splash (CSS handles display)
+  // Reset to splash view (remove form-active so demo shows)
   const box=document.getElementById('welcomeBox');
-  if(box){
-    if(localStorage.getItem('sloth_splash_seen')){
-      box.classList.add('mobile-form-active');
-    } else {
-      box.classList.remove('mobile-form-active');
-    }
-  }
-  // Make sure config panel is hidden (show demo)
+  if(box) box.classList.remove('mobile-form-active');
+  // Make sure config panel is hidden
   const configPanel=document.getElementById('wbConfigPanel');
   if(configPanel)configPanel.classList.remove('active');
   // If already configured, pre-fill and show Connected state
@@ -2633,9 +2608,7 @@ async function doLogout(){
   await supabaseClient.auth.signOut();
   clearAuthUser();
   clearLocalConfig();
-  localStorage.setItem('sloth_signed_out','1');
   addMessage('Signed out.','system');
-  // Show welcome page
   showWelcome();
 }
 // Clear config from memory & localStorage only (cloud keeps it)
@@ -2653,7 +2626,6 @@ async function doWelcomeSignOut(){
   await supabaseClient.auth.signOut();
   clearAuthUser();
   clearLocalConfig();
-  localStorage.setItem('sloth_signed_out','1');
   // Reset welcome auth section
   const wStatus=document.getElementById('welcomeAuthStatus');
   const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
