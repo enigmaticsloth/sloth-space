@@ -347,8 +347,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 /* Tablet: stack chat below slide */
 @media(max-width:900px){
   .middle { flex-direction:column; }
-  .chat-panel { width:100%; height:200px; border-left:none; border-top:1px solid var(--border); }
-  .slide-panel { padding:4px 4px 4px; }
+  .chat-panel { width:100%; flex:1; min-height:120px; border-left:none; border-top:1px solid var(--border); }
+  .slide-panel { padding:4px 4px 4px; flex:0 0 auto; }
   .topbar .logo { font-size:22px; }
   .topbar .tagline { display:none; }
   .preset-pills { display:none; }
@@ -356,110 +356,139 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .deck-action-btn { padding:3px 7px; font-size:9px; }
 }
 
-/* ═══════════════════════════════════════════ */
-/* PHONE: Instagram-style vertical card UI    */
-/* ═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════ */
+/* PHONE: App-style adaptive layout (SwiftUI-like)    */
+/* Layout from top to bottom:                         */
+/*   Topbar → Slide (top-aligned) → Page dots →       */
+/*   Chat messages (scrollable flex) → Toolbar →       */
+/*   Input area (tall, expandable)                    */
+/* ═══════════════════════════════════════════════════ */
 @media(max-width:600px){
-  /* --- Layout: full-screen card feed --- */
+  /* --- Global: fill viewport, no scroll on body --- */
   body { overflow:hidden; }
 
-  /* Topbar: ultra compact — logo left, icons right */
+  /* --- Topbar: compact --- */
   .topbar { padding:6px 10px; gap:6px; }
   .topbar .logo { font-size:18px; }
   .topbar .tagline { display:none; }
   .preset-pills { display:none; }
-  .export-btn { display:none; } /* hidden — accessible via menu */
+  .export-btn { display:none; }
   .auth-bar { margin-left:auto; }
+  .product-bar { display:none !important; }
 
-  /* Middle: vertical stack, slide takes most space */
-  .middle { flex-direction:column; position:relative; }
+  /* --- Middle: vertical column, slide + chat stacked --- */
+  .middle {
+    flex-direction:column;
+    flex:1; min-height:0; overflow:hidden;
+  }
 
-  /* Slide panel: full width, flex grow */
-  .slide-panel { padding:2px 4px 0; flex:1; min-height:0; }
+  /* --- Slide panel: top-aligned, shrink to content --- */
+  .slide-panel {
+    flex:0 0 auto; /* don't grow — take only what slide needs */
+    align-items:center;
+    justify-content:flex-start; /* TOP-ALIGNED */
+    padding:4px 4px 0;
+    overflow:hidden;
+    min-height:0;
+  }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }
   .deck-name-input { font-size:12px; }
-  .deck-actions { display:none; } /* hidden on mobile — use chat commands or menu */
+  .deck-actions { display:none; }
+  .slide-frame { border-radius:6px; }
 
-  /* Slide frame: fill available width */
-  .slide-frame { border-radius:8px; }
-
-  /* Slide bar: IG-style dots instead of numbered buttons */
-  .slide-bar { gap:4px; margin-top:6px; padding-bottom:2px; }
-  .slide-nav { gap:2px; }
-  .slide-nav button { width:8px; height:8px; border-radius:50%; font-size:0; color:transparent; padding:0; border:none; background:#333; transition:all 0.2s; }
-  .slide-nav button.active { width:20px; border-radius:4px; background:#7886A5; }
+  /* --- Page dots: small circles, active = filled --- */
+  .slide-bar { gap:4px; margin-top:4px; padding-bottom:2px; }
+  .slide-nav { gap:4px; }
+  .slide-nav button {
+    width:8px; height:8px; border-radius:50%;
+    font-size:0; color:transparent; padding:0;
+    border:none; background:#333;
+    transition:background 0.2s;
+  }
+  .slide-nav button.active { background:#7886A5; } /* filled circle, no width change */
+  .slide-nav button:hover { background:#555; }
   .slide-info { font-size:8px; }
 
-  /* Chat panel: collapsed by default, expandable overlay */
+  /* --- Chat panel: inline flow (not overlay), scrollable flex area --- */
   .chat-panel {
-    position:absolute; bottom:0; left:0; right:0;
-    height:auto; max-height:60vh;
+    width:100%; flex:1 1 0; min-height:0;
     border-left:none; border-top:1px solid var(--border);
-    background:var(--surface);
-    transform:translateY(100%);
-    transition:transform 0.25s ease;
-    z-index:200;
-    border-radius:16px 16px 0 0;
-    width:100%;
-  }
-  .chat-panel.mobile-open {
-    transform:translateY(0);
+    display:flex; flex-direction:column;
+    overflow:hidden;
   }
   .chat-header {
-    padding:12px 14px 6px; font-size:10px; cursor:pointer;
-    display:flex; align-items:center; justify-content:space-between;
-    position:relative;
+    padding:4px 12px; font-size:9px;
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
   }
-  .chat-messages { max-height:40vh; padding:6px 10px; gap:4px; }
-  .msg { font-size:11px; padding:5px 8px; }
-
-  /* Chat toggle handle */
-  .chat-header::before {
-    content:''; display:block; width:32px; height:4px; background:#444;
-    border-radius:2px; position:absolute; top:6px; left:50%; transform:translateX(-50%);
+  .chat-messages {
+    flex:1; min-height:0;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+    padding:6px 10px; gap:4px;
   }
+  .msg { font-size:11px; padding:5px 8px; max-width:92%; }
 
-  /* Bottom panel: IG-style input bar */
-  .bottom-panel { border-top:1px solid var(--border); }
-  .toolbar { display:none !important; } /* hidden on mobile — use voice/text commands */
+  /* --- Bottom panel: toolbar + tall input --- */
+  .bottom-panel { flex-shrink:0; border-top:1px solid var(--border); }
+
+  /* --- Toolbar: visible, compact horizontal scroll --- */
+  .toolbar {
+    display:flex !important;
+    overflow-x:auto; -webkit-overflow-scrolling:touch;
+    gap:0; padding:0 4px;
+  }
+  .tool-btn { padding:4px 10px; font-size:10px; white-space:nowrap; }
+  .font-size-indicator { font-size:9px; min-width:28px; padding:2px 4px; }
+  .undo-redo-btn { padding:4px 8px; font-size:12px; }
+
+  /* --- Selection bar --- */
   .selection-bar { padding:2px 8px; font-size:9px; }
-  .input-area { padding:4px 8px 6px; gap:6px; align-items:center; }
-  .input-area textarea {
-    height:38px; min-height:38px; max-height:100px;
-    font-size:16px; padding:8px 12px;
-    border-radius:20px; /* pill shape like IG */
-    line-height:1.3;
+
+  /* --- Input area: tall (roughly 2/5 of screen height) --- */
+  .input-area {
+    padding:4px 8px 6px; gap:6px;
+    align-items:stretch;
+    flex-shrink:0;
   }
-  .input-area.collapsed textarea { height:38px; }
-  .input-toggle { display:none; } /* no expand toggle on mobile */
+  .input-area textarea {
+    height:28vh; min-height:80px; max-height:40vh;
+    font-size:16px; padding:10px 12px;
+    border-radius:12px;
+    line-height:1.5;
+    resize:none;
+    transition:height 0.2s ease;
+  }
+  /* Collapsed state: single-line bar */
+  .input-area.collapsed textarea {
+    height:40px; min-height:40px;
+    border-radius:20px;
+    padding:8px 14px;
+  }
+  .input-toggle {
+    display:flex; /* keep toggle visible on mobile for expand/collapse */
+    top:2px; right:44px;
+    width:20px; height:14px; font-size:9px;
+  }
   .send-btn {
     padding:0 14px; font-size:11px; height:34px;
-    border-radius:17px; /* pill shape */
-    flex-shrink:0; align-self:center;
+    border-radius:8px;
+    flex-shrink:0; align-self:flex-end;
   }
 
-  /* File nav sidebar */
+  /* --- Overlay panels: full-width --- */
   .file-nav { width:85vw; max-width:320px; }
-
-  /* Settings panel */
   .settings-panel { width:92vw; padding:20px 18px; }
-
-  /* Welcome box */
   .welcome-box { width:96%; padding:20px 16px; }
   .welcome-box .wb-logo { font-size:32px; }
   .wb-provider-row { flex-direction:column; gap:8px; }
   .wb-products { gap:12px; }
   .wb-product-icon { width:38px; height:38px; }
-
-  /* Workspace modal */
   .ws-modal { width:95%; }
 
-  /* Onboarding chips: smaller on mobile */
+  /* --- Onboarding: compact --- */
   .chat-chip { padding:7px 10px; font-size:10px; }
   .chat-onboarding-title { font-size:11px; }
-
-  /* Product bar hidden on mobile */
-  .product-bar { display:none !important; }
+  .chat-onboarding { padding:12px 10px; gap:8px; }
 }
 
 /* Very small phones */
@@ -3615,32 +3644,9 @@ autoLoad(); // Restore previous session from localStorage
 checkShareLink(); // Check for ?load= share link
 
 // ═══════════════════════════════════════════
-// MOBILE: Instagram-style interactions
+// MOBILE: App-style interactions
 // ═══════════════════════════════════════════
 const isMobile=()=>window.innerWidth<=600;
-
-// Mobile chat panel toggle — tap header to expand/collapse
-document.querySelector('.chat-header').addEventListener('click',function(){
-  if(!isMobile())return;
-  document.querySelector('.chat-panel').classList.toggle('mobile-open');
-});
-
-// Auto-open chat panel when AI responds (mobile)
-const origAddMessage=addMessage;
-addMessage=function(text,type){
-  const div=origAddMessage(text,type);
-  if(isMobile()&&(type==='ai'||type==='system')){
-    document.querySelector('.chat-panel').classList.add('mobile-open');
-  }
-  return div;
-};
-
-// Close chat panel when user taps slide area (mobile)
-document.querySelector('.slide-panel').addEventListener('click',function(e){
-  if(!isMobile())return;
-  if(e.target.closest('.region-box'))return; // don't close if selecting region
-  document.querySelector('.chat-panel').classList.remove('mobile-open');
-});
 
 // Swipe left/right on slide to navigate (mobile)
 let touchStartX=0;
@@ -3654,7 +3660,6 @@ slideCanvas.addEventListener('touchend',function(e){
   if(!currentDeck)return;
   const dx=e.changedTouches[0].clientX-touchStartX;
   const dy=e.changedTouches[0].clientY-touchStartY;
-  // Only handle horizontal swipes (not vertical scroll)
   if(Math.abs(dx)<50||Math.abs(dy)>Math.abs(dx))return;
   if(dx<0&&currentSlide<currentDeck.slides.length-1){
     currentSlide++;renderApp();
@@ -3663,19 +3668,12 @@ slideCanvas.addEventListener('touchend',function(e){
   }
 },{passive:true});
 
-// Auto-expand textarea on mobile when typing (auto-grow)
-const chatInputEl=document.getElementById('chatInput');
-chatInputEl.addEventListener('input',function(){
-  if(!isMobile())return;
-  this.style.height='38px';
-  this.style.height=Math.min(this.scrollHeight,100)+'px';
+// Auto-scroll chat to bottom when new message arrives (mobile)
+const chatMsgsEl=document.getElementById('chatMessages');
+const chatObserver=new MutationObserver(function(){
+  chatMsgsEl.scrollTop=chatMsgsEl.scrollHeight;
 });
-chatInputEl.addEventListener('focus',function(){
-  if(isMobile()){
-    // Close chat overlay when focusing input (input is in bottom-panel, not chat-panel)
-    document.querySelector('.chat-panel').classList.remove('mobile-open');
-  }
-});
+chatObserver.observe(chatMsgsEl,{childList:true});
 
 renderApp();
 </script>
