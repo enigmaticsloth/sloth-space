@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Sloth Space</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PptxGenJS/3.12.0/pptxgen.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1351,11 +1351,12 @@ function renderApp(){
   const panel=document.querySelector('.slide-panel');
   const isMobile=window.innerWidth<=600;
   const panelW=panel.clientWidth-(isMobile?8:12);
-  // On mobile: use 36vh minus chrome (deck-name-bar ~28px + slide-bar ~28px + padding ~8px = ~64px)
+  // On mobile: use CACHED initial viewport height so pinch-to-zoom doesn't shrink slide
   // On desktop: use actual panel height minus chrome
   let panelH;
   if(isMobile){
-    panelH=Math.max(window.innerHeight*0.36-64, 80); // match CSS flex:0 0 36vh
+    const stableVH=typeof INITIAL_VH!=='undefined'?INITIAL_VH:window.innerHeight;
+    panelH=Math.max(stableVH*0.36-64, 80); // match CSS flex:0 0 36vh
   }else{
     panelH=panel.clientHeight-70;
   }
@@ -3666,7 +3667,6 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight'&&currentDeck){goSlide(Math.min(currentSlide+1,currentDeck.slides.length-1));e.preventDefault();}
   if(e.key==='ArrowLeft'&&currentDeck){goSlide(Math.max(currentSlide-1,0));e.preventDefault();}
 });
-window.addEventListener('resize',renderApp);
 initToolbar();
 // Deck name input — update title on change
 document.getElementById('deckNameInput').addEventListener('input',function(){
@@ -3687,6 +3687,9 @@ checkShareLink(); // Check for ?load= share link
 // ═══════════════════════════════════════════
 // MOBILE: App-style interactions
 // ═══════════════════════════════════════════
+// Cache initial viewport size — pinch-to-zoom changes innerHeight but we want stable slide sizing
+const INITIAL_VH=window.innerHeight;
+const INITIAL_VW=window.innerWidth;
 const isMobile=()=>window.innerWidth<=600;
 
 // Swipe left/right on slide to navigate (mobile)
@@ -3716,11 +3719,15 @@ const chatObserver=new MutationObserver(function(){
 });
 chatObserver.observe(chatMsgsEl,{childList:true});
 
-// Re-render on resize/orientation change so slide scales correctly
-let resizeTimer;
+// Re-render on orientation change only (not pinch-to-zoom)
+let lastW=window.innerWidth;
 window.addEventListener('resize',function(){
-  clearTimeout(resizeTimer);
-  resizeTimer=setTimeout(renderApp,150);
+  // Only re-render if width actually changed (orientation change or real resize)
+  // Pinch-to-zoom on mobile doesn't change innerWidth
+  if(Math.abs(window.innerWidth-lastW)>20){
+    lastW=window.innerWidth;
+    renderApp();
+  }
 });
 
 renderApp();
