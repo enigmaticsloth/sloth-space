@@ -6313,46 +6313,51 @@ function applyStyleOverrides(styleObj){
 }
 
 // ── Pass 1: small fast model decides intent ──
-const ROUTER_PROMPT=`You are an intent router for Sloth Space, a content creation app with multiple modes (slide, doc, sheet, workspace).
-You will receive the user's message and context. Classify the intent.
+const ROUTER_PROMPT=`You are an intent router for Sloth Space, a content creation app with modes: slide, doc, sheet, workspace.
+Classify the user's message into ONE intent. Output ONLY a JSON object.
 
-Output ONLY a JSON object with "intent" and optional fields.
+INTENTS:
 
-INTENTS (pick one):
+"undo" — undo, restore, revert, go back to previous state.
+  Output: {"intent":"undo"}
+  CRITICAL RULE: 恢復, 復原, 還原, 回復, 撤銷, 取消, 上一步, 退回, undo, redo, ctrl+z ALL mean undo.
+  These words mean "go back" NOT "delete". NEVER confuse undo with delete/content_edit.
 
-"style" — visual style changes: colors, fonts, font sizes, backgrounds, bold, italic, underline, spacing, moving/resizing regions. NOT content changes. (Slide mode only)
-Examples: "背景改藍色", "字型改Georgia", "標題加粗", "字大一點", "change background to dark blue", "make title red"
+"content_edit" — edit or delete specific content (a region on a slide, a doc block).
+  Slides: {"intent":"content_edit","slide":N or null,"region":"regionId" or null,"delete":true/false}
+  Docs: {"intent":"content_edit","delete":true/false}
+  delete:true when user wants to remove/clear/delete content: "刪除", "刪掉", "移除", "清除", "delete", "remove", "clear"
+  Also: insert table, add divider, move image, change image position → content_edit in doc mode.
 
-"image" — anything about images on slides: place, move, resize, delete, scale, crop, fit. (Slide mode only)
-Examples: "放到第3頁右邊", "圖片大一點", "刪除這張圖片", "move image left"
+"style" — visual changes only: colors, fonts, sizes, backgrounds, bold, italic, underline, spacing, region bounds. Slide mode only.
 
-"deck_edit" — edit content across ALL slides at once OR edit entire doc content. (Slide: batch edit; Doc: rewrite/restructure)
-Examples: "全部翻成英文", "所有頁面加上公司logo文字", "translate to English", "重新整理這篇文章"
+"image" — image operations on slides: place, move, resize, delete, scale, crop, fit. Slide mode only.
 
-"content_edit" — edit content of a SPECIFIC region/slide or specific doc block, including deleting.
-For slides: {"intent":"content_edit","slide":N or null,"region":"regionId" or null,"delete":true/false}
-For docs: {"intent":"content_edit","delete":true/false}
-When the user says "delete this", "刪除這個", "remove this block", "把這個刪掉" → set delete:true.
-Examples: "改標題", "第三頁的內容豐富一點", "rewrite the body text", "刪除這個block", "delete this"
+"deck_edit" — batch edit ALL slides at once or restructure entire doc.
+  "全部翻成英文", "translate everything", "重新整理這篇文章"
 
-"generate" — create new content: slides/deck, doc/article, add new content. Also when user gives a TOPIC they want written about.
-Examples: "做一份AI簡報", "加三頁", "寫一篇文章", "generate an article about stem cells", "做吧", "make a 5-page pitch deck", "寫一篇幹細胞的文章", "生成海膽的介紹", "介紹量子力學", "寫關於咖啡的文章", "生成XX介紹", "XX的介紹"
+"generate" — create NEW content from scratch. User provides a topic or confirms generation.
+  Any mode. Includes: 生成X, 寫X, 介紹X, X的介紹, write about X, create article about X, 做一份簡報, 加三頁.
+  In DOC mode: if user gives ANY topic to write about → ALWAYS generate.
+  Confirmations like "好", "OK", "做吧", "go" → generate.
 
-"chat" — just conversation, greetings, questions, no action needed.
-Examples: "你好", "這是什麼app", "hello", "what can you do"
+"chat" — pure conversation, greetings, questions with no action.
+  "你好", "hello", "what can you do", "這是什麼app"
 
-RULES:
-- Check the [Context] for the current mode (slide/doc/sheet/workspace).
-- In DOC mode: if the user gives a TOPIC or asks to write/generate/create content → ALWAYS "generate". If they ask to edit existing content → "content_edit" or "deck_edit".
-- CRITICAL: In DOC mode, phrases like "生成X", "寫X", "介紹X", "X的介紹", "generate X", "write about X", "create an article about X" are ALL "generate" intent. Do NOT ask clarifying questions. Do NOT choose "chat". Always route to "generate" when the user mentions a topic they want content about.
-- In SLIDE mode: standard slide-related routing as before.
-- When the user gives a TOPIC or confirms ("好","OK","做吧","go"), choose "generate".
-- When in doubt between "chat" and "generate": if the user mentions ANY topic or subject they want created/written → ALWAYS choose "generate".
-- When in doubt between "content_edit" and "generate": if editing existing content→content_edit, if creating new→generate.
-- "image" and "style" only apply in slide mode. In doc mode, route to "generate" or "content_edit" instead.
-- In DOC mode: requests to insert tables, add dividers, move/position images, add figure captions → "content_edit".
-  Examples: "插入一個表格", "加一條分隔線", "把圖片移到左邊", "add a table comparing X and Y", "insert a divider"
-- NEVER choose "chat" when the user is clearly asking for content creation in doc mode.
+PRIORITY RULES (follow in order):
+1. Undo words (恢復/復原/還原/回復/撤銷/undo etc.) → ALWAYS "undo", no exceptions.
+2. Delete words (刪除/刪掉/移除/delete/remove) → "content_edit" with delete:true.
+3. Topic/creation requests → "generate".
+4. Edit existing specific content → "content_edit".
+5. Style/visual changes → "style" (slide only).
+6. Image manipulation → "image" (slide only).
+7. Batch edits → "deck_edit".
+8. Everything else → "chat".
+
+MODE-SPECIFIC:
+- "style" and "image" intents ONLY in slide mode. In doc mode use content_edit or generate.
+- In DOC mode: insert table/divider, position image → content_edit. Topic creation → generate.
+- NEVER choose "chat" when user wants content created, edited, or deleted.
 
 Output ONLY the JSON object.`;
 
@@ -6882,25 +6887,21 @@ async function sendMessage(){
       console.warn('Router parse failed:',e,'raw:',routerRaw);
     }
 
-    // ── Doc mode safety net: if router says "chat" but message looks like a content request, override to "generate" ──
-    if(currentMode==='doc'&&intent==='chat'){
-      const docGenPattern=/^(生成|寫|介紹|撰寫|create|write|generate|draft|compose|explain|描述|說明|整理)/i;
-      const topicPattern=/(的介紹|的文章|的報告|的說明|about\s+\w|article|report|essay|document)/i;
-      if(docGenPattern.test(trimText)||topicPattern.test(trimText)){
-        intent='generate';
-        console.log('Router override: chat→generate for doc mode topic request');
-      }
-      // Catch table/divider/image edit commands
-      const docEditPattern=/(插入|加入|新增|insert|add|移動|移到|move|放到|刪除|remove)(.*)(表格|table|分隔|divider|圖片|image|圖)/i;
-      if(docEditPattern.test(trimText)){
-        intent='content_edit';
-        console.log('Router override: chat→content_edit for doc mode edit command');
-      }
-    }
+    // ── Dispatch based on router intent (all classification done by LLM, no hardcoded overrides) ──
 
-    // ── Dispatch based on router intent ──
+    if(intent==='undo'){
+      // ── UNDO: restore previous state ──
+      statusDiv.remove();
+      if(currentMode==='doc'){
+        docUndo();
+        addMessage('↩ Undo','system');
+      } else {
+        undo();
+        addMessage('↩ Undo','system');
+        renderApp();
+      }
 
-    if(intent==='image'){
+    }else if(intent==='image'){
       // ── IMAGE: LLM interprets image command ──
       statusDiv.textContent='Processing image...';
       const imgRaw=await callLLM(IMAGE_PROMPT,[{role:'user',content:text}],{temperature:0,max_tokens:128,json:true});
@@ -6978,6 +6979,15 @@ async function sendMessage(){
 
     }else if(intent==='content_edit'&&currentDeck){
       // ── CONTENT EDIT: targeted region edit ──
+      // For bare "delete" with nothing selected, ask user
+      if(routerData.delete&&!routerData.region&&!routerData.slide&&!selectedRegion){
+        statusDiv.remove();
+        addMessage('請先點選你要刪除的區域，或告訴我要刪除哪一頁的什麼內容。','ai');
+        chatHistory.push({role:'assistant',content:'請先點選你要刪除的區域。'});
+        sendBtn.disabled=false; sendBtn.textContent='Send';
+        autoSave();
+        return;
+      }
       // Router provides slide number and region — no hardcoded regex
       let targetSlide=routerData.slide?routerData.slide-1:currentSlide;
       let targetRegion=routerData.region||null;
