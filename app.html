@@ -307,12 +307,13 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mc-sheet-cell:last-child { border-right:none; }
 .mc-sheet-row.header .mc-sheet-cell { color:rgba(255,255,255,0.5); font-weight:600; }
 
-/* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop */
-.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin-top:4px; }
+/* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop, centered */
+.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin:8px auto 0; }
 .mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:140px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
-.mode-card-wide .mode-card-info { text-align:left; padding:16px 20px; display:flex; align-items:center; gap:14px; }
+.mode-card-wide .mode-card-info { text-align:left; padding:14px 18px; display:flex; flex-direction:column; gap:4px; }
 .mode-card-wide .mode-card-icon { margin:0; flex-shrink:0; }
-.mode-card-wide .mode-card-name { margin-bottom:2px; }
+.mode-card-wide .mode-card-name { margin-bottom:0; }
+.mode-card-wide .mode-card-desc { margin-top:2px; }
 
 /* Workspace mini-preview */
 .mc-ws-preview { display:flex; width:85%; max-width:170px; height:80px; background:#1a1a1a; border-radius:5px; overflow:hidden; border:1px solid rgba(255,255,255,0.06); box-shadow:0 2px 12px rgba(0,0,0,0.3); }
@@ -393,13 +394,29 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .ws-new-btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:rgba(139,123,168,0.15); border:1px solid rgba(139,123,168,0.3); color:#A899C4; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; font-family:Arial; transition:all 0.2s; }
 .ws-new-btn:hover { background:rgba(139,123,168,0.25); border-color:rgba(139,123,168,0.5); }
 .ws-file-list { display:flex; flex-direction:column; gap:6px; }
-.ws-file-card { display:flex; align-items:center; gap:14px; padding:12px 16px; background:rgba(30,30,30,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:10px; cursor:pointer; transition:all 0.2s; }
+.ws-file-card { display:flex; align-items:center; gap:14px; padding:12px 16px; background:rgba(30,30,30,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:10px; cursor:pointer; transition:all 0.2s; position:relative; }
 .ws-file-card:hover { background:rgba(40,40,40,0.8); border-color:rgba(255,255,255,0.12); }
-.ws-file-icon { width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ws-file-card.ws-selected { border-color:rgba(139,123,168,0.5); background:rgba(139,123,168,0.08); }
+.ws-file-card .ws-check { position:absolute; left:6px; top:6px; width:18px; height:18px; border-radius:4px; border:1.5px solid rgba(255,255,255,0.15); background:transparent; display:flex; align-items:center; justify-content:center; font-size:11px; color:transparent; transition:all 0.15s; cursor:pointer; z-index:2; }
+.ws-file-card:hover .ws-check, .ws-file-card.ws-selected .ws-check { border-color:rgba(139,123,168,0.5); }
+.ws-file-card.ws-selected .ws-check { background:rgba(139,123,168,0.6); color:#fff; border-color:rgba(139,123,168,0.8); }
+.ws-file-preview { width:48px; height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; font-size:11px; }
+.ws-file-preview.slide-prev { background:linear-gradient(135deg,#2a3a50,#3a2a45); }
+.ws-file-preview.doc-prev { background:#1e1e1e; border:1px solid rgba(255,255,255,0.06); }
+.ws-file-preview.sheet-prev { background:#1a1a1a; border:1px solid rgba(255,255,255,0.06); }
 .ws-file-info { flex:1; min-width:0; }
 .ws-file-name { font-size:13px; font-weight:600; color:#e0e0e0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ws-file-meta { font-size:10px; color:#666; margin-top:2px; }
 .ws-empty { text-align:center; padding:40px 20px; }
+/* Workspace batch action bar */
+.ws-batch-bar { display:flex; align-items:center; gap:8px; padding:8px 14px; background:rgba(139,123,168,0.12); border:1px solid rgba(139,123,168,0.25); border-radius:8px; margin-bottom:12px; }
+.ws-batch-bar .ws-batch-count { font-size:12px; color:#A899C4; font-weight:600; }
+.ws-batch-btn { padding:5px 12px; border-radius:5px; font-size:11px; font-family:Arial; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#ccc; transition:all 0.15s; }
+.ws-batch-btn:hover { background:rgba(255,255,255,0.1); color:#fff; }
+.ws-batch-btn.danger { color:#e47474; }
+.ws-batch-btn.danger:hover { background:rgba(228,116,116,0.15); border-color:rgba(228,116,116,0.3); }
+.ws-batch-cancel { background:none; border:none; color:#888; font-size:11px; cursor:pointer; padding:4px 8px; font-family:Arial; }
+.ws-batch-cancel:hover { color:#ccc; }
 
 /* ─── Welcome screen (Monet palette) ─── */
 .welcome-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:600; display:flex; align-items:center; justify-content:center;
@@ -811,10 +828,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .mc-sheet-preview { width:75%; max-width:85px; }
   .mc-sheet-cell { padding:3px 4px; font-size:6px; }
   /* Workspace card on phone: same horizontal strip as others */
-  .mode-card-wide { flex-direction:row; margin-top:0; }
-  .mode-card-wide .mode-card-demo { width:110px; min-height:80px; border-radius:12px 0 0 12px; }
-  .mode-card-wide .mode-card-info { flex-direction:column; align-items:flex-start; gap:6px; padding:14px 14px; }
-  .mode-card-wide .mode-card-icon { width:32px; height:32px; }
+  .mode-card-wide { flex-direction:row; margin:0 auto; max-width:100% !important; }
+  .mode-card-wide .mode-card-demo { width:100px; min-height:70px; border-radius:12px 0 0 12px; }
+  .mode-card-wide .mode-card-info { flex-direction:column; align-items:flex-start; gap:4px; padding:10px 12px; }
+  .mode-card-wide .mode-card-icon { width:28px; height:28px; }
   .mc-ws-preview { max-width:85px; height:60px; }
   .mc-ws-sidebar { width:14px; padding:5px 0; gap:4px; }
   .mc-ws-dot { width:4px; height:4px; }
@@ -900,11 +917,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 <div class="topbar slides-ui">
   <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
   <div class="logo" onclick="showModePicker()" style="cursor:pointer;" title="Home">Sloth Space</div>
+  <div class="tagline" style="color:#777;">Type what you want. Sloth will design it.</div>
   <div class="mode-badge" id="modeBadge" onclick="showModePicker()" title="Switch mode">
     <svg class="mode-badge-icon" id="modeBadgeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
     <span id="modeBadgeLabel">Slide</span>
   </div>
-  <div class="tagline">Type what you want. Sloth will design it.</div>
   <div class="preset-pills" id="presetPills"></div>
   <button class="export-btn" onclick="saveSloth()">Export .sloth</button>
   <button class="export-btn" onclick="exportPPTX()">Export .pptx</button>
@@ -1170,9 +1187,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         </div>
       </div>
 
-      <!-- Tagline hint -->
-      <div style="color:#555;font-size:12px;font-style:italic;align-self:center;margin-right:8px;white-space:nowrap;">Type what you want.<br>Sloth will design it.</div>
-
       <!-- Doc -->
       <div class="mode-card" onclick="pickMode('doc')">
         <div class="mode-card-demo">
@@ -1239,11 +1253,13 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         </div>
       </div>
       <div class="mode-card-info">
-        <div class="mode-card-icon" style="background:linear-gradient(135deg,#8B7BA8,#A899C4);">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="mode-card-icon" style="background:linear-gradient(135deg,#8B7BA8,#A899C4);width:32px;height:32px;border-radius:8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="mode-card-name">Workspace</div>
         </div>
-        <div class="mode-card-name">Workspace</div>
-        <div class="mode-card-desc">Your project hub. Manage all docs, slides, and sheets in one place. Cross-file AI, split view, activity timeline.</div>
+        <div class="mode-card-desc">Your project hub. Manage all docs, slides, and sheets in one place.</div>
       </div>
     </div>
 
@@ -3455,11 +3471,24 @@ function enterWorkspaceMode(){
   renderWorkspaceMode();
 }
 
+let wsSelectedIds=new Set(); // multi-select state
+
 function renderWorkspaceMode(){
   const canvas=document.getElementById('workspaceCanvas');
   if(!canvas) return;
-  // Get saved files from workspace storage
   const saved=wsLoad();
+
+  // Batch action bar (visible when items selected)
+  let batchHtml='';
+  if(wsSelectedIds.size>0){
+    batchHtml=`<div class="ws-batch-bar">
+      <span class="ws-batch-count">${wsSelectedIds.size} selected</span>
+      <button class="ws-batch-btn danger" onclick="wsBatchDelete()">Delete</button>
+      <button class="ws-batch-btn" onclick="wsBatchDuplicate()">Duplicate</button>
+      <button class="ws-batch-cancel" onclick="wsClearSelection()">Cancel</button>
+    </div>`;
+  }
+
   let itemsHtml='';
   if(saved.length===0){
     itemsHtml=`
@@ -3470,20 +3499,19 @@ function renderWorkspaceMode(){
   } else {
     itemsHtml=saved.map((item,i)=>{
       const type=item.type||'slide';
-      const colors={slide:'#7886A5',doc:'#6B8E7B',sheet:'#A08060'};
-      const icons={
-        slide:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
-        doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
-        sheet:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/>'
-      };
+      const isSelected=wsSelectedIds.has(item.id);
+      const selClass=isSelected?' ws-selected':'';
       const date=item.updated?new Date(item.updated).toLocaleDateString():item.modified?new Date(item.modified).toLocaleDateString():'';
-      return `<div class="ws-file-card" onclick="openWorkspaceItem(${i})">
-        <div class="ws-file-icon" style="background:${colors[type]||colors.slide}20;color:${colors[type]||colors.slide};">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icons[type]||icons.slide}</svg>
-        </div>
-        <div class="ws-file-info">
-          <div class="ws-file-name">${item.title||item.name||'Untitled'}</div>
-          <div class="ws-file-meta">${type.charAt(0).toUpperCase()+type.slice(1)} \u00B7 ${date}</div>
+      // Mini preview based on type
+      const preview=wsRenderFilePreview(item);
+      return `<div class="ws-file-card${selClass}" data-ws-id="${item.id}">
+        <div class="ws-check" onclick="event.stopPropagation();wsToggleSelect('${item.id}')">${isSelected?'✓':''}</div>
+        <div onclick="openWorkspaceItem(${i})" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;">
+          ${preview}
+          <div class="ws-file-info">
+            <div class="ws-file-name">${escapeHtml(item.title||item.name||'Untitled')}</div>
+            <div class="ws-file-meta">${type.charAt(0).toUpperCase()+type.slice(1)} \u00B7 ${date}</div>
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -3500,9 +3528,96 @@ function renderWorkspaceMode(){
           New
         </button>
       </div>
+      ${batchHtml}
       <div class="ws-file-list">${itemsHtml}</div>
     </div>
   `;
+}
+
+function wsRenderFilePreview(item){
+  const type=item.type||'slide';
+  if(type==='slide'){
+    // Mini slide preview: show first slide's title if available
+    const title=item.content?.slides?.[0]?.content?.title||item.content?.slides?.[0]?.content?.heading||'';
+    const shortTitle=typeof title==='string'?title.slice(0,12):'';
+    return `<div class="ws-file-preview slide-prev">
+      <div style="width:100%;height:100%;padding:4px;display:flex;flex-direction:column;gap:2px;">
+        <div style="height:4px;width:60%;background:rgba(255,255,255,0.25);border-radius:1px;"></div>
+        <div style="height:3px;width:40%;background:rgba(255,255,255,0.12);border-radius:1px;"></div>
+        <div style="flex:1;display:flex;gap:2px;margin-top:2px;">
+          <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:1px;"></div>
+          <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:1px;"></div>
+        </div>
+      </div>
+    </div>`;
+  } else if(type==='doc'){
+    // Mini doc preview: show lines
+    const blockCount=item.content?.blocks?.length||0;
+    const lines=Math.min(blockCount,4);
+    let linesHtml='';
+    for(let i=0;i<lines;i++){
+      const w=i===0?'50%':(['80%','65%','70%'])[i-1]||'60%';
+      const h=i===0?'4px':'2px';
+      const bg=i===0?'rgba(120,134,165,0.4)':'rgba(255,255,255,0.1)';
+      linesHtml+=`<div style="height:${h};width:${w};background:${bg};border-radius:1px;"></div>`;
+    }
+    return `<div class="ws-file-preview doc-prev">
+      <div style="width:100%;height:100%;padding:5px 6px;display:flex;flex-direction:column;gap:3px;justify-content:center;">
+        ${linesHtml}
+      </div>
+    </div>`;
+  } else if(type==='sheet'){
+    return `<div class="ws-file-preview sheet-prev">
+      <div style="width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:1px;padding:3px;">
+        ${Array(9).fill('<div style="background:rgba(255,255,255,0.05);border-radius:1px;"></div>').join('')}
+      </div>
+    </div>`;
+  }
+  return `<div class="ws-file-preview" style="background:rgba(255,255,255,0.05);">?</div>`;
+}
+
+function wsToggleSelect(id){
+  if(wsSelectedIds.has(id)) wsSelectedIds.delete(id);
+  else wsSelectedIds.add(id);
+  renderWorkspaceMode();
+}
+
+function wsClearSelection(){
+  wsSelectedIds.clear();
+  renderWorkspaceMode();
+}
+
+function wsBatchDelete(){
+  if(wsSelectedIds.size===0) return;
+  const count=wsSelectedIds.size;
+  if(!confirm(`Delete ${count} file${count>1?'s':''}? This cannot be undone.`)) return;
+  for(const id of wsSelectedIds){
+    wsDeleteFile(id);
+  }
+  wsSelectedIds.clear();
+  renderWorkspaceMode();
+  addMessage(`✓ Deleted ${count} file${count>1?'s':''}`,'system');
+}
+
+function wsBatchDuplicate(){
+  if(wsSelectedIds.size===0) return;
+  const files=wsLoad();
+  let count=0;
+  for(const id of wsSelectedIds){
+    const orig=files.find(f=>f.id===id);
+    if(!orig) continue;
+    const dup=JSON.parse(JSON.stringify(orig));
+    dup.id=wsId();
+    dup.title=(dup.title||'Untitled')+' (copy)';
+    dup.created=new Date().toISOString();
+    dup.updated=new Date().toISOString();
+    files.push(dup);
+    count++;
+  }
+  wsSave(files);
+  wsSelectedIds.clear();
+  renderWorkspaceMode();
+  addMessage(`✓ Duplicated ${count} file${count>1?'s':''}`,'system');
 }
 
 function openWorkspaceItem(index){
@@ -5618,43 +5733,37 @@ async function doGenerate(statusDiv,wsContext){
 }
 
 // ── Doc generation (blocks instead of slides) ──
-const DOC_GEN_PROMPT=`You are Sloth Space Doc Mode, an AI document writer. Output ONLY valid JSON — no text, no markdown, no code fences.
+const DOC_GEN_PROMPT=`You are Sloth Space Doc Mode, an AI document writer.
+You MUST output ONLY a valid JSON object. No markdown, no code fences, no explanation before or after.
 
-OUTPUT FORMAT:
-{
-  "title": "Document Title",
-  "blocks": [
-    {"type":"heading1","text":"Section Title"},
-    {"type":"paragraph","text":"Body text here..."},
-    {"type":"heading2","text":"Sub-heading"},
-    {"type":"paragraph","text":"More content..."},
-    {"type":"quote","text":"Important quote here"},
-    {"type":"list","text":"First bullet point"},
-    {"type":"list","text":"Second bullet point"},
-    {"type":"divider","text":""},
-    {"type":"caption","text":"Figure 1: Description"}
-  ]
-}
+The JSON object must have exactly this structure:
+{"title":"string","blocks":[{"type":"string","text":"string"}]}
 
-BLOCK TYPES: heading1, heading2, heading3, paragraph, quote, code, list, numbered, divider, caption
-- Use heading1 for main title and major sections
-- Use heading2/heading3 for subsections
-- Each paragraph should be one focused idea (not too long)
+Each block has "type" (one of: heading1, heading2, heading3, paragraph, quote, code, list, numbered, divider, caption) and "text" (the block content as a string).
+
+Rules:
+- heading1 for main title and major sections
+- heading2/heading3 for subsections
+- Each paragraph = one focused idea, 2-4 sentences
 - Use list/numbered for enumerations
-- Use quote for key insights or important statements
-- Use divider to separate major sections
-- Write in the user's language
-- For academic/scientific content, use proper structure with introduction, methods, results, discussion
-- Make content detailed and substantive, not placeholder text`;
+- quote for key insights
+- divider to separate major sections
+- Write in the SAME LANGUAGE as the user
+- For scientific content, use proper structure: introduction, background, methods, results, discussion
+- Generate real, detailed, substantive content — NOT placeholder text
+- Minimum 15 blocks for a full article`;
 
 async function doDocGenerate(statusDiv,userText,wsContext){
   statusDiv.textContent='Writing document...';
 
   let editContext='';
-  if(currentDoc&&currentDoc.blocks.length>1){
-    // Existing doc — provide current content for editing
-    const currentBlocks=currentDoc.blocks.map(b=>({type:b.type,text:blockPlainText(b)}));
-    editContext=`\n\n## EDITING MODE\nThe user already has this document. Modify it based on their instruction.\nKeep existing content unless told to change it. You may add, remove, or rewrite blocks.\n\n[CURRENT DOC]\n${JSON.stringify({title:currentDoc.title,blocks:currentBlocks})}`;
+  // Only include edit context if the doc has real content (more than just title + empty paragraph)
+  if(currentDoc&&currentDoc.blocks.length>2){
+    const hasContent=currentDoc.blocks.some(b=>blockPlainText(b).trim().length>10);
+    if(hasContent){
+      const currentBlocks=currentDoc.blocks.map(b=>({type:b.type,text:blockPlainText(b)}));
+      editContext=`\n\nEDITING MODE: The user has an existing document. Modify based on their instruction. Keep existing content unless told to change.\n\n[CURRENT DOC]\n${JSON.stringify({title:currentDoc.title,blocks:currentBlocks})}`;
+    }
   }
 
   const wsExtra=wsContext||'';
