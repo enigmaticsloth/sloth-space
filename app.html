@@ -1900,7 +1900,7 @@ document.addEventListener('keydown',function(e){
     const isUndo=(e.key==='z'||e.key==='Z')&&!e.shiftKey;
     const isRedo=(e.key==='y'||e.key==='Y')||((e.key==='z'||e.key==='Z')&&e.shiftKey);
     if(isUndo){
-      if(currentMode==='doc'){ docPushUndo(); docUndo(); }
+      if(currentMode==='doc'){ docUndo(); }
       else { undo(); }
     } else if(isRedo){
       if(currentMode==='doc') docRedo(); else redo();
@@ -4626,7 +4626,7 @@ function modeUndo(){
       const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
       if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
     }
-    docPushUndo();
+    // Don't docPushUndo() here — docUndo() already saves current state to redoStack
     docUndo();
   } else { undo(); }
 }
