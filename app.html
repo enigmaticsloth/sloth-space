@@ -784,7 +784,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     -webkit-overflow-scrolling:touch;
     touch-action:pan-y !important;
     padding:16px 8px;
+    scrollbar-width:none; /* Firefox */
   }
+  body.mode-doc .doc-canvas::-webkit-scrollbar,
+  body.mode-workspace .workspace-canvas::-webkit-scrollbar { display:none; /* Chrome/Safari */ }
   /* Drag handle: always visible on mobile (no hover), and allow touch drag */
   body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }
@@ -1881,12 +1884,19 @@ document.addEventListener('keydown',function(e){
 
   // ── Undo/Redo ──
   if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z'||e.key==='y'||e.key==='Y')){
-    // ANY input/textarea/contenteditable → let browser handle natively (undo & redo)
-    if(isInput) return;
-    // Slide inline edit → let browser handle contenteditable undo
+    // Regular inputs (chatInput, textarea, select) — NOT contenteditable → let browser handle
+    const isPlainInput=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT');
+    if(isPlainInput) return;
+    // Slide inline edit contenteditable → let browser handle (DOM isn't rebuilt)
     if(isInlineEditing()) return;
-    // Not editing anything → use our block/slide-level undo system
+    // Doc block contenteditable OR no focus → use our undo system
     e.preventDefault();
+    // Flush current doc edit state to model before undo/redo
+    if(currentMode==='doc'&&docEditingBlockId){
+      clearTimeout(docUndoPushTimer);
+      const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
+      if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
+    }
     const isUndo=(e.key==='z'||e.key==='Z')&&!e.shiftKey;
     const isRedo=(e.key==='y'||e.key==='Y')||((e.key==='z'||e.key==='Z')&&e.shiftKey);
     if(isUndo){
@@ -5403,7 +5413,7 @@ function renderDocMode(){
   canvas.innerHTML=`
     <div class="doc-page" id="docPage"
       ondragover="docDragOver(event)" ondrop="docDrop(event)" ondragleave="docDragLeave(event)"
-      onclick="docPageClick(event)"
+      onclick="docPageClick(event)">
       ${blocksHtml}
     </div>`;
 
