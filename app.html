@@ -61,8 +61,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .preset-pills button { background:transparent; color:var(--text2); border:1px solid transparent; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
 .preset-pills button:hover { color:#999; }
 .preset-pills button.active { color:#ccc; border-color:var(--border); background:var(--surface2); }
-.export-btn { background:transparent; color:var(--text2); border:1px solid var(--border); padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; margin-left:6px; }
-.export-btn:hover { color:#999; }
+.export-btn { background:#E8D5A3; color:#333; border:1px solid #E8D5A3; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; margin-left:6px; font-weight:600; }
+.export-btn:hover { background:#DECA8E; border-color:#DECA8E; color:#222; }
 
 /* ─── Middle area: slide left + chat right ─── */
 .middle { display:flex; flex:1; min-height:0; overflow:hidden; }
@@ -91,7 +91,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .slide-nav button { background:transparent; color:var(--text2); border:1px solid transparent; width:26px; height:26px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
 .slide-nav button.active { color:#ccc; border-color:var(--border); background:var(--surface2); }
 .slide-nav button:hover { color:#999; }
-.slide-info { font-size:10px; color:#444; font-family:'Courier New',monospace; white-space:nowrap; margin-left:8px; }
+.slide-info { font-size:10px; color:#ccc; font-family:'Courier New',monospace; white-space:nowrap; margin-left:8px; }
 
 /* Chat panel (right) */
 .chat-panel { width:320px; flex-shrink:0; display:flex; flex-direction:column; border-left:1px solid var(--border); background:var(--surface); }
@@ -166,8 +166,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .send-btn:hover { background:#d0d0d0; color:#222; }
 
 /* ─── Image staging area ─── */
-.img-attach-btn { background:#7886A5; border:1px solid #7886A5; color:#333; width:34px; height:34px; border-radius:4px; cursor:pointer; font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; }
-.img-attach-btn:hover { background:#6775A0; border-color:#6775A0; color:#222; }
+.img-attach-btn { background:#E8D5A3; border:1px solid #E8D5A3; color:#444; width:34px; height:34px; border-radius:4px; cursor:pointer; font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; }
+.img-attach-btn:hover { background:#DECA8E; border-color:#DECA8E; color:#333; }
 .img-staging { display:none; padding:4px 10px 0; gap:6px; flex-wrap:wrap; align-items:center; }
 .img-staging.has-images { display:flex; }
 .img-thumb { position:relative; width:48px; height:48px; border-radius:4px; overflow:hidden; border:1px solid var(--border); flex-shrink:0; }
@@ -613,7 +613,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   <div class="logo" onclick="showWelcome()" style="cursor:pointer;" title="Home">Sloth Space</div>
   <div class="tagline">Type what you want. Sloth will design it.</div>
   <div class="preset-pills" id="presetPills"></div>
-  <button class="export-btn" onclick="saveSloth()">Save .sloth</button>
+  <button class="export-btn" onclick="saveSloth()">Export .sloth</button>
   <button class="export-btn" onclick="exportPPTX()">Export .pptx</button>
   <button class="export-btn" onclick="openSettings()" title="Settings">&#9881;</button>
   <div class="auth-bar" id="authBar">
@@ -938,7 +938,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   </div>
   <div class="input-area" id="inputArea">
     <button class="input-toggle" id="inputToggle" onclick="toggleInputSize()" title="Expand / Collapse">&#9650;</button>
-    <textarea id="chatInput" placeholder="Tell Sloth what you need — a pitch deck, quarterly report, project proposal... Press Enter and your slides will appear."></textarea>
+    <textarea id="chatInput" placeholder=""></textarea>
     <button class="send-btn" onclick="sendMessage()">Send</button>
   </div>
 </div>
@@ -3822,6 +3822,20 @@ async function deleteFileFromNav(id,source,keyOrPath){
       if(error)throw error;
     }catch(e){addMessage('Delete error: '+e.message,'system');return;}
   }
+  // If the deleted file is the currently loaded deck, reset to blank
+  if(currentDeck){
+    const deckTitle=(currentDeck.title||'').toLowerCase().replace(/\s+/g,' ').trim();
+    const deletedName=name.toLowerCase().replace(/\s+/g,' ').trim();
+    if(deckTitle&&deletedName&&(deckTitle===deletedName||deckTitle.includes(deletedName)||deletedName.includes(deckTitle))){
+      currentDeck=null;
+      currentSlide=0;
+      chatHistory=[];
+      selectedRegion=null;
+      document.getElementById('deckNameInput').value='';
+      renderApp();
+      addMessage('Deck deleted. Starting fresh.','system');
+    }
+  }
   refreshFileList();
 }
 
@@ -4117,6 +4131,35 @@ window.addEventListener('resize',function(){
 });
 
 renderApp();
+
+// ── Typewriter placeholder animation ──
+(function(){
+  const input=document.getElementById('chatInput');
+  const fullText='Tell Sloth what you need — a pitch deck, quarterly report, project proposal...';
+  let idx=0;
+  let typing=true;
+  function tick(){
+    // Stop typing if user has focused or typed something
+    if(document.activeElement===input||input.value.length>0){
+      if(typing){typing=false; input.placeholder=fullText;}
+      return;
+    }
+    if(idx<=fullText.length){
+      input.placeholder=fullText.slice(0,idx)+(idx<fullText.length?'|':'');
+      idx++;
+      setTimeout(tick,45+Math.random()*35);
+    }else{
+      // Done typing — remove cursor after a pause
+      setTimeout(()=>{ input.placeholder=fullText; },600);
+    }
+  }
+  setTimeout(tick,500); // Start after 0.5s
+  // If user focuses then blurs without typing, show full text
+  input.addEventListener('focus',()=>{
+    typing=false;
+    input.placeholder=fullText;
+  });
+})();
 </script>
 </body>
 </html>
