@@ -61,10 +61,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .topbar-settings-btn { font-size:20px !important; line-height:1 !important; padding:2px 8px !important; }
 .topbar .logo { font-size:28px; font-weight:700; color:var(--text); white-space:nowrap; letter-spacing:-0.5px; }
 .topbar .tagline { font-size:12px; color:#ffffff; white-space:nowrap; margin-left:4px; align-self:flex-end; padding-bottom:4px; }
-.preset-pills, .topbar-center { display:flex; gap:3px; }
-.preset-pills button { background:transparent; color:var(--text2); border:1px solid transparent; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
-.preset-pills button:hover { color:#999; }
-.preset-pills button.active { color:#ccc; border-color:var(--border); background:var(--surface2); }
+.preset-pills, .topbar-center { display:flex; gap:4px; }
+.preset-pills button, #presetPills button { padding:4px 12px; border-radius:4px; cursor:pointer; font-size:10px; font-family:Arial; font-weight:500; transition:opacity 0.15s, transform 0.1s; }
+.preset-pills button:hover, #presetPills button:hover { opacity:0.85; transform:translateY(-1px); }
+.preset-pills button.active, #presetPills button.active { font-weight:700; box-shadow:0 1px 4px rgba(0,0,0,0.3); }
 .topbar-exports { display:flex; align-items:center; gap:2px; }
 .export-btn { background:#E8D5A3; color:#6B5E4A; border:1px solid #E8D5A3; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; margin-left:6px; font-weight:600; }
 .export-btn:hover { background:#DECA8E; border-color:#DECA8E; color:#5A4E3A; }
@@ -111,7 +111,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .bottom-panel { flex-shrink:0; border-top:1px solid var(--border); background:var(--surface); display:flex; flex-direction:column; }
 
 /* Toolbar */
-.toolbar { display:flex; gap:1px; padding:0 10px; flex-shrink:0; overflow-x:auto; overflow-y:hidden; align-items:stretch; }
+.toolbar { display:flex; gap:1px; padding:0 10px; flex-shrink:0; align-items:stretch; }
 .tool-btn { flex:0; background:transparent; color:#ddd; border:none; padding:5px 14px; cursor:pointer; font-size:11px; font-family:Arial; position:relative; border-top:1px solid var(--border); white-space:nowrap; }
 .tool-btn:hover { color:#fff; background:var(--surface2); }
 .tool-btn.active-btn { color:#fff; background:var(--surface2); }
@@ -422,7 +422,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .insert-plus-btn { background:#7886A5 !important; color:#fff !important; border-radius:5px !important; padding:3px 14px !important; font-size:20px !important; font-weight:700 !important; line-height:1 !important; margin:2px 4px 2px 0 !important; min-width:36px; min-height:28px; text-align:center; border:none !important; }
 .insert-plus-btn:hover { background:#8a9cc0 !important; }
 .insert-group { border-right:1px solid var(--border) !important; padding-right:6px !important; }
-.insert-menu { position:absolute; top:100%; left:0; margin-top:4px; background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:4px 0; z-index:300; box-shadow:0 6px 24px rgba(0,0,0,0.6); min-width:180px; max-height:320px; overflow-y:auto; }
+.insert-menu { position:fixed; background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:4px 0; z-index:9999; box-shadow:0 6px 24px rgba(0,0,0,0.6); min-width:200px; max-height:320px; overflow-y:auto; }
 .insert-menu-title { font-size:9px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:4px 12px 2px; }
 .insert-menu-item { padding:7px 12px; font-size:11px; color:#ccc; cursor:pointer; transition:background 0.1s; white-space:nowrap; }
 .insert-menu-item:hover { background:#2a2a2a; color:#fff; }
@@ -2908,9 +2908,15 @@ function renderApp(){
     deckNameEl.value=currentDeck?.title||'';
   }
 
-  document.getElementById('presetPills').innerHTML=Object.values(PRESETS).map(pr=>
-    `<button class="${pr.id===currentPreset?'active':''}" onclick="setPreset('${pr.id}')">${pr.name}</button>`
-  ).join('');
+  document.getElementById('presetPills').innerHTML=Object.values(PRESETS).map(pr=>{
+    const c=pr.colors;
+    const isActive=pr.id===currentPreset;
+    // Each pill shows its theme color: bg=preset background, text=preset primary, border=accent
+    const bg=isActive?c.accent:c.background;
+    const fg=isActive?c.on_accent:c.primary;
+    const border=isActive?c.accent:c.border;
+    return `<button class="${isActive?'active':''}" onclick="setPreset('${pr.id}')" style="background:${bg};color:${fg};border:1px solid ${border};">${pr.name}</button>`;
+  }).join('');
 
   // Toolbar visibility is ONLY controlled by updateToolbarForMode().
   // Do NOT touch toolbar display here — it causes mode conflicts.
@@ -4325,7 +4331,8 @@ function applyDocZoom(){
 function toggleInsertMenu(e){
   e&&e.stopPropagation();
   const menu=document.getElementById('insertMenu');
-  if(!menu) return;
+  const btn=document.getElementById('insertPlusBtn');
+  if(!menu||!btn) return;
   if(menu.style.display==='none'||!menu.style.display){
     // Update visibility of mode-specific items
     menu.querySelectorAll('.tb-slide-only').forEach(el=>{
@@ -4334,7 +4341,20 @@ function toggleInsertMenu(e){
     menu.querySelectorAll('.tb-doc-only').forEach(el=>{
       el.style.display=(currentMode==='doc')?'':'none';
     });
+    // Position menu relative to button (fixed positioning, opens upward since toolbar is at bottom)
+    const rect=btn.getBoundingClientRect();
+    // Show offscreen briefly to measure
+    menu.style.visibility='hidden';
     menu.style.display='block';
+    const menuH=menu.offsetHeight;
+    menu.style.visibility='';
+    // If there's room above, open upward; otherwise open downward
+    if(rect.top>menuH+8){
+      menu.style.top=(rect.top-menuH-4)+'px';
+    } else {
+      menu.style.top=(rect.bottom+4)+'px';
+    }
+    menu.style.left=rect.left+'px';
     // Close on outside click
     setTimeout(()=>document.addEventListener('click',hideInsertMenu,{once:true}),0);
   } else {
