@@ -2257,8 +2257,13 @@ function checkWelcomeScreen() {
   }
   if (hasConfig && isConfigured()) {
     document.getElementById('welcomeOverlay').classList.add('hidden');
+  } else {
+    // Welcome screen stays visible — apply mobile splash logic
+    const box=document.getElementById('welcomeBox');
+    if(box && localStorage.getItem('sloth_splash_seen')){
+      box.classList.add('mobile-form-active');
+    }
   }
-  // Otherwise welcome screen stays visible
 }
 
 // ═══════════════════════════════════════════
@@ -2486,11 +2491,6 @@ function setAuthUser(user){
       </div>
     </div>
   `;
-  // Also set display name if not set
-  if(!llmConfig.displayName){
-    llmConfig.displayName=name;
-    saveConfig();
-  }
   // Update welcome page auth section if visible
   const wStatus=document.getElementById('welcomeAuthStatus');
   const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
@@ -2510,6 +2510,11 @@ function setAuthUser(user){
   if(!_authSyncDone){
     _authSyncDone=true;
     const restored=restoreConfigFromCloud(user);
+    // Set display name from GitHub if not already set from cloud
+    if(!llmConfig.displayName){
+      llmConfig.displayName=name;
+      saveConfig();
+    }
     if(restored&&isConfigured()&&!sessionStorage.getItem('sloth_on_welcome')){
       document.getElementById('welcomeOverlay').classList.add('hidden');
       addMessage('☁️ Settings synced from cloud.','system');
@@ -2616,7 +2621,11 @@ async function doLogout(){
   if(!confirm('Sign out?'))return;
   await supabaseClient.auth.signOut();
   clearAuthUser();
-  // Clear LLM config
+  clearLocalConfig();
+  addMessage('Signed out.','system');
+}
+// Clear config from memory & localStorage only (cloud keeps it)
+function clearLocalConfig(){
   llmConfig.apiKey='';
   llmConfig.provider='groq';
   llmConfig.url=LLM_DEFAULTS.groq.url;
@@ -2624,20 +2633,12 @@ async function doLogout(){
   llmConfig.router=LLM_DEFAULTS.groq.router;
   llmConfig.displayName='';
   localStorage.removeItem(CONFIG_KEY);
-  addMessage('Signed out. API keys cleared.','system');
 }
 async function doWelcomeSignOut(){
   if(!supabaseClient)return;
   await supabaseClient.auth.signOut();
   clearAuthUser();
-  // Clear LLM config (API keys, provider settings)
-  llmConfig.apiKey='';
-  llmConfig.provider='groq';
-  llmConfig.url=LLM_DEFAULTS.groq.url;
-  llmConfig.model=LLM_DEFAULTS.groq.model;
-  llmConfig.router=LLM_DEFAULTS.groq.router;
-  llmConfig.displayName='';
-  localStorage.removeItem(CONFIG_KEY);
+  clearLocalConfig();
   // Reset welcome auth section
   const wStatus=document.getElementById('welcomeAuthStatus');
   const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
@@ -4411,6 +4412,15 @@ document.querySelectorAll('.popup').forEach(p=>{
   p.addEventListener('click',e=>e.stopPropagation());
 });
 checkWelcomeScreen(); // Show welcome if not configured
+// On mobile: ensure splash state is correct on initial load
+(function(){
+  const box=document.getElementById('welcomeBox');
+  if(!box)return;
+  const isMobile=window.innerWidth<=900;
+  if(isMobile && localStorage.getItem('sloth_splash_seen')){
+    box.classList.add('mobile-form-active');
+  }
+})();
 initOllamaGuide(); // Render OS-specific Ollama instructions
 initAuth(); // Initialize Supabase auth if configured
 autoLoad(); // Restore previous session from localStorage
