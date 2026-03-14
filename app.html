@@ -399,7 +399,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="table"] .table-add-row:hover { color:#aaa; border-color:#666; }
 
 /* Drag handle */
-.doc-block-handle { position:absolute; left:-28px; top:50%; transform:translateY(-50%); width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#555; border-radius:3px; }
+.doc-block-handle { position:absolute; left:-28px; top:50%; transform:translateY(-50%); width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#555; border-radius:3px; z-index:5; }
+/* For fit-content blocks (image, table), handle goes inside top-right so it stays reachable */
+.doc-block[data-type="image"] .doc-block-handle,
+.doc-block[data-type="table"] .doc-block-handle { left:auto; right:4px; top:4px; transform:none; background:rgba(0,0,0,0.5); color:#aaa; border-radius:4px; padding:2px; }
 .doc-block:hover .doc-block-handle, .doc-block.selected .doc-block-handle { opacity:1; }
 .doc-block-handle:hover { color:#999; background:rgba(255,255,255,0.05); }
 .doc-block-handle:active { cursor:grabbing; }
@@ -5026,7 +5029,7 @@ function renderDocMode(){
 
     // Divider is special — non-editable
     if(block.type==='divider'){
-      return `<div class="doc-block${selected}" data-type="divider" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
+      return `<div class="doc-block${selected}" data-type="divider" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
       </div>`;
     }
@@ -5043,7 +5046,7 @@ function renderDocMode(){
       const btnC=float==='none'?' active':'';
       const btnR=float==='right'?' active':'';
       const capClass=hasCaption?'':'hidden-cap';
-      return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
+      return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         ${src?`<img src="${src}" alt="${escapeHtml(alt)}" onclick="event.stopPropagation();docShowImagePopup('${block.id}',this)" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
         <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
@@ -5068,7 +5071,7 @@ function renderDocMode(){
       });
       tableHtml+='</table>';
       tableHtml+=`<button class="table-add-row" onclick="docTableAddRow('${block.id}')">+ Add row</button>`;
-      return `<div class="doc-block${selected}" data-type="table" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)" onfocusin="docSelectBlock('${block.id}')">
+      return `<div class="doc-block${selected}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         ${tableHtml}
       </div>`;
