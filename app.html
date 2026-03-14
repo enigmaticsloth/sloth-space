@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Sloth Space</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PptxGenJS/3.12.0/pptxgen.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -13,7 +13,7 @@
   --text: #e0e0e0; --text2: #555; --input-bg: #121212;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 
 /* ─── File Nav Sidebar ─── */
 .file-nav-toggle { background:none; border:none; color:var(--text2); font-size:18px; cursor:pointer; padding:2px 6px; border-radius:4px; flex-shrink:0; }
@@ -229,13 +229,13 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 /* Demo panel */
 .demo-panel { flex:1; display:flex; flex-direction:column; padding:18px; gap:10px; }
 .demo-label { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; text-align:center; margin-bottom:4px; }
-.demo-slide-area { flex:0 0 auto; height:130px; border-radius:10px; overflow:hidden; position:relative; background:#1a1a1a; border:1px solid #333; }
+.demo-slide-area { flex:1 1 0; min-height:0; border-radius:10px; overflow:hidden; position:relative; background:#1a1a1a; border:1px solid #333; }
 .demo-slide-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center; opacity:0; transition:opacity 0.8s ease; }
 .demo-slide-inner.visible { opacity:1; }
 .demo-slide-inner .ds-title { font-size:18px; font-weight:700; margin-bottom:5px; }
 .demo-slide-inner .ds-subtitle { font-size:10px; opacity:0.8; }
 .demo-slide-inner .ds-body { font-size:9px; opacity:0.6; margin-top:6px; line-height:1.5; }
-.demo-chat-area { flex:1; min-height:160px; border-radius:8px; background:#111; border:1px solid #2a2a2a; display:flex; flex-direction:column; overflow:hidden; }
+.demo-chat-area { flex:1 1 0; min-height:0; border-radius:8px; background:#111; border:1px solid #2a2a2a; display:flex; flex-direction:column; overflow:hidden; }
 .demo-messages { flex:1; padding:10px 12px; overflow:hidden; display:flex; flex-direction:column; gap:8px; }
 .demo-msg { font-size:13px; padding:7px 12px; border-radius:8px; max-width:88%; opacity:0; transition:opacity 0.5s ease; line-height:1.5; }
 .demo-msg.visible { opacity:1; }
@@ -406,13 +406,15 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   /* --- Global: fill viewport, no scroll on body --- */
   body { overflow:hidden; }
 
-  /* --- Topbar: compact --- */
-  .topbar { padding:6px 10px; gap:6px; }
+  /* --- Topbar: compact, extra padding for safe area --- */
+  .topbar { padding:8px 10px; gap:6px; min-height:44px; }
   .topbar .logo { font-size:18px; }
   .topbar .tagline { display:none; }
   .preset-pills { display:none; }
   .export-btn { display:none; }
-  .auth-bar { margin-left:auto; }
+  .auth-bar { margin-left:auto; gap:4px; }
+  .auth-avatar { width:28px; height:28px; font-size:11px; }
+  .auth-login-btn { padding:6px 10px; min-height:32px; }
   .product-bar { display:none !important; }
 
   /* --- Middle: vertical column, no horizontal overflow --- */
@@ -481,8 +483,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   }
   .msg { font-size:11px; padding:5px 8px; max-width:92%; }
 
-  /* --- Bottom panel: toolbar + tall input --- */
-  .bottom-panel { flex-shrink:0; border-top:1px solid var(--border); }
+  /* --- Bottom panel: toolbar + tall input, extra padding for home bar --- */
+  .bottom-panel { flex-shrink:0; border-top:1px solid var(--border); padding-bottom:env(safe-area-inset-bottom,0px); }
 
   /* --- Toolbar: visible, compact horizontal scroll --- */
   .toolbar {
@@ -504,7 +506,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     flex-shrink:0;
   }
   .input-area textarea {
-    height:28vh; min-height:80px; max-height:40vh;
+    height:22vh; min-height:60px; max-height:30vh;
     font-size:16px; padding:10px 12px;
     border-radius:12px;
     line-height:1.5;
@@ -533,6 +535,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .img-thumb { width:36px; height:36px; }
   .img-staging-label { font-size:9px; }
   .img-attach-btn { width:30px; height:30px; font-size:16px; }
+
+  /* --- Nav toggle: bigger tap target on mobile --- */
+  .file-nav-toggle { font-size:22px; padding:6px 10px; min-width:44px; min-height:44px; display:flex; align-items:center; justify-content:center; }
 
   /* --- Overlay panels: full-width --- */
   .file-nav { width:85vw; max-width:320px; }
@@ -1057,7 +1062,6 @@ async function syncWorkspaceToCloud(){
   if(!supabaseClient||!currentUser)return;
   try{
     const files=wsLoad();
-    if(files.length===0)return;
     const blob=new Blob([JSON.stringify(files)],{type:'application/json'});
     const path=currentUser.id+'/workspace.json';
     await supabaseClient.storage.from('decks').upload(path,blob,{upsert:true});
@@ -1128,6 +1132,9 @@ function wsCreateSheet(title,csvOrText){
 function wsDeleteFile(id){
   const files=wsLoad().filter(f=>f.id!==id);
   wsSave(files);
+  // Force immediate cloud sync so deleted state is persisted before any refresh
+  clearTimeout(wsSave._timer);
+  syncWorkspaceToCloud();
 }
 
 function wsUpdateFile(id,updates){
@@ -2474,8 +2481,8 @@ function showWelcome(){
     // Update connect button to show configured state
     const btn=document.getElementById('wbConnectBtn');
     const def=LLM_DEFAULTS[llmConfig.provider]||{};
-    btn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B9E8B;margin-right:6px;"></span> Connected to ${def.label||llmConfig.provider}`;
-    btn.style.color='#fff'; btn.style.borderColor='#8B9E8B';
+    btn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${def.color||'#8B9E8B'};margin-right:6px;"></span> Connected to ${def.label||llmConfig.provider}`;
+    btn.style.color='#fff'; btn.style.borderColor=def.color||'#8B9E8B';
   }
 }
 
