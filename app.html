@@ -336,7 +336,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mp-back:hover { border-color:rgba(255,255,255,0.3); color:#ccc; }
 
 /* ─── Mode Badge (toolbar) ─── */
-.mode-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(120,134,165,0.15); border:1px solid rgba(120,134,165,0.25); border-radius:6px; color:#9BA8C4; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.2s; margin-left:6px; }
+.mode-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(120,134,165,0.15); border:1px solid rgba(120,134,165,0.25); border-radius:6px; color:#9BA8C4; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.2s; margin-left:6px; position:relative; }
 .mode-badge:hover { background:rgba(120,134,165,0.25); border-color:rgba(120,134,165,0.4); color:#B8C9DA; }
 .mode-badge-icon { opacity:0.7; }
 
@@ -383,6 +383,47 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 /* Drop indicator for drag reorder */
 .doc-drop-indicator { height:2px; background:#7886A5; margin:0; border-radius:1px; transition:opacity 0.1s; pointer-events:none; }
+
+/* Block drag swap animation */
+.doc-block.drag-above { transform:translateY(-4px); transition:transform 0.2s ease; }
+.doc-block.drag-below { transform:translateY(4px); transition:transform 0.2s ease; }
+.doc-block.drag-source { opacity:0.3; transform:scale(0.98); transition:opacity 0.15s, transform 0.15s; }
+.doc-block.drag-settling { transition:transform 0.25s cubic-bezier(0.2,0.8,0.3,1); transform:translateY(0); }
+
+/* Mode switch mini-menu */
+.mode-switch-menu { position:absolute; top:100%; left:0; margin-top:4px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:4px; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,0.5); min-width:130px; }
+.mode-switch-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-radius:5px; cursor:pointer; font-size:12px; color:var(--text); transition:background 0.1s; }
+.mode-switch-item:hover { background:var(--surface2); }
+.mode-switch-item .msi-icon { width:20px; height:20px; border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.mode-switch-item.current { color:#7886A5; font-weight:600; }
+
+/* Doc toolbar (replaces slide toolbar in doc mode) */
+.doc-toolbar { display:flex; gap:1px; padding:0 10px; flex-shrink:0; align-items:stretch; flex-wrap:nowrap; overflow-x:auto; }
+.doc-toolbar::-webkit-scrollbar { height:0; }
+.dt-group { display:flex; gap:1px; align-items:stretch; border-right:1px solid var(--border); padding-right:4px; margin-right:3px; }
+.dt-group:last-child { border-right:none; }
+.dt-btn { background:transparent; color:#aaa; border:none; padding:4px 8px; cursor:pointer; font-size:11px; font-family:Arial; border-top:1px solid var(--border); white-space:nowrap; transition:all 0.1s; display:flex; align-items:center; gap:3px; }
+.dt-btn:hover { color:#fff; background:var(--surface2); }
+.dt-btn.active { color:#7886A5; background:rgba(120,134,165,0.1); }
+.dt-btn svg { width:14px; height:14px; }
+.dt-sep { width:1px; background:var(--border); margin:0 2px; }
+.dt-select { background:var(--input-bg); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 4px; font-size:10px; font-family:Arial; cursor:pointer; outline:none; }
+.dt-select:hover { border-color:#555; }
+.dt-color-swatch { width:16px; height:16px; border-radius:3px; border:1px solid rgba(255,255,255,0.2); cursor:pointer; }
+.dt-font-size { width:36px; text-align:center; background:var(--input-bg); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px; font-size:10px; font-family:'Courier New',monospace; }
+
+/* Doc AI context menu */
+.doc-ctx-menu { position:fixed; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:6px; z-index:300; box-shadow:0 8px 28px rgba(0,0,0,0.5); min-width:180px; backdrop-filter:blur(12px); }
+.doc-ctx-section { padding:2px 8px; font-size:9px; color:#666; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px; }
+.doc-ctx-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px; color:var(--text); transition:background 0.1s; }
+.doc-ctx-item:hover { background:var(--surface2); }
+.doc-ctx-item .dci-icon { width:18px; text-align:center; font-size:13px; }
+.doc-ctx-sep { height:1px; background:var(--border); margin:4px 8px; }
+.doc-ctx-input-row { display:flex; gap:4px; padding:4px 8px; }
+.doc-ctx-input { flex:1; background:var(--input-bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:6px 8px; font-size:11px; font-family:Arial; outline:none; }
+.doc-ctx-input:focus { border-color:#7886A5; }
+.doc-ctx-go { background:#7886A5; color:#fff; border:none; border-radius:5px; padding:6px 10px; font-size:11px; cursor:pointer; font-family:Arial; font-weight:600; }
+.doc-ctx-go:hover { background:#6775A0; }
 
 /* ─── Workspace Canvas ─── */
 .workspace-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; }
@@ -918,9 +959,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
   <div class="logo" onclick="showModePicker()" style="cursor:pointer;" title="Home">Sloth Space</div>
   <div class="tagline" style="color:#777;">Type what you want. Sloth will design it.</div>
-  <div class="mode-badge" id="modeBadge" onclick="showModePicker()" title="Switch mode">
+  <div class="mode-badge" id="modeBadge" onclick="toggleModeSwitchMenu(event)" title="Switch mode">
     <svg class="mode-badge-icon" id="modeBadgeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
     <span id="modeBadgeLabel">Slide</span>
+    <div class="mode-switch-menu" id="modeSwitchMenu" style="display:none;"></div>
   </div>
   <div class="preset-pills" id="presetPills"></div>
   <button class="export-btn" onclick="saveSloth()">Export .sloth</button>
@@ -1348,76 +1390,94 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     <span class="selection-tag" id="selectionTag"></span>
     <button class="selection-clear" onclick="clearSelection()">✕ clear</button>
   </div>
-  <div class="toolbar">
-    <button class="img-attach-btn" onclick="document.getElementById('imgFileInput').click()" title="Attach image">+</button>
-    <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleImageFiles(this.files)">
-    <span class="font-size-indicator" id="fontSizeIndicator" title="Current font size">--</span>
-    <button class="tool-btn" onclick="togglePopup('textPopup',this,event)">
-      Text
-      <div class="popup" id="textPopup">
-        <h4>Basic</h4>
-        <div class="color-grid" id="textBasicColors"></div>
-        <h4>Monet</h4>
-        <div class="color-grid" id="textMonetColors"></div>
-        <h4>Seurat</h4>
-        <div class="color-grid" id="textSeuratColors"></div>
-      </div>
-    </button>
-    <button class="tool-btn" onclick="togglePopup('bgPopup',this,event)">
-      Background
-      <div class="popup" id="bgPopup">
-        <h4>Basic</h4>
-        <div class="color-grid" id="bgBasicColors"></div>
-        <h4>Monet</h4>
-        <div class="color-grid" id="bgMonetColors"></div>
-        <h4>Seurat</h4>
-        <div class="color-grid" id="bgSeuratColors"></div>
-      </div>
-    </button>
-    <button class="tool-btn" onclick="togglePopup('fontPopup',this,event)">
-      Font
-      <div class="popup" id="fontPopup">
-        <div class="font-list" id="fontList"></div>
-      </div>
-    </button>
-    <button class="tool-btn" onclick="togglePopup('stylePopup',this,event)">
-      Style
-      <div class="popup" id="stylePopup">
-        <div class="style-row">
-          <span class="style-tag" onclick="insertTag('[bold]')"><b>B</b></span>
-          <span class="style-tag" onclick="insertTag('[italic]')"><i>I</i></span>
-          <span class="style-tag" onclick="insertTag('[underline]')"><u>U</u></span>
-          <span class="style-tag" onclick="insertTag('[strikethrough]')"><s>S</s></span>
-        </div>
-        <h4>Size</h4>
-        <div class="style-row">
-          <span class="style-tag" onclick="insertTag('[size: small]')">Small</span>
-          <span class="style-tag" onclick="insertTag('[size: medium]')">Medium</span>
-          <span class="style-tag" onclick="insertTag('[size: large]')">Large</span>
-          <span class="style-tag" onclick="insertTag('[size: xlarge]')">XL</span>
-        </div>
-      </div>
-    </button>
-    <button class="tool-btn" onclick="togglePopup('layoutPopup',this,event)">
-      Layout
-      <div class="popup" id="layoutPopup">
-        <div class="font-list">
-          <div class="font-item" onclick="insertTag('[layout: content]')">Content</div>
-          <div class="font-item" onclick="insertTag('[layout: two-column]')">Two Column</div>
-          <div class="font-item" onclick="insertTag('[layout: image-top]')">Image Top</div>
-          <div class="font-item" onclick="insertTag('[layout: image-left]')">Image Left</div>
-          <div class="font-item" onclick="insertTag('[layout: image-right]')">Image Right</div>
-          <div class="font-item" onclick="insertTag('[layout: image-bottom]')">Image Bottom</div>
-          <div class="font-item" onclick="insertTag('[layout: quote]')">Quote</div>
-          <div class="font-item" onclick="insertTag('[layout: data-table]')">Data Table</div>
-        </div>
-      </div>
-    </button>
-    <div class="toolbar-spacer"></div>
+  <!-- Unified toolbar (adapts to current mode) -->
+  <div class="toolbar" id="unifiedToolbar">
+    <!-- Undo/Redo (all modes) -->
     <div class="undo-redo-group">
-      <button class="undo-redo-btn" id="undoBtn" onclick="undo()" disabled title="Undo (Ctrl+Z)">&#8630;<span class="undo-label">Undo</span></button>
-      <button class="undo-redo-btn" id="redoBtn" onclick="redo()" disabled title="Redo (Ctrl+Shift+Z)">&#8631;<span class="undo-label">Redo</span></button>
+      <button class="undo-redo-btn" id="undoBtn" onclick="modeUndo()" title="Undo (Ctrl+Z)">&#8630;</button>
+      <button class="undo-redo-btn" id="redoBtn" onclick="modeRedo()" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
     </div>
+    <!-- Doc-only: Block type -->
+    <div class="dt-group tb-doc-only" style="display:none;">
+      <select class="dt-select" id="dtBlockType" onchange="docToolbarChangeType(this.value)" title="Block type">
+        <option value="paragraph">¶ Text</option>
+        <option value="heading1">H1</option>
+        <option value="heading2">H2</option>
+        <option value="heading3">H3</option>
+        <option value="quote">❝ Quote</option>
+        <option value="code">⟨⟩ Code</option>
+        <option value="list">• Bullet</option>
+        <option value="numbered">1. Numbered</option>
+      </select>
+    </div>
+    <!-- Shared: Text formatting -->
+    <div class="dt-group">
+      <button class="dt-btn" onclick="modeExecCmd('bold')" title="Bold (Ctrl+B)"><strong>B</strong></button>
+      <button class="dt-btn" onclick="modeExecCmd('italic')" title="Italic (Ctrl+I)"><em>I</em></button>
+      <button class="dt-btn" onclick="modeExecCmd('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
+      <button class="dt-btn" onclick="modeExecCmd('strikeThrough')" title="Strikethrough"><s>S</s></button>
+      <button class="dt-btn" onclick="modeExecCmd('superscript')" title="Superscript">X<sup style="font-size:8px;">²</sup></button>
+      <button class="dt-btn" onclick="modeExecCmd('subscript')" title="Subscript">X<sub style="font-size:8px;">₂</sub></button>
+    </div>
+    <!-- Shared: Font family & size -->
+    <div class="dt-group">
+      <select class="dt-select" id="dtFontFamily" onchange="modeToolbarFont(this.value)" title="Font family">
+        <option value="Arial">Arial</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Helvetica">Helvetica</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Verdana">Verdana</option>
+        <option value="Trebuchet MS">Trebuchet MS</option>
+        <option value="Palatino">Palatino</option>
+        <option value="Garamond">Garamond</option>
+        <option value="Calibri">Calibri</option>
+      </select>
+      <input type="number" class="dt-font-size" id="dtFontSize" value="15" min="8" max="72" onchange="modeToolbarFontSize(this.value)" title="Font size (px)">
+    </div>
+    <!-- Shared: Colors -->
+    <div class="dt-group">
+      <label title="Text color" style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:0 4px;border-top:1px solid var(--border);font-size:10px;color:#aaa;">
+        A <input type="color" id="dtTextColor" value="#e0e0e0" onchange="modeToolbarTextColor(this.value)" style="width:18px;height:18px;border:none;background:none;cursor:pointer;padding:0;">
+      </label>
+      <label title="Highlight" style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:0 4px;border-top:1px solid var(--border);font-size:10px;color:#aaa;">
+        <span style="background:#7886A5;color:#fff;padding:0 3px;border-radius:2px;font-size:9px;">bg</span>
+        <input type="color" id="dtBgColor" value="#1e1e1e" onchange="modeToolbarBgColor(this.value)" style="width:18px;height:18px;border:none;background:none;cursor:pointer;padding:0;">
+      </label>
+    </div>
+    <!-- Slide-only: image attach + layout -->
+    <div class="dt-group tb-slide-only">
+      <button class="dt-btn" onclick="document.getElementById('imgFileInput').click()" title="Attach image">+ img</button>
+      <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleImageFiles(this.files)">
+      <button class="dt-btn" onclick="togglePopup('layoutPopup',this,event)" title="Layout">
+        Layout
+        <div class="popup" id="layoutPopup">
+          <div class="font-list">
+            <div class="font-item" onclick="insertTag('[layout: content]')">Content</div>
+            <div class="font-item" onclick="insertTag('[layout: two-column]')">Two Column</div>
+            <div class="font-item" onclick="insertTag('[layout: image-top]')">Image Top</div>
+            <div class="font-item" onclick="insertTag('[layout: image-left]')">Image Left</div>
+            <div class="font-item" onclick="insertTag('[layout: image-right]')">Image Right</div>
+            <div class="font-item" onclick="insertTag('[layout: image-bottom]')">Image Bottom</div>
+            <div class="font-item" onclick="insertTag('[layout: quote]')">Quote</div>
+            <div class="font-item" onclick="insertTag('[layout: data-table]')">Data Table</div>
+          </div>
+        </div>
+      </button>
+    </div>
+    <!-- Doc-only: Insert -->
+    <div class="dt-group tb-doc-only" style="display:none;">
+      <button class="dt-btn" onclick="docInsertDivider()" title="Insert divider">—</button>
+      <button class="dt-btn" onclick="docInsertImageBlock()" title="Insert image">🖼</button>
+      <button class="dt-btn" onclick="docInsertTablePrompt()" title="Insert table (via AI)">⊞</button>
+    </div>
+    <!-- Doc-only: Zoom -->
+    <div class="dt-group tb-doc-only" style="display:none;">
+      <button class="dt-btn" onclick="docZoom(-10)" title="Zoom out">−</button>
+      <span class="dt-btn" id="docZoomLabel" style="cursor:default;min-width:36px;text-align:center;font-family:'Courier New',monospace;" onclick="docZoomReset()">100%</span>
+      <button class="dt-btn" onclick="docZoom(10)" title="Zoom in">+</button>
+    </div>
+    <div class="toolbar-spacer"></div>
   </div>
   <div class="img-staging" id="imgStaging">
     <span class="img-staging-label">📎 Attached:</span>
@@ -1717,10 +1777,18 @@ function updateUndoRedoUI(){
 }
 // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
 document.addEventListener('keydown',function(e){
-  if(isInlineEditing())return; // let browser handle undo/redo in contenteditable
+  if(isInlineEditing()) return; // let browser handle undo/redo in contenteditable
   if((e.ctrlKey||e.metaKey)&&!e.altKey){
-    if(e.key==='z'&&!e.shiftKey){ e.preventDefault(); undo(); return; }
-    if((e.key==='z'&&e.shiftKey)||e.key==='y'){ e.preventDefault(); redo(); return; }
+    if(e.key==='z'&&!e.shiftKey){
+      e.preventDefault();
+      if(currentMode==='doc') docUndo(); else undo();
+      return;
+    }
+    if((e.key==='z'&&e.shiftKey)||e.key==='y'){
+      e.preventDefault();
+      if(currentMode==='doc') docRedo(); else redo();
+      return;
+    }
   }
 });
 
@@ -2909,7 +2977,9 @@ function insertBgColor(hex){ insertTag(`[bg: ${hex}]`); }
 
 function initToolbar(){
   const makeSwatches=(arr,containerId,fn)=>{
-    document.getElementById(containerId).innerHTML=arr.map(c=>
+    const el=document.getElementById(containerId);
+    if(!el) return;
+    el.innerHTML=arr.map(c=>
       `<div class="color-swatch" style="background:${c};" onclick="${fn}('${c}')" title="${c}"></div>`
     ).join('');
   };
@@ -2919,9 +2989,12 @@ function initToolbar(){
   makeSwatches(BASIC_COLORS,'bgBasicColors','insertBgColor');
   makeSwatches(MONET_COLORS,'bgMonetColors','insertBgColor');
   makeSwatches(SEURAT_COLORS,'bgSeuratColors','insertBgColor');
-  document.getElementById('fontList').innerHTML=FONTS.map(f=>
+  const fontListEl=document.getElementById('fontList');
+  if(fontListEl) fontListEl.innerHTML=FONTS.map(f=>
     `<div class="font-item" style="font-family:'${f}';" onclick="insertTag('[font: ${f}]')">${f}</div>`
   ).join('');
+  // Set initial toolbar mode
+  updateToolbarForMode(currentMode||'slide');
 }
 
 // ═══════════════════════════════════════════
@@ -3455,8 +3528,12 @@ function enterWorkspaceMode(){
   sessionStorage.setItem('sloth_active','1');
   sessionStorage.setItem('sloth_mode','workspace');
   updateModeBadge('workspace');
-  // Hide slide & doc canvases
+  // Hide slide & doc chrome
   document.getElementById('slideCanvas').style.display='none';
+  const deckNameBar=document.querySelector('.deck-name-bar');
+  if(deckNameBar) deckNameBar.style.display='none';
+  const slideBar=document.querySelector('.slide-bar');
+  if(slideBar) slideBar.style.display='none';
   const docCanvas=document.getElementById('docCanvas');
   if(docCanvas) docCanvas.style.display='none';
   // Show workspace canvas
@@ -3468,6 +3545,7 @@ function enterWorkspaceMode(){
     document.getElementById('slideCanvas').parentElement.insertBefore(wsCanvas,document.getElementById('slideCanvas'));
   }
   wsCanvas.style.display='';
+  updateToolbarForMode('workspace');
   renderWorkspaceMode();
 }
 
@@ -3649,31 +3727,453 @@ function updateModeBadge(mode){
   icon.innerHTML=icons[mode]||icons.slide;
 }
 
+// ── Mode switch mini-menu ──
+function toggleModeSwitchMenu(e){
+  e.stopPropagation();
+  const menu=document.getElementById('modeSwitchMenu');
+  if(!menu) return;
+  if(menu.style.display!=='none'){ menu.style.display='none'; return; }
+  const modes=[
+    {id:'slide',label:'Slide',color:'#7886A5',icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'},
+    {id:'doc',label:'Doc',color:'#6B8E7B',icon:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>'},
+    {id:'sheet',label:'Sheet',color:'#A08060',icon:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/>'},
+    {id:'workspace',label:'Workspace',color:'#8B7BA8',icon:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'}
+  ];
+  menu.innerHTML=modes.map(m=>{
+    const isCurrent=m.id===currentMode;
+    return `<div class="mode-switch-item${isCurrent?' current':''}" onclick="event.stopPropagation();switchToMode('${m.id}')">
+      <div class="msi-icon" style="background:${m.color}30;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${m.color}" stroke-width="2">${m.icon}</svg></div>
+      <span>${m.label}</span>${isCurrent?'<span style="margin-left:auto;font-size:9px;opacity:0.5;">current</span>':''}
+    </div>`;
+  }).join('');
+  menu.style.display='block';
+  // Close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click',function _close(){ menu.style.display='none'; document.removeEventListener('click',_close); },{once:true});
+  },10);
+}
+function switchToMode(mode){
+  document.getElementById('modeSwitchMenu').style.display='none';
+  if(mode===currentMode) return;
+  if(mode==='sheet'){ addMessage('Sheet mode coming soon!','system'); return; }
+  // Switch directly without going through mode picker
+  sessionStorage.setItem('sloth_mode',mode);
+  updateModeBadge(mode);
+  updateToolbarForMode(mode);
+  if(mode==='slide') enterSlideMode();
+  else if(mode==='doc') enterDocMode();
+  else if(mode==='workspace') enterWorkspaceMode();
+}
+
+// ── Toggle toolbar for mode ──
+function updateToolbarForMode(mode){
+  const toolbar=document.getElementById('unifiedToolbar');
+  if(!toolbar) return;
+  // Show toolbar for slide and doc modes, hide for workspace
+  if(mode==='workspace'){
+    toolbar.style.display='none';
+  } else {
+    toolbar.style.display='flex';
+  }
+  // Toggle mode-specific groups
+  toolbar.querySelectorAll('.tb-slide-only').forEach(el=>{
+    el.style.display=(mode==='slide')?'':'none';
+  });
+  toolbar.querySelectorAll('.tb-doc-only').forEach(el=>{
+    el.style.display=(mode==='doc')?'':'none';
+  });
+  // Update undo/redo button state for current mode
+  modeUpdateUndoUI();
+}
+
+// ── Mode dispatcher functions (unified toolbar → mode-specific) ──
+function modeUndo(){
+  if(currentMode==='doc') docUndo();
+  else undo();
+}
+function modeRedo(){
+  if(currentMode==='doc') docRedo();
+  else redo();
+}
+function modeExecCmd(cmd){
+  if(currentMode==='doc'){
+    docExecCmd(cmd);
+  } else {
+    // Slide mode: insert tag into chat input
+    insertTag(`[${cmd}]`);
+  }
+}
+function modeToolbarFont(font){
+  if(currentMode==='doc'){
+    docToolbarFont(font);
+  } else {
+    insertTag(`[font: ${font}]`);
+  }
+}
+function modeToolbarFontSize(size){
+  if(currentMode==='doc'){
+    docToolbarFontSize(size);
+  } else {
+    insertTag(`[size: ${size}]`);
+  }
+}
+function modeToolbarTextColor(color){
+  if(currentMode==='doc'){
+    docToolbarTextColor(color);
+  } else {
+    insertTextColor(color);
+  }
+}
+function modeToolbarBgColor(color){
+  if(currentMode==='doc'){
+    docToolbarBgColor(color);
+  } else {
+    insertBgColor(color);
+  }
+}
+function modeUpdateUndoUI(){
+  const ub=document.getElementById('undoBtn');
+  const rb=document.getElementById('redoBtn');
+  if(!ub||!rb) return;
+  if(currentMode==='doc'){
+    ub.style.opacity=docUndoStack.length?'1':'0.3';
+    rb.style.opacity=docRedoStack.length?'1':'0.3';
+  } else {
+    ub.disabled=undoStack.length===0;
+    rb.disabled=redoStack.length===0;
+    ub.style.opacity='';
+    rb.style.opacity='';
+  }
+}
+
+// ── Doc Zoom ──
+let docZoomLevel=100;
+function docZoom(delta){
+  docZoomLevel=Math.max(50,Math.min(200,docZoomLevel+delta));
+  applyDocZoom();
+}
+function docZoomReset(){
+  docZoomLevel=100;
+  applyDocZoom();
+}
+function applyDocZoom(){
+  const page=document.getElementById('docPage');
+  if(page){
+    page.style.transform=`scale(${docZoomLevel/100})`;
+    page.style.transformOrigin='top center';
+  }
+  const label=document.getElementById('docZoomLabel');
+  if(label) label.textContent=docZoomLevel+'%';
+}
+
+// ── Doc undo/redo ──
+const DOC_MAX_UNDO=50;
+let docUndoStack=[];
+let docRedoStack=[];
+
+function docSnapshotDoc(){
+  if(!currentDoc) return null;
+  return JSON.parse(JSON.stringify(currentDoc));
+}
+function docPushUndo(){
+  const snap=docSnapshotDoc();
+  if(!snap) return;
+  docUndoStack.push(snap);
+  if(docUndoStack.length>DOC_MAX_UNDO) docUndoStack.shift();
+  docRedoStack=[];
+  docUpdateUndoUI();
+}
+function docUndo(){
+  if(!docUndoStack.length) return;
+  const current=docSnapshotDoc();
+  if(current) docRedoStack.push(current);
+  const snap=docUndoStack.pop();
+  currentDoc=snap;
+  docUpdateUndoUI();
+  renderDocMode();
+  docAutoSave();
+  addMessage('↩ Undo','system');
+}
+function docRedo(){
+  if(!docRedoStack.length) return;
+  const current=docSnapshotDoc();
+  if(current) docUndoStack.push(current);
+  const snap=docRedoStack.pop();
+  currentDoc=snap;
+  docUpdateUndoUI();
+  renderDocMode();
+  docAutoSave();
+  addMessage('↪ Redo','system');
+}
+function docUpdateUndoUI(){
+  // Use unified toolbar buttons
+  const ub=document.getElementById('undoBtn');
+  const rb=document.getElementById('redoBtn');
+  if(ub) ub.style.opacity=docUndoStack.length?'1':'0.3';
+  if(rb) rb.style.opacity=docRedoStack.length?'1':'0.3';
+}
+
+// ── Doc toolbar action functions ──
+function docExecCmd(cmd){
+  document.execCommand(cmd);
+}
+function docToolbarChangeType(type){
+  if(!docEditingBlockId&&!docSelectedBlockId) return;
+  const bid=docEditingBlockId||docSelectedBlockId;
+  docPushUndo();
+  docConvertBlock(bid, type);
+  renderDocMode();
+  setTimeout(()=>{ const el=document.querySelector(`[data-block-id="${bid}"]`); if(el) el.focus(); },10);
+}
+function docToolbarFont(font){
+  document.execCommand('fontName', false, font);
+}
+function docToolbarFontSize(size){
+  // execCommand fontSize only supports 1-7, so use CSS instead
+  const sel=window.getSelection();
+  if(!sel||!sel.rangeCount) return;
+  const range=sel.getRangeAt(0);
+  if(range.collapsed) return;
+  const span=document.createElement('span');
+  span.style.fontSize=size+'px';
+  range.surroundContents(span);
+}
+function docToolbarTextColor(color){
+  document.execCommand('foreColor', false, color);
+}
+function docToolbarBgColor(color){
+  document.execCommand('hiliteColor', false, color);
+}
+function docInsertDivider(){
+  const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
+  docPushUndo();
+  docInsertBlock(afterId,'divider','');
+  renderDocMode();
+}
+function docInsertImageBlock(){
+  const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
+  docPushUndo();
+  const blk=docInsertBlock(afterId,'image','');
+  // Prompt for URL
+  const url=prompt('Image URL:');
+  if(url){
+    blk.meta={src:url, alt:''};
+    currentDoc.updated=new Date().toISOString();
+  }
+  renderDocMode();
+}
+function docInsertTablePrompt(){
+  // Use AI to create a table (as a code block placeholder or future table block)
+  const input=document.getElementById('chatInput');
+  if(input){
+    input.value='Insert a table here with columns: ';
+    input.focus();
+  }
+  addMessage('Type your table description in chat and AI will generate it.','system');
+}
+
+// Update block type dropdown when a block is selected/focused
+function docUpdateToolbarState(){
+  const bid=docEditingBlockId||docSelectedBlockId;
+  if(!bid) return;
+  const block=docGetBlock(bid);
+  if(!block) return;
+  const typeSelect=document.getElementById('dtBlockType');
+  if(typeSelect) typeSelect.value=block.type;
+}
+
+// ═══════════════════════════════════════════
+// STEP 6: AI Context Menu for Doc Blocks
+// ═══════════════════════════════════════════
+let docCtxMenuBlockId=null;
+
+function docShowContextMenu(blockId, x, y){
+  docCtxMenuBlockId=blockId;
+  const block=docGetBlock(blockId);
+  if(!block) return;
+  const text=blockPlainText(block);
+
+  // Remove existing menu
+  docHideContextMenu();
+
+  const menu=document.createElement('div');
+  menu.id='docCtxMenu';
+  menu.className='doc-ctx-menu';
+
+  // Build menu based on block type
+  const isText=!['divider','image'].includes(block.type);
+  menu.innerHTML=`
+    <div class="doc-ctx-section">Direct</div>
+    ${isText?`
+    <div class="doc-ctx-item" onclick="docCtxAction('edit')"><span class="dci-icon">✏️</span>Edit text</div>
+    `:''}
+    <div class="doc-ctx-item" onclick="docCtxAction('duplicate')"><span class="dci-icon">📋</span>Duplicate block</div>
+    <div class="doc-ctx-item" onclick="docCtxAction('moveUp')"><span class="dci-icon">↑</span>Move up</div>
+    <div class="doc-ctx-item" onclick="docCtxAction('moveDown')"><span class="dci-icon">↓</span>Move down</div>
+    <div class="doc-ctx-item" onclick="docCtxAction('insertBelow')"><span class="dci-icon">＋</span>Insert block below</div>
+    <div class="doc-ctx-sep"></div>
+    <div class="doc-ctx-section">✦ AI</div>
+    ${isText?`
+    <div class="doc-ctx-item" onclick="docCtxAI('rewrite','Rewrite this more concisely')"><span class="dci-icon">✨</span>Rewrite concisely</div>
+    <div class="doc-ctx-item" onclick="docCtxAI('expand','Expand this with more detail')"><span class="dci-icon">📝</span>Expand / elaborate</div>
+    <div class="doc-ctx-item" onclick="docCtxAI('translate','Translate this to English')"><span class="dci-icon">🌐</span>Translate</div>
+    <div class="doc-ctx-item" onclick="docCtxAI('improve','Improve the writing quality, fix grammar')"><span class="dci-icon">💡</span>Improve writing</div>
+    <div class="doc-ctx-item" onclick="docCtxAI('simplify','Simplify this for a general audience')"><span class="dci-icon">📖</span>Simplify</div>
+    `:''}
+    <div class="doc-ctx-sep"></div>
+    <div class="doc-ctx-input-row">
+      <input class="doc-ctx-input" id="docCtxInput" placeholder="Ask AI to change this..." onkeydown="if(event.key==='Enter')docCtxCustomAI()">
+      <button class="doc-ctx-go" onclick="docCtxCustomAI()">Go</button>
+    </div>
+    <div class="doc-ctx-sep"></div>
+    <div class="doc-ctx-item" style="color:#e47474;" onclick="docCtxAction('delete')"><span class="dci-icon">🗑️</span>Delete block</div>
+  `;
+
+  document.body.appendChild(menu);
+
+  // Position: ensure it stays on screen
+  const menuRect=menu.getBoundingClientRect();
+  if(x+menuRect.width>window.innerWidth) x=window.innerWidth-menuRect.width-10;
+  if(y+menuRect.height>window.innerHeight) y=window.innerHeight-menuRect.height-10;
+  menu.style.left=Math.max(5,x)+'px';
+  menu.style.top=Math.max(5,y)+'px';
+
+  // Close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click',function _close(e){
+      if(!menu.contains(e.target)){ docHideContextMenu(); document.removeEventListener('click',_close); }
+    });
+  },10);
+}
+
+function docHideContextMenu(){
+  const menu=document.getElementById('docCtxMenu');
+  if(menu) menu.remove();
+  docCtxMenuBlockId=null;
+}
+
+function docCtxAction(action){
+  const bid=docCtxMenuBlockId;
+  if(!bid) return;
+  docHideContextMenu();
+
+  switch(action){
+    case 'edit': {
+      const el=document.querySelector(`[data-block-id="${bid}"]`);
+      if(el){ el.focus(); docFocusBlock(bid); }
+      break;
+    }
+    case 'duplicate': {
+      docPushUndo();
+      const block=docGetBlock(bid);
+      if(block){
+        const newBlock=docInsertBlock(bid, block.type, blockPlainText(block));
+        newBlock.meta={...block.meta};
+      }
+      renderDocMode();
+      break;
+    }
+    case 'moveUp': docPushUndo(); docMoveBlock(bid,'up'); renderDocMode(); break;
+    case 'moveDown': docPushUndo(); docMoveBlock(bid,'down'); renderDocMode(); break;
+    case 'insertBelow': {
+      docPushUndo();
+      const nb=docInsertBlock(bid,'paragraph','');
+      docEditingBlockId=nb.id;
+      renderDocMode();
+      setTimeout(()=>{ const el=document.querySelector(`[data-block-id="${nb.id}"]`); if(el) el.focus(); },10);
+      break;
+    }
+    case 'delete': docPushUndo(); docDeleteBlock(bid); renderDocMode(); break;
+  }
+  docAutoSave();
+}
+
+async function docCtxAI(action, instruction){
+  const bid=docCtxMenuBlockId;
+  docHideContextMenu();
+  if(!bid) return;
+  const block=docGetBlock(bid);
+  if(!block) return;
+  const text=blockPlainText(block);
+  if(!text.trim()){ addMessage('Block is empty — nothing to process.','system'); return; }
+
+  const statusDiv=addMessage('✦ AI processing...','system');
+  try{
+    const prompt=`You are a document editor AI. The user wants you to edit a single text block.
+Instruction: ${instruction}
+Original text: "${text}"
+Output ONLY the new text. No quotes, no explanation, no JSON. Just the improved text in the same language as the original.`;
+    const raw=await callLLM(prompt,[{role:'user',content:instruction}],{temperature:0.5,max_tokens:2048});
+    const cleaned=raw.trim().replace(/^["']|["']$/g,'');
+    docPushUndo();
+    blockFromPlainText(block, cleaned);
+    currentDoc.updated=new Date().toISOString();
+    statusDiv.remove();
+    addMessage(`✓ Block updated (${action})`,'ai');
+    renderDocMode();
+    docAutoSave();
+  }catch(err){
+    statusDiv.remove();
+    addMessage(`Error: ${err.message}`,'ai');
+  }
+}
+
+async function docCtxCustomAI(){
+  const input=document.getElementById('docCtxInput');
+  if(!input) return;
+  const instruction=input.value.trim();
+  if(!instruction) return;
+  const bid=docCtxMenuBlockId;
+  await docCtxAI('custom', instruction);
+}
+
+// Right-click to open context menu on doc blocks
+document.addEventListener('contextmenu',function(e){
+  if(currentMode!=='doc') return;
+  const blockEl=e.target.closest('.doc-block');
+  if(!blockEl) return;
+  e.preventDefault();
+  const blockId=blockEl.dataset.blockId;
+  if(blockId) docShowContextMenu(blockId, e.clientX, e.clientY);
+});
+
 function enterSlideMode(){
-  // Show slide UI, hide doc & workspace UI
+  // Show all slide-specific chrome
   document.getElementById('slideCanvas').style.display='';
+  const deckNameBar=document.querySelector('.deck-name-bar');
+  if(deckNameBar) deckNameBar.style.display='';
+  const slideBar=document.querySelector('.slide-bar');
+  if(slideBar) slideBar.style.display='';
+  // Hide doc & workspace
   const docCanvas=document.getElementById('docCanvas');
   if(docCanvas) docCanvas.style.display='none';
   const wsCanvas=document.getElementById('workspaceCanvas');
   if(wsCanvas) wsCanvas.style.display='none';
   currentMode='slide';
+  updateToolbarForMode('slide');
   renderApp();
 }
 
 function enterDocMode(){
-  // Show doc UI, hide slide UI
+  // Hide all slide-specific chrome
   document.getElementById('slideCanvas').style.display='none';
+  const deckNameBar=document.querySelector('.deck-name-bar');
+  if(deckNameBar) deckNameBar.style.display='none';
+  const slideBar=document.querySelector('.slide-bar');
+  if(slideBar) slideBar.style.display='none';
   const wsCanvas=document.getElementById('workspaceCanvas');
   if(wsCanvas) wsCanvas.style.display='none';
+  // Show doc canvas
   let docCanvas=document.getElementById('docCanvas');
   if(!docCanvas){
     docCanvas=document.createElement('div');
     docCanvas.id='docCanvas';
     docCanvas.className='doc-canvas';
-    document.getElementById('slideCanvas').parentElement.insertBefore(docCanvas,document.getElementById('slideCanvas'));
+    document.querySelector('.slide-panel').appendChild(docCanvas);
   }
   docCanvas.style.display='';
   currentMode='doc';
+  updateToolbarForMode('doc');
   // Ensure a current doc exists
   if(!currentDoc){
     currentDoc=docCreateNew('Untitled Document');
@@ -3898,11 +4398,13 @@ function docSelectBlock(blockId){
   document.querySelectorAll('.doc-block').forEach(el=>{
     el.classList.toggle('selected', el.dataset.blockId===blockId);
   });
+  docUpdateToolbarState();
 }
 
 function docFocusBlock(blockId){
   docEditingBlockId=blockId;
   docSelectBlock(blockId);
+  docUpdateToolbarState();
 }
 
 function docBlurBlock(blockId){
@@ -4215,29 +4717,34 @@ function docApplyTypeMenuSelection(blockId){
   }
 }
 
-// ── Drag & drop reorder ──
+// ── Drag & drop reorder (with swap animation) ──
 let docDragBlockId=null;
+let docDragLastOver=null; // track last hovered block for animation
 
 function docDragStart(event, blockId){
   docDragBlockId=blockId;
+  docDragLastOver=null;
   event.dataTransfer.effectAllowed='move';
   event.dataTransfer.setData('text/plain', blockId);
-  // Make the dragged block semi-transparent
+  docPushUndo();
   setTimeout(()=>{
     const el=document.querySelector(`[data-block-id="${blockId}"]`);
-    if(el) el.style.opacity='0.4';
+    if(el) el.classList.add('drag-source');
   },0);
 }
 
 function docDragOver(event){
   event.preventDefault();
   event.dataTransfer.dropEffect='move';
-  // Find closest block for drop indicator
+  if(!docDragBlockId) return;
   const page=document.getElementById('docPage');
   if(!page) return;
-  const blocks=page.querySelectorAll('.doc-block');
+  const blocks=[...page.querySelectorAll('.doc-block')];
+
+  // Find closest block
   let closestBlock=null, closestDist=Infinity, insertAfter=false;
   for(const block of blocks){
+    if(block.dataset.blockId===docDragBlockId) continue;
     const rect=block.getBoundingClientRect();
     const midY=rect.top+rect.height/2;
     const dist=Math.abs(event.clientY-midY);
@@ -4247,34 +4754,62 @@ function docDragOver(event){
       insertAfter=event.clientY>midY;
     }
   }
-  // Show drop indicator
+
+  // Animate: shift blocks up/down around the drag target
+  const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
+  const hoverId=closestBlock?.dataset?.blockId;
+  if(hoverId!==docDragLastOver){
+    docDragLastOver=hoverId;
+    // Clear previous animation classes
+    blocks.forEach(b=>{
+      b.classList.remove('drag-above','drag-below');
+    });
+    if(closestBlock&&closestBlock.dataset.blockId!==docDragBlockId){
+      const hoverIdx=currentDoc.blocks.findIndex(b=>b.id===hoverId);
+      // Shift blocks between source and hover position
+      for(const block of blocks){
+        const bid=block.dataset.blockId;
+        if(bid===docDragBlockId) continue;
+        const idx=currentDoc.blocks.findIndex(b=>b.id===bid);
+        if(srcIdx<hoverIdx){
+          // Dragging down: blocks between src+1..hover shift up
+          if(idx>srcIdx&&idx<=hoverIdx) block.classList.add('drag-above');
+        } else {
+          // Dragging up: blocks between hover..src-1 shift down
+          if(idx>=hoverIdx&&idx<srcIdx) block.classList.add('drag-below');
+        }
+      }
+    }
+  }
+
+  // Drop indicator line
   page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
   if(closestBlock){
     const indicator=document.createElement('div');
     indicator.className='doc-drop-indicator';
-    if(insertAfter){
-      closestBlock.after(indicator);
-    } else {
-      closestBlock.before(indicator);
-    }
+    if(insertAfter) closestBlock.after(indicator);
+    else closestBlock.before(indicator);
   }
 }
 
 function docDragLeave(event){
   const page=document.getElementById('docPage');
-  if(page) page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
+  if(!page) return;
+  page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
 }
 
 function docDrop(event){
   event.preventDefault();
   const page=document.getElementById('docPage');
-  if(page) page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
-  if(!docDragBlockId||!currentDoc) return;
+  if(!page) return;
+  page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
+  if(!docDragBlockId||!currentDoc){ docDragBlockId=null; return; }
 
   // Find target position
-  const blocks=page.querySelectorAll('.doc-block');
+  const blocks=[...page.querySelectorAll('.doc-block')];
   let targetIdx=-1;
   for(const block of blocks){
+    if(block.dataset.blockId===docDragBlockId) continue;
     const rect=block.getBoundingClientRect();
     const midY=rect.top+rect.height/2;
     if(event.clientY>midY){
@@ -4282,20 +4817,27 @@ function docDrop(event){
     }
   }
 
-  // Move block
+  // Move block in data
   const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
-  if(srcIdx===-1){docDragBlockId=null;return;}
+  if(srcIdx===-1){ docDragBlockId=null; return; }
   const [moved]=currentDoc.blocks.splice(srcIdx,1);
   const insertAt=targetIdx===-1?0:(targetIdx>=srcIdx?targetIdx:targetIdx+1);
   currentDoc.blocks.splice(insertAt,0,moved);
   currentDoc.updated=new Date().toISOString();
 
-  // Restore opacity and re-render
-  const el=document.querySelector(`[data-block-id="${docDragBlockId}"]`);
-  if(el) el.style.opacity='';
+  // Add settling animation class before re-render
+  blocks.forEach(b=>{
+    b.classList.remove('drag-source','drag-above','drag-below');
+    b.classList.add('drag-settling');
+  });
+
   docDragBlockId=null;
-  renderDocMode();
-  docAutoSave();
+  docDragLastOver=null;
+  // Slight delay for settling animation then re-render
+  setTimeout(()=>{
+    renderDocMode();
+    docAutoSave();
+  },80);
 }
 
 // ── Doc auto-save ──
@@ -5371,10 +5913,10 @@ async function sendMessage(){
   // ── PASS -1: Local UI commands (no LLM needed) ──
   const trimText=text.trim();
   if(/^(復原|undo|撤[銷回]|還原|上一步|回去)$/i.test(trimText)){
-    undo(); return;
+    if(currentMode==='doc') docUndo(); else undo(); return;
   }
   if(/^(重做|redo|取消復原|下一步)$/i.test(trimText)){
-    redo(); return;
+    if(currentMode==='doc') docRedo(); else redo(); return;
   }
   if(/^(儲存|存檔|save|保存|存sloth|save\s*sloth)$/i.test(trimText)){
     saveSloth(); return;
@@ -5393,6 +5935,16 @@ async function sendMessage(){
   }
   if(/^(設定|settings?|設置|config)$/i.test(trimText)){
     openSettings(); return;
+  }
+  // Doc zoom commands
+  if(currentMode==='doc'){
+    const zoomMatch=trimText.match(/^(?:zoom|縮放|放大|zoom\s*in)\s*(\d+)?%?$/i);
+    if(zoomMatch){ docZoomLevel=parseInt(zoomMatch[1])||Math.min(200,docZoomLevel+10); applyDocZoom(); addMessage(`🔍 Zoom: ${docZoomLevel}%`,'system'); return; }
+    const zoomOutMatch=trimText.match(/^(?:zoom\s*out|縮小)\s*(\d+)?%?$/i);
+    if(zoomOutMatch){ docZoomLevel=Math.max(50,parseInt(zoomOutMatch[1])||docZoomLevel-10); applyDocZoom(); addMessage(`🔍 Zoom: ${docZoomLevel}%`,'system'); return; }
+    const zoomSetMatch=trimText.match(/^(?:zoom|縮放)\s*[:=]?\s*(\d+)%?$/i);
+    if(zoomSetMatch){ docZoomLevel=Math.max(50,Math.min(200,parseInt(zoomSetMatch[1]))); applyDocZoom(); addMessage(`🔍 Zoom: ${docZoomLevel}%`,'system'); return; }
+    if(/^(?:zoom\s*reset|reset\s*zoom|縮放重置|100%)$/i.test(trimText)){ docZoomReset(); addMessage('🔍 Zoom reset to 100%','system'); return; }
   }
 
   // Workspace quick-create: "/doc Title\nContent..." or "/sheet Title\nCSV..."
