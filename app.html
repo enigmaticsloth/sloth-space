@@ -166,8 +166,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .send-btn:hover { background:#d0d0d0; color:#222; }
 
 /* ─── Image staging area ─── */
-.img-attach-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text2); width:34px; height:34px; border-radius:4px; cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; flex-shrink:0; align-self:flex-end; transition:all 0.15s; }
-.img-attach-btn:hover { color:var(--text); border-color:#555; background:var(--surface); }
+.img-attach-btn { background:#7886A5; border:1px solid #7886A5; color:#333; width:34px; height:34px; border-radius:4px; cursor:pointer; font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; }
+.img-attach-btn:hover { background:#6775A0; border-color:#6775A0; color:#222; }
 .img-staging { display:none; padding:4px 10px 0; gap:6px; flex-wrap:wrap; align-items:center; }
 .img-staging.has-images { display:flex; }
 .img-thumb { position:relative; width:48px; height:48px; border-radius:4px; overflow:hidden; border:1px solid var(--border); flex-shrink:0; }
@@ -863,6 +863,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     <button class="selection-clear" onclick="clearSelection()">✕ clear</button>
   </div>
   <div class="toolbar">
+    <button class="img-attach-btn" onclick="document.getElementById('imgFileInput').click()" title="Attach image">+</button>
+    <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleImageFiles(this.files)">
     <span class="font-size-indicator" id="fontSizeIndicator" title="Current font size">--</span>
     <button class="tool-btn" onclick="togglePopup('textPopup',this,event)">
       Text
@@ -936,8 +938,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   </div>
   <div class="input-area" id="inputArea">
     <button class="input-toggle" id="inputToggle" onclick="toggleInputSize()" title="Expand / Collapse">&#9650;</button>
-    <button class="img-attach-btn" onclick="document.getElementById('imgFileInput').click()" title="Attach image">+</button>
-    <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleImageFiles(this.files)">
     <textarea id="chatInput" placeholder="Tell Sloth what you need — a pitch deck, quarterly report, project proposal... Press Enter and your slides will appear."></textarea>
     <button class="send-btn" onclick="sendMessage()">Send</button>
   </div>
@@ -1367,6 +1367,14 @@ function renderSlide(slide,idx,p,total){
     html+=rc(c,r.role,p,r,regionColor,regionFontSize);
     html+='</div>';
   });
+  // Render floating images (overlays on top of content)
+  if(slide.images&&slide.images.length>0){
+    slide.images.forEach(fi=>{
+      html+=`<div style="position:absolute;left:${fi.x}px;top:${fi.y}px;width:${fi.w}px;height:${fi.h}px;overflow:hidden;pointer-events:none;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+        <img src="${fi.dataUrl}" alt="${fi.name||'image'}" style="width:100%;height:100%;object-fit:${fi.fit||'contain'};pointer-events:none;">
+      </div>`;
+    });
+  }
   html+=`<div style="position:absolute;bottom:${m.bottom*0.4}px;right:${m.right}px;font-family:Arial;font-size:${p.typography.scale[5]}px;color:${p.colors.secondary};opacity:0.4;">${idx+1}</div>`;
   html+='</div>';
   return html;
@@ -2194,6 +2202,7 @@ const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 let supabaseClient=null;
 let currentUser=null;
+let _authSyncDone=false; // prevent duplicate sync messages
 
 function initAuth(){
   if(!SUPABASE_URL||!SUPABASE_ANON_KEY){
@@ -2277,18 +2286,22 @@ function setAuthUser(user){
   const nameInput=document.getElementById('welcomeDisplayName');
   if(nameInput&&!nameInput.value)nameInput.value=name;
   // Always restore LLM config from cloud on login (cloud takes priority)
-  // This ensures API keys sync across devices
-  const restored=restoreConfigFromCloud(user);
-  if(restored&&isConfigured()){
-    document.getElementById('welcomeOverlay').classList.add('hidden');
-    addMessage('☁️ Settings synced from cloud.','system');
+  // This ensures API keys sync across devices — but only show message once
+  if(!_authSyncDone){
+    _authSyncDone=true;
+    const restored=restoreConfigFromCloud(user);
+    if(restored&&isConfigured()){
+      document.getElementById('welcomeOverlay').classList.add('hidden');
+      addMessage('☁️ Settings synced from cloud.','system');
+    }
+    // Also sync workspace files from cloud
+    syncWorkspaceFromCloud();
   }
-  // Also sync workspace files from cloud
-  syncWorkspaceFromCloud();
 }
 
 function clearAuthUser(){
   currentUser=null;
+  _authSyncDone=false;
   const bar=document.getElementById('authBar');
   bar.innerHTML='<button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>';
 }
@@ -2403,34 +2416,9 @@ Examples:
 
 Output ONLY the JSON object.`;
 
-// Detect if user message is about style/color changes
-function isStyleRequest(text){
-  if(!currentDeck)return false;
-  return /背景|字[的型體]?[顏颜]?色?|文字|顏色|color|background|bg|font|字[型體]|配色|標題|副標|title|subtitle|body|heading|改[成為]?\s*[#a-zA-Z\u4e00-\u9fff]|[換改用].*色|底線|underline|粗體|bold|斜體|italic|[字文].*[大小]|大一點|小一點|bigger|smaller|larger|font.?size|\d+px/i.test(text);
-}
-
-// Detect if user message is about content editing
-function isContentEdit(text){
-  if(!currentDeck)return false;
-  // "改標題"/"改內容"/"改副標" = content edit targeting a region
-  if(/改[標副內正]|改\s*(title|heading|body|subtitle|quote)/i.test(text))return true;
-  // Also catch "忘記改" / "沒改" / "還沒改" patterns
-  if(/[忘沒沒還].*改/i.test(text))return true;
-  // Delete/remove patterns targeting content (selected region)
-  // Note: slide-level ops like "刪掉第三頁" go through the LLM router → generate path
-  if(/刪[掉除了去]|移除|清[掉除空]|remove|delete|clear|拿掉/i.test(text)){
-    // If it mentions a slide/page, it's a slide-level op → let LLM handle it
-    if(/[頁張]|slide|page/i.test(text))return false;
-    return true;
-  }
-  return /內容|豐富|改寫|rewrite|更多|加[更多]|詳細|expand|elaborate|修改|改[一成]|寫[多好]|補充|充實|enrich|improve|更新|update|重寫/i.test(text);
-}
-
-// Detect if user wants a deck-wide content change (all slides)
-function isDeckWideEdit(text){
-  if(!currentDeck)return false;
-  return /全[部都]|所有|每[一]?[頁張]|整[份個]|all\s*(slides?|pages?|content)|change\s*all|translate|翻[成譯]|改[成為].*[英中日韓文語]|換[成為].*[英中日韓文語]|用.*[英中日韓文語].*寫/i.test(text);
-}
+// NOTE: isStyleRequest / isContentEdit / isDeckWideEdit removed.
+// All intent detection is handled by the unified LLM router (ROUTER_PROMPT).
+// No hardcoded regex for user intent — LLM interprets user's language.
 
 // Serialize deck content compactly for LLM
 function deckToContentJSON(){
@@ -2546,24 +2534,41 @@ function applyStyleOverrides(styleObj){
 
 // ── Pass 1: small fast model decides intent ──
 const ROUTER_PROMPT=`You are an intent router for Sloth Space, a presentation app.
-You will receive the last few messages of a conversation. Classify into one of two intents based on the FULL context.
-Output ONLY: {"intent":"chat"} or {"intent":"generate"}
+You will receive the user's message and context. Classify the intent.
 
-"generate" if ANY of these are true:
-- A presentation topic has been mentioned at any point in the conversation AND the user is saying "go", "do it", "開始", "動手", "生成", "做吧", "好", "OK", or similar confirmation
-- The user gives a clear, complete request like "做一份AI簡報 5頁"
-- The user asks to add/remove/rewrite slides or change content
-- The user is frustrated and wants action: "動手啊", "快做", "趕快", etc.
+Output ONLY a JSON object with "intent" and optional fields.
 
-"chat" if ALL of these are true:
-- No topic has been discussed yet
-- The user is just greeting or asking questions
-- The request is truly vague with zero topic info
+INTENTS (pick one):
 
-NOTE: Style changes like "改顏色", "換背景", "字改藍色" are handled separately. If the message is ONLY about colors/fonts/background, still choose "chat" — the app handles it locally.
-IMPORTANT: When in doubt and a topic EXISTS in the conversation, choose "generate".
+"style" — visual style changes: colors, fonts, font sizes, backgrounds, bold, italic, underline, spacing. NOT content changes.
+Examples: "背景改藍色", "字型改Georgia", "標題加粗", "字大一點", "change background to dark blue", "make title red"
 
-Output ONLY the JSON object, nothing else.`;
+"image" — anything about images on slides: place, move, resize, delete, scale, crop, fit.
+Examples: "放到第3頁右邊", "圖片大一點", "刪除這張圖片", "move image left", "remove the photo"
+
+"deck_edit" — edit content across ALL slides at once: translate, batch change, apply to all pages.
+Examples: "全部翻成英文", "所有頁面加上公司logo文字", "translate to English", "change all slides"
+
+"content_edit" — edit content of a SPECIFIC region or slide: rewrite, add detail, change text, delete text, modify specific section.
+Must include: {"intent":"content_edit","slide":N or null,"region":"regionId" or null,"delete":true/false}
+slide: 1-indexed number if user specifies (e.g. "第三頁"→3, "slide 2"→2), null if not specified.
+region: one of [title, subtitle, heading, body, left, right, quote, table, description, footnote, tagline, date, author, role, source, contact] or null if unclear.
+delete: true ONLY if the user explicitly wants to DELETE/CLEAR/REMOVE the content (not modify it).
+Examples: "改標題", "第三頁的內容豐富一點", "刪掉這段", "rewrite the body text", "subtitle改成xxx"
+
+"generate" — create new slides/deck, add new slides, or significantly restructure.
+Examples: "做一份AI簡報", "加三頁", "重新生成", "做吧", "make a 5-page pitch deck"
+
+"chat" — just conversation, greetings, questions, no action needed.
+Examples: "你好", "這是什麼app", "hello", "what can you do"
+
+RULES:
+- When the user has a deck loaded AND gives a TOPIC or confirms ("好","OK","做吧","go"), choose "generate".
+- When in doubt between "content_edit" and "generate": if editing existing content→content_edit, if creating new→generate.
+- When in doubt between "style" and "content_edit": if about appearance→style, if about text content→content_edit.
+- "image" takes priority when the message is about images, even if it also mentions slides.
+
+Output ONLY the JSON object.`;
 
 // ── Pass 2a: conversation mode ──
 const CHAT_PROMPT=`You are Sloth Space, a friendly AI presentation assistant. Reply in the user's language.
@@ -2715,153 +2720,139 @@ async function callLLM(systemContent,messages,opts={}){
 }
 
 // ═══════════════════════════════════════════
-// IMAGE COMMANDS (local, no LLM needed)
+// IMAGE COMMANDS
 // ═══════════════════════════════════════════
-function isImageCommand(text){
-  return /圖片|圖|image|img|photo|照片|加[到入].*[頁張]|放[到入].*[頁張]|insert|縮小|放大|等比|寬一點|窄一點|高一點|低一點|向左|向右|向上|向下|左移|右移|上移|下移|move.*left|move.*right|bigger|smaller|resize|scale/i.test(text);
+
+// LLM prompt for interpreting image commands (any language, any phrasing)
+const IMAGE_PROMPT=`You are an image placement/manipulation interpreter for a presentation app.
+The user's message is about an image on a slide. Convert it into a JSON action.
+
+Output ONLY a JSON object with one of these action types:
+
+PLACEMENT (when user wants to put an image on a slide):
+- {"action":"place","slide":N,"position":"left"|"right"|"top"|"bottom"|"auto"}
+  slide: slide number (1-indexed). Default: current slide.
+  position: where to place the image. "auto" if not specified.
+
+MANIPULATION (when user wants to adjust an existing image):
+- {"action":"scale","factor":0.85}         — scale uniformly (0.85 = shrink 15%, 1.15 = grow 15%)
+- {"action":"scale_w","factor":1.1}        — scale width only (wider/narrower)
+- {"action":"scale_h","factor":1.1}        — scale height only (taller/shorter)
+- {"action":"move","dx":0,"dy":0}          — move by pixels. left=-20, right=+20, up=-20, down=+20. Adjust amount based on phrasing ("a lot" = 60, "a bit" = 15, default = 25)
+- {"action":"fit","mode":"contain"|"cover"|"fill"} — change fit mode
+- {"action":"remove"}                      — remove image from slide
+
+If the message is NOT about image manipulation, output {"action":"none"}.
+
+Examples:
+"圖片右邊一點" → {"action":"move","dx":25,"dy":0}
+"move image left a lot" → {"action":"move","dx":-60,"dy":0}
+"縮小" → {"action":"scale","factor":0.85}
+"放大一點" → {"action":"scale","factor":1.15}
+"bigger" → {"action":"scale","factor":1.15}
+"make it half the size" → {"action":"scale","factor":0.5}
+"寬一點" → {"action":"scale_w","factor":1.1}
+"窄一點" → {"action":"scale_w","factor":0.9}
+"等比縮放" → {"action":"fit","mode":"contain"}
+"填滿" → {"action":"fit","mode":"fill"}
+"裁切" → {"action":"fit","mode":"cover"}
+"放到第3頁左邊" → {"action":"place","slide":3,"position":"left"}
+"put it on slide 5" → {"action":"place","slide":5,"position":"auto"}
+"刪掉這張圖" → {"action":"remove"}
+"圖片上面一點 左邊一點" → {"action":"move","dx":-25,"dy":-25}
+
+Output ONLY the JSON object.`;
+
+// Place staged images into a slide as a floating overlay (preserves existing content & layout)
+function placeImageOnSlide(images,targetSlide,position){
+  if(!currentDeck||images.length===0)return null;
+  pushUndo();
+  targetSlide=Math.max(0,Math.min(targetSlide,currentDeck.slides.length-1));
+  const slide=currentDeck.slides[targetSlide];
+  const img=images[0];
+  const p=PRESETS[currentPreset];
+  const W=p.slide.width, H=p.slide.height;
+
+  // Calculate default position based on user intent
+  // Image is placed as a floating overlay — never changes the layout
+  const imgW=Math.min(img.width, W*0.4); // max 40% of slide width
+  const imgH=imgW*(img.height/img.width); // keep aspect ratio
+  let x,y;
+  if(position==='left'){ x=40; y=Math.round((H-imgH)/2); }
+  else if(position==='right'){ x=W-imgW-40; y=Math.round((H-imgH)/2); }
+  else if(position==='top'){ x=Math.round((W-imgW)/2); y=40; }
+  else if(position==='bottom'){ x=Math.round((W-imgW)/2); y=H-imgH-40; }
+  else{
+    // Auto: find an empty-ish spot — default to bottom-right corner
+    x=W-imgW-60; y=H-imgH-60;
+  }
+
+  // Store as floating image overlay (not tied to a layout region)
+  if(!slide.images) slide.images=[];
+  slide.images.push({
+    id:'img_'+Date.now(),
+    dataUrl:img.dataUrl, name:img.name,
+    origW:img.width, origH:img.height,
+    x:Math.round(x), y:Math.round(y),
+    w:Math.round(imgW), h:Math.round(imgH),
+    fit:'contain'
+  });
+  currentSlide=targetSlide;
+
+  let msg=`✓ Placed "${img.name}" into slide ${targetSlide+1}`;
+  if(images.length>1){
+    msg+=`. ${images.length-1} more image(s) still staged.`;
+    stagedImages=images.slice(1);
+    renderStagedImages();
+  }
+  return msg;
 }
 
-function handleImageCommand(text,images){
-  if(!currentDeck){
-    if(images.length>0){
-      addMessage('Please create a deck first, then I can place images into slides.','system');
-    }
-    return null;
-  }
-
-  // ── Place new images into a slide ──
-  if(images.length>0){
-    pushUndo();
-    // Parse target slide number
-    let targetSlide=currentSlide;
-    const slideMatch=text.match(/(?:第|slide\s*)([一二三四五六七八九十\d]+)/i);
-    if(slideMatch){
-      const numMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
-      targetSlide=(numMap[slideMatch[1]]||parseInt(slideMatch[1])||1)-1;
-    }
-    targetSlide=Math.max(0,Math.min(targetSlide,currentDeck.slides.length-1));
-    const slide=currentDeck.slides[targetSlide];
-
-    // Determine position: left, right, or auto (image region if exists)
-    const wantLeft=/左[邊半]?|left/i.test(text);
-    const wantRight=/右[邊半]?|right/i.test(text);
-
-    // Check if current layout has an image region
-    const L=LAYOUTS[slide.layout];
-    const hasImageRegion=L&&L.regions.some(r=>r.role==='image');
-
-    if(hasImageRegion){
-      // Place into the existing image region
-      const img=images[0];
-      slide.content['image']={type:'image',dataUrl:img.dataUrl,name:img.name,
-        width:img.width,height:img.height,alt:img.name,fit:'contain'};
-      currentSlide=targetSlide;
-      return `✓ Placed "${img.name}" into slide ${targetSlide+1} image area`;
-    }
-
-    // No image region — switch layout to accommodate
-    const img=images[0];
-    const prevLayout=slide.layout;
-    if(wantLeft){
-      slide.layout='image-left';
-    }else if(wantRight){
-      slide.layout='image-right';
-    }else{
-      // Default: image-right if body exists, image-top otherwise
-      slide.layout=slide.content['body']?'image-right':'image-top';
-    }
-    slide.content['image']={type:'image',dataUrl:img.dataUrl,name:img.name,
-      width:img.width,height:img.height,alt:img.name,fit:'contain'};
-    currentSlide=targetSlide;
-
-    let msg=`✓ Placed "${img.name}" into slide ${targetSlide+1}`;
-    if(prevLayout!==slide.layout) msg+=` (layout → ${slide.layout})`;
-    if(images.length>1) msg+=`. ${images.length-1} more image(s) still staged — send another command to place them.`;
-    // Re-stage remaining images
-    if(images.length>1){
-      stagedImages=images.slice(1);
-      renderStagedImages();
-    }
-    return msg;
-  }
-
-  // ── Manipulate existing image on current slide ──
+function hasImageOnCurrentSlide(){
+  if(!currentDeck||!currentDeck.slides[currentSlide])return false;
   const slide=currentDeck.slides[currentSlide];
-  if(!slide)return null;
-  const imgContent=slide.content['image'];
-  if(!imgContent||imgContent.type!=='image'||!imgContent.dataUrl){
+  return (slide.images&&slide.images.length>0);
+}
+
+// Apply a parsed image action to the last image on current slide
+function applyImageAction(actionObj){
+  const slide=currentDeck.slides[currentSlide];
+  if(!slide)return '⚠ No slide selected.';
+  if(!slide.images||slide.images.length===0){
     return '⚠ No image on current slide. Attach an image first with the + button.';
   }
-
   pushUndo();
+  const a=actionObj;
+  // Operate on the last-placed image (most recent)
+  const img=slide.images[slide.images.length-1];
 
-  // Parse resize/move commands
-  const t=text.toLowerCase();
-
-  // Resize: 縮小/放大/等比例
-  if(/縮小|smaller|shrink|小一點/i.test(t)){
-    imgContent.displayW=(imgContent.displayW||imgContent.width)*0.85;
-    imgContent.displayH=(imgContent.displayH||imgContent.height)*0.85;
-    return `✓ Image scaled down to ${Math.round((imgContent.displayW/imgContent.width)*100)}%`;
+  if(a.action==='scale'){
+    const f=a.factor||1;
+    img.w=Math.round(img.w*f);
+    img.h=Math.round(img.h*f);
+    return `✓ Image resized (${img.w}×${img.h})`;
   }
-  if(/放大|bigger|larger|enlarge|大一點/i.test(t)){
-    imgContent.displayW=(imgContent.displayW||imgContent.width)*1.15;
-    imgContent.displayH=(imgContent.displayH||imgContent.height)*1.15;
-    return `✓ Image scaled up to ${Math.round((imgContent.displayW/imgContent.width)*100)}%`;
+  if(a.action==='scale_w'){
+    img.w=Math.round(img.w*(a.factor||1));
+    return `✓ Image width → ${img.w}px`;
   }
-
-  // Aspect: wider/narrower/taller/shorter
-  if(/寬一點|wider/i.test(t)){
-    imgContent.displayW=(imgContent.displayW||imgContent.width)*1.1;
-    return '✓ Image widened';
+  if(a.action==='scale_h'){
+    img.h=Math.round(img.h*(a.factor||1));
+    return `✓ Image height → ${img.h}px`;
   }
-  if(/窄一點|narrower/i.test(t)){
-    imgContent.displayW=(imgContent.displayW||imgContent.width)*0.9;
-    return '✓ Image narrowed';
+  if(a.action==='move'){
+    img.x=Math.round(img.x+(a.dx||0));
+    img.y=Math.round(img.y+(a.dy||0));
+    return `✓ Image moved to (${img.x}, ${img.y})`;
   }
-  if(/高一點|taller/i.test(t)){
-    imgContent.displayH=(imgContent.displayH||imgContent.height)*1.1;
-    return '✓ Image made taller';
+  if(a.action==='fit'){
+    img.fit=a.mode||'contain';
+    return `✓ Image fit → ${img.fit}`;
   }
-  if(/低一點|矮一點|shorter/i.test(t)){
-    imgContent.displayH=(imgContent.displayH||imgContent.height)*0.9;
-    return '✓ Image made shorter';
+  if(a.action==='remove'){
+    slide.images.pop();
+    return '✓ Image removed from slide';
   }
-
-  // Move: directional nudge (20px per command)
-  const nudge=20;
-  if(/向左|左移|move.*left/i.test(t)){
-    imgContent.offsetX=(imgContent.offsetX||0)-nudge;
-    return '✓ Image moved left';
-  }
-  if(/向右|右移|move.*right/i.test(t)){
-    imgContent.offsetX=(imgContent.offsetX||0)+nudge;
-    return '✓ Image moved right';
-  }
-  if(/向上|上移|move.*up/i.test(t)){
-    imgContent.offsetY=(imgContent.offsetY||0)-nudge;
-    return '✓ Image moved up';
-  }
-  if(/向下|下移|move.*down/i.test(t)){
-    imgContent.offsetY=(imgContent.offsetY||0)+nudge;
-    return '✓ Image moved down';
-  }
-
-  // Fit mode
-  if(/填滿|fill|stretch/i.test(t)){
-    imgContent.fit='fill';
-    return '✓ Image set to fill (stretch)';
-  }
-  if(/等比|contain|fit/i.test(t)){
-    imgContent.fit='contain';
-    return '✓ Image set to contain (aspect ratio preserved)';
-  }
-  if(/裁切|cover|crop/i.test(t)){
-    imgContent.fit='cover';
-    return '✓ Image set to cover (may crop)';
-  }
-
-  // If we have images but didn't match any specific command, just place them
   return null;
 }
 
@@ -2921,16 +2912,8 @@ async function sendMessage(){
     return;
   }
 
-  // ── Image commands: place, resize, move staged images ──
+  // ── Consume any staged images before routing ──
   const pendingImages=consumeStagedImages();
-  if(pendingImages.length>0||isImageCommand(text)){
-    const imgResult=handleImageCommand(text,pendingImages);
-    if(imgResult){
-      addMessage(imgResult,'ai');
-      renderApp();
-      return;
-    }
-  }
 
   const statusDiv=addMessage('Thinking...','system');
   const sendBtn=document.querySelector('.send-btn');
@@ -2950,42 +2933,108 @@ async function sendMessage(){
   }
 
   try{
-    // ── PASS 0: Style edit? (LLM interprets any language/phrasing) ──
-    // Style check takes PRIORITY when isStyleRequest matches — never skip it for content edit
-    // The old bug: "背景都改成莫內藍" was skipped because "改成" matched isContentEdit()
-    if(isStyleRequest(text)){
+    // ── If user attached images, go straight to image path (no router needed) ──
+    if(pendingImages.length>0){
+      statusDiv.textContent='Processing image...';
+      try{
+        const imgRaw=await callLLM(IMAGE_PROMPT,[{role:'user',content:text}],{temperature:0,max_tokens:128,json:true});
+        const imgAction=JSON.parse(imgRaw);
+        const targetSlide=(imgAction.slide||currentSlide+1)-1;
+        const position=imgAction.position||'auto';
+        const msg=placeImageOnSlide(pendingImages,targetSlide,position);
+        statusDiv.remove();
+        if(msg) addMessage(msg,'ai');
+        renderApp();
+      }catch(imgErr){
+        console.warn('Image LLM failed, using default placement:',imgErr);
+        statusDiv.remove();
+        const msg=placeImageOnSlide(pendingImages,currentSlide,'auto');
+        if(msg) addMessage(msg,'ai');
+        renderApp();
+      }
+      sendBtn.disabled=false; sendBtn.textContent='Send';
+      autoSave();
+      return;
+    }
+
+    // ── UNIFIED LLM ROUTER — classify intent (no hardcoded regex) ──
+    const routerMsgs=chatHistory.slice(-6);
+    // Add context so router can make informed decisions
+    const ctx=[];
+    if(currentDeck) ctx.push('User has a deck loaded with '+currentDeck.slides.length+' slides.');
+    if(hasImageOnCurrentSlide()) ctx.push('Current slide has floating images.');
+    if(selectedRegion) ctx.push(`User has selected region "${selectedRegion.regionId}" (${selectedRegion.role}) on slide ${selectedRegion.slideIdx+1}.`);
+    if(wsRefs.length>0) ctx.push('User referenced workspace files: '+wsRefs.map(f=>f.title).join(', ')+'.');
+    if(!currentDeck) ctx.push('No deck loaded yet.');
+    if(ctx.length>0) routerMsgs.push({role:'system',content:'[Context: '+ctx.join(' ')+']'});
+
+    statusDiv.textContent='Routing...';
+    const routerRaw=await callLLM(ROUTER_PROMPT,routerMsgs,{useRouter:true,temperature:0,max_tokens:128,json:true});
+    let intent='chat';
+    let routerData={};
+    try{
+      routerData=JSON.parse(routerRaw);
+      intent=routerData.intent||'chat';
+    }catch(e){
+      console.warn('Router parse failed:',e,'raw:',routerRaw);
+    }
+
+    // ── Dispatch based on router intent ──
+
+    if(intent==='image'){
+      // ── IMAGE: LLM interprets image command ──
+      statusDiv.textContent='Processing image...';
+      const imgRaw=await callLLM(IMAGE_PROMPT,[{role:'user',content:text}],{temperature:0,max_tokens:128,json:true});
+      const imgAction=JSON.parse(imgRaw);
+      if(imgAction.action==='none'){
+        // LLM says not really an image command — fall through to chat
+        statusDiv.textContent='...';
+        const raw=await callLLM(CHAT_PROMPT,chatHistory);
+        chatHistory.push({role:'assistant',content:raw});
+        statusDiv.remove();
+        addMessage(raw,'ai');
+      }else if(imgAction.action==='place'){
+        statusDiv.remove();
+        addMessage('⚠ No image attached. Use the + button to attach an image first.','system');
+      }else{
+        // Manipulation: scale, move, fit, remove
+        const msg=applyImageAction(imgAction);
+        statusDiv.remove();
+        if(msg) addMessage(msg,'ai');
+        renderApp();
+      }
+
+    }else if(intent==='style'&&currentDeck){
+      // ── STYLE: LLM interprets style change ──
       statusDiv.textContent='Interpreting style...';
       let styleInput=text;
       if(selectedRegion){
         styleInput+=`\n[USER HAS SELECTED: slide ${selectedRegion.slideIdx+1}, region "${selectedRegion.regionId}" (${selectedRegion.role}). Apply changes to this region unless they specify otherwise.]`;
       }
-      try{
-        const styleRaw=await callLLM(STYLE_PROMPT,[{role:'user',content:styleInput}],{temperature:0,max_tokens:128,json:true});
-        const styleObj=JSON.parse(styleRaw);
-        if(!styleObj.none){
-          const msgs=applyStyleOverrides(styleObj);
-          chatHistory.push({role:'assistant',content:`[style: ${msgs.join(', ')}]`});
-          statusDiv.remove();
-          addMessage(`✓ ${msgs.join(', ')}`,'ai');
-          renderApp();
-          sendBtn.disabled=false;sendBtn.textContent='Send';
-          return;
-        }
-      }catch(styleErr){
-        console.warn('Style LLM failed, falling through:',styleErr);
+      const styleRaw=await callLLM(STYLE_PROMPT,[{role:'user',content:styleInput}],{temperature:0,max_tokens:128,json:true});
+      const styleObj=JSON.parse(styleRaw);
+      if(!styleObj.none){
+        const msgs=applyStyleOverrides(styleObj);
+        chatHistory.push({role:'assistant',content:`[style: ${msgs.join(', ')}]`});
+        statusDiv.remove();
+        addMessage(`✓ ${msgs.join(', ')}`,'ai');
+        renderApp();
+      }else{
+        // Style LLM said none — fall through to chat
+        statusDiv.textContent='...';
+        const raw=await callLLM(CHAT_PROMPT,chatHistory);
+        chatHistory.push({role:'assistant',content:raw});
+        statusDiv.remove();
+        addMessage(raw,'ai');
       }
-      // If style interpreter said "none" or failed, fall through to content edit
-    }
 
-    // ── PASS 0.4: Deck-wide content edit? (all slides at once) ──
-    if(isDeckWideEdit(text)&&currentDeck){
+    }else if(intent==='deck_edit'&&currentDeck){
+      // ── DECK-WIDE EDIT: all slides at once ──
       statusDiv.textContent='Editing all slides...';
       const deckContent=deckToContentJSON();
       const editInput=`Current deck content:\n${JSON.stringify(deckContent)}\n\nUser instruction: ${text}${wsContext}`;
       const raw=await callLLM(DECK_EDIT_PROMPT,[{role:'user',content:editInput}],{max_tokens:8192});
       chatHistory.push({role:'assistant',content:`[deck-wide edit: ${text}]`});
-
-      // Parse updated content array
       let updated;
       try{updated=JSON.parse(raw);}catch(e){
         const extracted=extractJSON(raw);
@@ -2993,145 +3042,94 @@ async function sendMessage(){
         else if(extracted&&Array.isArray(extracted.slides))updated=extracted.slides;
         else throw new Error('LLM returned invalid JSON for deck edit');
       }
-
-      // Save undo snapshot before mutation
       pushUndo();
-      // Apply updates back to deck
       let count=0;
       (Array.isArray(updated)?updated:[]).forEach(item=>{
         const idx=(item.slide||1)-1;
         if(idx>=0&&idx<currentDeck.slides.length&&item.content){
-          // Merge content: only update keys that exist in the response
           for(const[k,v]of Object.entries(item.content)){
             currentDeck.slides[idx].content[k]=v;
           }
           count++;
         }
       });
-
       statusDiv.remove();
       addMessage(`✓ Updated ${count} slides`,'ai');
       renderApp();
-      sendBtn.disabled=false;sendBtn.textContent='Send';
-      return;
-    }
 
-    // ── PASS 0.5: Content edit? (targeted region content change) ──
-    if(isContentEdit(text)&&currentDeck){
-      // Figure out which region to edit
-      let targetSlide=currentSlide;
-      let targetRegion=null;
-      let slideFromText=false;
+    }else if(intent==='content_edit'&&currentDeck){
+      // ── CONTENT EDIT: targeted region edit ──
+      // Router provides slide number and region — no hardcoded regex
+      let targetSlide=routerData.slide?routerData.slide-1:currentSlide;
+      let targetRegion=routerData.region||null;
 
-      // ALWAYS try to parse slide number from text first — user's words > click selection
-      const slideMatch=text.match(/第([一二三四五六七八九十\d]+)[頁張]/);
-      if(slideMatch){
-        const numMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
-        targetSlide=(numMap[slideMatch[1]]||parseInt(slideMatch[1])||1)-1;
-        slideFromText=true;
-      }
-
-      // Try to detect region from text
-      const regionMap={'標題':'title','title':'title','副標':'subtitle','subtitle':'subtitle',
-        '內容':'body','body':'body','正文':'body','heading':'heading',
-        '引言':'quote','quote':'quote','表格':'table','table':'table',
-        '左邊':'left','左':'left','右邊':'right','右':'right'};
-      for(const[k,v]of Object.entries(regionMap)){
-        if(text.includes(k)){targetRegion=v;break;}
-      }
-
-      // Fall back to click selection if text didn't specify
+      // Fall back to click selection if router didn't specify
       if(selectedRegion){
-        if(!slideFromText)targetSlide=selectedRegion.slideIdx;
+        if(!routerData.slide)targetSlide=selectedRegion.slideIdx;
         if(!targetRegion)targetRegion=selectedRegion.regionId;
       }
 
-      // If we have a target (or at least a slide number from text), do focused content edit
-      if(targetRegion||selectedRegion||slideFromText){
-        const slide=currentDeck.slides[targetSlide];
-        if(!slide){throw new Error(`Slide ${targetSlide+1} not found`);}
-        // Find the right region to edit
-        let rId=targetRegion||'body';
-        // title ↔ heading equivalence: content layouts use "heading", title layout uses "title"
-        if(!slide.content[rId]){
-          if(rId==='title'&&slide.content['heading'])rId='heading';
-          else if(rId==='heading'&&slide.content['title'])rId='title';
-        }
-        // If the requested region doesn't exist in this slide, find the main content region
-        if(!slide.content[rId]){
-          // Priority: body → left → quote → table → first non-heading region
-          const fallbacks=['body','left','quote','table','description'];
-          rId=fallbacks.find(f=>slide.content[f])||null;
-          if(!rId){
-            // Last resort: find the first region that has content and isn't 'title'/'heading'
-            const L=LAYOUTS[slide.layout];
-            if(L){
-              const contentRegion=L.regions.find(r=>r.id!=='heading'&&r.id!=='title'&&slide.content[r.id]);
-              if(contentRegion)rId=contentRegion.id;
-            }
+      const slide=currentDeck.slides[targetSlide];
+      if(!slide){throw new Error(`Slide ${targetSlide+1} not found`);}
+
+      // Resolve region ID — handle title↔heading equivalence
+      let rId=targetRegion||'body';
+      if(!slide.content[rId]){
+        if(rId==='title'&&slide.content['heading'])rId='heading';
+        else if(rId==='heading'&&slide.content['title'])rId='title';
+      }
+      // If region doesn't exist, find the main content region
+      if(!slide.content[rId]){
+        const fallbacks=['body','left','quote','table','description'];
+        rId=fallbacks.find(f=>slide.content[f])||null;
+        if(!rId){
+          const L=LAYOUTS[slide.layout];
+          if(L){
+            const contentRegion=L.regions.find(r=>r.id!=='heading'&&r.id!=='title'&&slide.content[r.id]);
+            if(contentRegion)rId=contentRegion.id;
           }
         }
-        const currentContent=rId?slide.content[rId]:null;
-        if(currentContent){
-          // Fast-path: delete/clear command → no LLM needed
-          const isDelete=/^(刪[掉除了去]|移除|清[掉除空]|remove|delete|clear|拿掉)$/i.test(text.replace(/這[個邊]|它|this|that|selected|選的|選取的/gi,'').trim())
-            || /刪[掉除了去].*這|這.*刪|remove\s*(this|it|selected)|delete\s*(this|it|selected)|清掉|拿掉/i.test(text);
-          if(isDelete){
-            pushUndo();
-            slide.content[rId]='';
-            statusDiv.remove();
-            addMessage(`✓ Slide ${targetSlide+1} → ${rId} cleared`,'ai');
-            renderApp();
-            sendBtn.disabled=false;sendBtn.textContent='Send';
-            return;
-          }
+      }
+      const currentContent=rId?slide.content[rId]:null;
+
+      if(currentContent){
+        // Delete: router tells us via delete flag — no hardcoded regex
+        if(routerData.delete){
+          pushUndo();
+          slide.content[rId]='';
+          statusDiv.remove();
+          addMessage(`✓ Slide ${targetSlide+1} → ${rId} cleared`,'ai');
+          renderApp();
+        }else{
+          // Edit content via LLM
           statusDiv.textContent='Editing content...';
           const contentStr=typeof currentContent==='object'?JSON.stringify(currentContent):currentContent;
           const editInput=`Current content of region "${rId}" on slide ${targetSlide+1} (layout: ${slide.layout}):\n${contentStr}\n\nUser instruction: ${text}${wsContext}`;
           const raw=await callLLM(CONTENT_EDIT_PROMPT,[{role:'user',content:editInput}],{max_tokens:2048});
           chatHistory.push({role:'assistant',content:`[edited slide ${targetSlide+1} ${rId}]`});
-
-          // Clean up LLM response: strip code fences, trim whitespace
           let cleaned=raw.trim();
           cleaned=cleaned.replace(/^```(?:json)?\n?/,'').replace(/\n?```$/,'').trim();
-          // Try to parse as JSON (list/table), fall back to cleaned string
           let newContent;
           try{newContent=JSON.parse(cleaned);}catch(e){newContent=cleaned;}
-          // Save undo snapshot before mutation
           pushUndo();
-          // Completely replace old content
           slide.content[rId]=newContent;
-
           statusDiv.remove();
           addMessage(`✓ Slide ${targetSlide+1} → ${rId} updated`,'ai');
           renderApp();
-          sendBtn.disabled=false;sendBtn.textContent='Send';
-          return;
         }
+      }else{
+        // No region found — ask user
+        statusDiv.remove();
+        addMessage('請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。','ai');
+        chatHistory.push({role:'assistant',content:'請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。'});
       }
-      // If no specific target, ask user what to edit
-      statusDiv.remove();
-      addMessage('請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。','ai');
-      chatHistory.push({role:'assistant',content:'請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。'});
-      sendBtn.disabled=false;sendBtn.textContent='Send';
-      return;
-    }
 
-    // ── PASS 1: Router (fast small model) — decide intent ──
-    const recentMsgs=chatHistory.slice(-6);
-    if(currentDeck)recentMsgs.push({role:'system',content:'[context: user has an existing deck loaded]'});
-    if(wsRefs.length>0)recentMsgs.push({role:'system',content:`[context: user referenced workspace files: ${wsRefs.map(f=>f.title).join(', ')}. This is likely a generate request.]`});
-    const routerRaw=await callLLM(ROUTER_PROMPT,recentMsgs,{useRouter:true,temperature:0,max_tokens:32,json:true});
-    let intent='chat';
-    try{
-      const r=JSON.parse(routerRaw);
-      if(r.intent==='generate')intent='generate';
-    }catch(e){}
-
-    if(intent==='generate'){
+    }else if(intent==='generate'){
+      // ── GENERATE: create/modify slides ──
       await doGenerate(statusDiv,wsContext);
+
     }else{
-      // ── PASS 2a: Chat (big model, natural language) ──
+      // ── CHAT: general conversation ──
       statusDiv.textContent='...';
       const raw=await callLLM(CHAT_PROMPT,chatHistory);
       chatHistory.push({role:'assistant',content:raw});
@@ -3451,6 +3449,24 @@ function exportPPTX(){
         });
       }
     });
+
+    // Floating overlay images (slide.images[])
+    if(slide.images&&slide.images.length>0){
+      slide.images.forEach(fi=>{
+        try{
+          sl.addImage({
+            data:fi.dataUrl,
+            x:toX(fi.x),y:toY(fi.y),
+            w:toW(fi.w),h:toH(fi.h),
+            sizing:{type:fi.fit==='cover'?'cover':'contain',w:toW(fi.w),h:toH(fi.h)}
+          });
+        }catch(imgErr){
+          console.warn('PPTX floating image failed:',imgErr);
+          sl.addShape(pptx.shapes.RECTANGLE,{x:toX(fi.x),y:toY(fi.y),w:toW(fi.w),h:toH(fi.h),line:{color:'CCCCCC',dashType:'dash',width:1},fill:{type:'none'}});
+          sl.addText(fi.name||'Image',{x:toX(fi.x),y:toY(fi.y),w:toW(fi.w),h:toH(fi.h),fontSize:9,color:'999999',fontFace:'Arial',align:'center',valign:'middle'});
+        }
+      });
+    }
 
     // Page number
     sl.addText(String(idx+1),{
