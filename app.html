@@ -535,6 +535,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .welcome-box.mobile-form-active .wb-mobile-splash { display:none; }
   .welcome-box.mobile-form-active .wb-left { display:block; }
   .welcome-box:not(.mobile-form-active) .wb-left { display:none; }
+  /* Mode picker tablet */
+  .mode-cards { gap:14px; }
+  .mode-card { max-width:240px; }
+  .mode-card-demo { height:130px; }
 }
 
 /* ═══════════════════════════════════════════════════ */
@@ -708,6 +712,25 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .ctx-ai-menu { position:fixed !important; left:0 !important; right:0 !important; bottom:0 !important; top:auto !important; max-width:100% !important; width:100% !important; border-radius:14px 14px 0 0 !important; max-height:60vh; overflow-y:auto; animation:ctx-slide-up 0.2s ease !important; }
   @keyframes ctx-slide-up { from{transform:translateY(100%);} to{transform:translateY(0);} }
   .text-sel-tooltip button { font-size:13px; padding:8px 14px; }
+  /* Mode picker phone */
+  .mode-picker { width:100%; padding:0 16px; }
+  .mode-picker .mp-logo { font-size:28px; margin-top:20px; }
+  .mode-picker .mp-tagline { font-size:12px; margin-bottom:20px; }
+  .mode-cards { flex-direction:column; align-items:center; gap:12px; overflow-y:auto; max-height:calc(100vh - 160px); padding-bottom:12px; }
+  .mode-card { max-width:100%; width:100%; flex-direction:row; display:flex; border-radius:12px; }
+  .mode-card-demo { height:auto; width:110px; min-height:100px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:12px 0 0 12px; }
+  .mode-card-info { padding:14px 14px; flex:1; text-align:left; }
+  .mode-card-icon { margin:0 0 6px; width:32px; height:32px; }
+  .mode-card-name { font-size:14px; }
+  .mode-card-desc { font-size:10px; }
+  .mode-card-badge { top:6px; right:auto; left:6px; font-size:8px; }
+  .mc-slide-preview { width:70%; max-width:80px; padding:8px; }
+  .mc-doc-preview { width:50%; max-width:60px; padding:8px 6px; }
+  .mc-doc-preview .mc-dimg { height:16px; }
+  .mc-sheet-preview { width:75%; max-width:85px; }
+  .mc-sheet-cell { padding:3px 4px; font-size:6px; }
+  .mp-back { margin-top:16px; padding:6px 14px; font-size:11px; }
+  .mode-badge { padding:2px 7px; font-size:10px; gap:3px; }
 }
 
 /* Very small phones */
