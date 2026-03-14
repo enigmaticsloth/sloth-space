@@ -113,6 +113,14 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .undo-redo-btn:disabled { color:#2a2a2a; cursor:default; }
 .undo-redo-btn .undo-label { font-size:9px; margin-left:2px; color:inherit; }
 
+/* Onboarding prompt chips in empty chat */
+.chat-onboarding { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; gap:12px; padding:20px 14px; }
+.chat-onboarding-title { font-size:12px; color:#444; font-weight:500; text-align:center; line-height:1.5; }
+.chat-onboarding-chips { display:flex; flex-direction:column; gap:6px; width:100%; }
+.chat-chip { background:var(--surface2); border:1px solid var(--border); color:var(--text2); padding:9px 12px; border-radius:8px; cursor:pointer; font-size:11px; font-family:Arial; text-align:left; line-height:1.4; transition:all 0.15s; }
+.chat-chip:hover { color:var(--text); border-color:#444; background:#1a1a2e; }
+.chat-chip .chip-icon { margin-right:6px; }
+
 /* Popups */
 .popup { display:none; position:absolute; bottom:30px; left:0; background:#1a1a1a; border:1px solid var(--border); border-radius:5px; padding:10px; z-index:100; box-shadow:0 6px 20px rgba(0,0,0,0.6); }
 .popup.show { display:block; }
@@ -190,6 +198,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .welcome-box .wb-input-group input::placeholder { color:#A0929B; }
 .wb-connect-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:12px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; font-family:Arial; margin-bottom:10px; transition:transform 0.15s,box-shadow 0.15s; box-shadow:0 2px 10px rgba(120,134,165,0.3); }
 .wb-connect-btn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(120,134,165,0.4); }
+@keyframes pulse-warn { 0%,100%{box-shadow:0 2px 10px rgba(120,134,165,0.3);} 50%{box-shadow:0 2px 20px rgba(231,76,60,0.5);transform:scale(1.02);} }
 .wb-connect-btn.connected { background:linear-gradient(135deg,#5B9E5B,#7BB87B); }
 .wb-provider-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
 .wb-pgrid-item { background:#F6F3EE; border:2px solid #D5D0C7; border-radius:8px; padding:10px 8px; cursor:pointer; text-align:center; transition:all 0.2s; }
@@ -398,11 +407,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 </head>
 <body>
 
-<!-- Product switcher -->
-<div class="product-bar">
+<!-- Product switcher (hidden — only Slides is ready; Docs & Sheets coming later) -->
+<div class="product-bar" style="display:none;">
   <button class="product-tab active" data-product="slides" onclick="switchProduct('slides')"><span class="pt-dot"></span>Slides</button>
-  <button class="product-tab" data-product="docs" onclick="switchProduct('docs')"><span class="pt-dot"></span>Docs</button>
-  <button class="product-tab" data-product="sheets" onclick="switchProduct('sheets')"><span class="pt-dot"></span>Sheets</button>
+  <!--<button class="product-tab" data-product="docs" onclick="switchProduct('docs')"><span class="pt-dot"></span>Docs</button>-->
+  <!--<button class="product-tab" data-product="sheets" onclick="switchProduct('sheets')"><span class="pt-dot"></span>Sheets</button>-->
 </div>
 
 <!-- Placeholder for Docs / Sheets (coming soon) -->
@@ -505,26 +514,12 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     <div class="wb-tagline">Type what you want. Sloth will design it.</div>
 
     <div class="wb-products">
-      <div class="wb-product active">
+      <div class="wb-product active" style="transform:scale(1.05);">
         <div class="wb-product-icon" style="background:linear-gradient(135deg,#7886A5,#9BA8C4);">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
         </div>
         <div class="wb-product-name">Slides</div>
         <div class="wb-product-status">Ready</div>
-      </div>
-      <div class="wb-product">
-        <div class="wb-product-icon" style="background:linear-gradient(135deg,#8B9E8B,#A8B8A0);">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        </div>
-        <div class="wb-product-name">Docs</div>
-        <div class="wb-product-status">Coming soon</div>
-      </div>
-      <div class="wb-product">
-        <div class="wb-product-icon" style="background:linear-gradient(135deg,#C67A3C,#D4A06A);">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-        </div>
-        <div class="wb-product-name">Sheets</div>
-        <div class="wb-product-status">Coming soon</div>
       </div>
     </div>
 
@@ -1022,6 +1017,47 @@ function renderSlide(slide,idx,p,total){
 // ═══════════════════════════════════════════
 // UI
 // ═══════════════════════════════════════════
+
+const ONBOARDING_PROMPTS=[
+  {icon:'🎯',text:'做一份AI趨勢簡報 5頁',desc:'AI trends deck in Chinese'},
+  {icon:'🚀',text:'Create a startup pitch deck about a food delivery app',desc:'Startup pitch'},
+  {icon:'📊',text:'Make a 3-slide quarterly business review',desc:'Business review'},
+  {icon:'🎓',text:'Design a lecture about climate change for college students',desc:'Educational'},
+];
+
+function useOnboardingPrompt(text){
+  const input=document.getElementById('chatInput');
+  input.value=text;
+  input.focus();
+  // Remove onboarding UI
+  const ob=document.getElementById('chatOnboarding');
+  if(ob)ob.remove();
+  // Auto-send
+  sendMessage();
+}
+
+function renderChatOnboarding(){
+  const msgs=document.getElementById('chatMessages');
+  const existing=document.getElementById('chatOnboarding');
+  // Show onboarding only when chat is empty (no user messages yet)
+  const hasMessages=msgs.querySelector('.msg');
+  if(hasMessages){
+    if(existing)existing.remove();
+    return;
+  }
+  if(existing)return; // already showing
+  const div=document.createElement('div');
+  div.id='chatOnboarding';
+  div.className='chat-onboarding';
+  div.innerHTML=`
+    <div class="chat-onboarding-title">What would you like to create?<br><span style="color:#333;font-size:10px;">Click a suggestion or type your own</span></div>
+    <div class="chat-onboarding-chips">
+      ${ONBOARDING_PROMPTS.map(p=>`<button class="chat-chip" onclick="useOnboardingPrompt('${p.text.replace(/'/g,"\\'")}')"><span class="chip-icon">${p.icon}</span>${p.text}</button>`).join('')}
+    </div>
+  `;
+  msgs.appendChild(div);
+}
+
 function renderApp(){
   // Auto-save on every render (deck changes trigger render)
   autoSave();
@@ -1036,12 +1072,23 @@ function renderApp(){
     `<button class="${pr.id===currentPreset?'active':''}" onclick="setPreset('${pr.id}')">${pr.name}</button>`
   ).join('');
 
+  // Hide toolbar when no deck loaded
+  const toolbarEl=document.querySelector('.toolbar');
+  if(toolbarEl) toolbarEl.style.display=currentDeck?'flex':'none';
+
+  // Onboarding: show prompt chips in empty chat
+  renderChatOnboarding();
+
   const panel=document.querySelector('.slide-panel');
   const panelW=panel.clientWidth-12;
   const panelH=panel.clientHeight-70; // account for deck-name-bar + slide-bar + padding
 
   if(!currentDeck){
-    document.getElementById('slideCanvas').innerHTML=`<div style="width:${panelW}px;height:${panelH}px;background:#131313;display:flex;align-items:center;justify-content:center;color:#555;font-size:15px;font-family:Arial;">Type what you want. Sloth will design it.</div>`;
+    document.getElementById('slideCanvas').innerHTML=`<div style="width:${panelW}px;height:${panelH}px;background:#131313;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:30px;">
+      <div style="font-size:32px;">🦥</div>
+      <div style="color:#555;font-size:15px;font-family:Arial;text-align:center;">Type what you want in the chat.<br>Sloth will design it.</div>
+      <div style="color:#333;font-size:11px;font-family:Arial;text-align:center;max-width:320px;line-height:1.5;">Try: &quot;做一份AI趨勢簡報 5頁&quot; or &quot;Create a startup pitch deck about...&quot;</div>
+    </div>`;
     document.getElementById('slideNav').innerHTML='';
     document.getElementById('slideInfo').textContent='';
     return;
@@ -1423,6 +1470,17 @@ function setWelcomeProvider(p) {
 }
 
 function finishWelcome() {
+  // If provider panel was never opened, prompt user to connect LLM first
+  const panel=document.getElementById('welcomeProviderPanel');
+  if(panel.style.display==='none'){
+    // Flash the connect button to draw attention
+    const btn=document.getElementById('wbConnectBtn');
+    btn.style.animation='none';
+    btn.offsetHeight; // force reflow
+    btn.style.animation='pulse-warn 0.5s ease 3';
+    toggleWelcomeProviders(); // auto-open the panel
+    return;
+  }
   // Validate based on provider type
   const isCloud=CLOUD_PROVIDERS.includes(welcomeProvider);
   if(isCloud){
