@@ -1610,6 +1610,18 @@ function initFreeformCanvas(){
     pushUndo(); autoSave();
     fcDrag=null;
   });
+
+  // ── Click empty space to deselect ──
+  canvas.addEventListener('click',function(e){
+    if(!selectedRegion||fcMoveMode||fcJustDragged||isInlineEditing())return;
+    // Only deselect if clicked on empty canvas area (not on a region)
+    const onRegion=!!e.target.closest('.region-box');
+    if(onRegion)return;
+    // Don't deselect if user just selected text
+    const sel=window.getSelection();
+    if(sel&&sel.toString().trim().length>0)return;
+    clearSelection();
+  });
 }
 
 let fcMoveMode=false;
