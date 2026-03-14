@@ -2148,6 +2148,7 @@ function finishWelcome() {
 function _commitWelcomeConfig(defaults, isCloud){
   saveConfig();
   syncConfigToCloud();
+  localStorage.removeItem('sloth_signed_out');
   document.getElementById('welcomeOverlay').classList.add('hidden');
   try{ sessionStorage.removeItem('sloth_on_welcome'); }catch(e){}
 }
@@ -2250,15 +2251,18 @@ function skipWelcome() {
 
 function checkWelcomeScreen() {
   const hasConfig = loadConfig();
+  // If user explicitly signed out, don't auto-enter slides
+  const signedOut = localStorage.getItem('sloth_signed_out');
   // If user was on welcome page before refresh, stay there
   if(sessionStorage.getItem('sloth_on_welcome')){
     showWelcome(true);
     return;
   }
-  if (hasConfig && isConfigured()) {
+  if (hasConfig && isConfigured() && !signedOut) {
     document.getElementById('welcomeOverlay').classList.add('hidden');
-  } else {
-    // Welcome screen stays visible — apply mobile splash logic
+  }
+  // Welcome screen stays visible — handle mobile splash state
+  if(!document.getElementById('welcomeOverlay').classList.contains('hidden')){
     const box=document.getElementById('welcomeBox');
     if(box && localStorage.getItem('sloth_splash_seen')){
       box.classList.add('mobile-form-active');
@@ -2509,6 +2513,7 @@ function setAuthUser(user){
   // This ensures API keys sync across devices — but only show message once
   if(!_authSyncDone){
     _authSyncDone=true;
+    localStorage.removeItem('sloth_signed_out'); // clear sign-out flag on login
     const restored=restoreConfigFromCloud(user);
     // Set display name from GitHub if not already set from cloud
     if(!llmConfig.displayName){
@@ -2573,9 +2578,15 @@ function showWelcome(fromInit){
   overlay.classList.remove('hidden');
   // Remember user is on welcome page so refresh stays here
   if(!fromInit) try{ sessionStorage.setItem('sloth_on_welcome','1'); }catch(e){}
-  // On mobile, if user already passed splash, skip straight to form
+  // On mobile: show splash if never seen, otherwise skip to form
   const box=document.getElementById('welcomeBox');
-  if(box && localStorage.getItem('sloth_splash_seen')) box.classList.add('mobile-form-active');
+  if(box){
+    if(localStorage.getItem('sloth_splash_seen')){
+      box.classList.add('mobile-form-active');
+    } else {
+      box.classList.remove('mobile-form-active');
+    }
+  }
   // Make sure config panel is hidden (show demo)
   const configPanel=document.getElementById('wbConfigPanel');
   if(configPanel)configPanel.classList.remove('active');
@@ -2622,7 +2633,10 @@ async function doLogout(){
   await supabaseClient.auth.signOut();
   clearAuthUser();
   clearLocalConfig();
+  localStorage.setItem('sloth_signed_out','1');
   addMessage('Signed out.','system');
+  // Show welcome page
+  showWelcome();
 }
 // Clear config from memory & localStorage only (cloud keeps it)
 function clearLocalConfig(){
@@ -2639,6 +2653,7 @@ async function doWelcomeSignOut(){
   await supabaseClient.auth.signOut();
   clearAuthUser();
   clearLocalConfig();
+  localStorage.setItem('sloth_signed_out','1');
   // Reset welcome auth section
   const wStatus=document.getElementById('welcomeAuthStatus');
   const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
@@ -4412,15 +4427,6 @@ document.querySelectorAll('.popup').forEach(p=>{
   p.addEventListener('click',e=>e.stopPropagation());
 });
 checkWelcomeScreen(); // Show welcome if not configured
-// On mobile: ensure splash state is correct on initial load
-(function(){
-  const box=document.getElementById('welcomeBox');
-  if(!box)return;
-  const isMobile=window.innerWidth<=900;
-  if(isMobile && localStorage.getItem('sloth_splash_seen')){
-    box.classList.add('mobile-form-active');
-  }
-})();
 initOllamaGuide(); // Render OS-specific Ollama instructions
 initAuth(); // Initialize Supabase auth if configured
 autoLoad(); // Restore previous session from localStorage
