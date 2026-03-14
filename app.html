@@ -1893,12 +1893,7 @@ document.addEventListener('keydown',function(e){
     if(isInlineEditing()) return;
     // Doc block contenteditable OR no focus → use our undo system
     e.preventDefault();
-    // Flush current doc edit state to model before undo/redo
-    if(currentMode==='doc'&&docEditingBlockId){
-      clearTimeout(docUndoPushTimer);
-      const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
-      if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
-    }
+    if(currentMode==='doc') docFlushEditing();
     const isUndo=(e.key==='z'||e.key==='Z')&&!e.shiftKey;
     const isRedo=(e.key==='y'||e.key==='Y')||((e.key==='z'||e.key==='Z')&&e.shiftKey);
     if(isUndo){
@@ -4624,13 +4619,7 @@ function exportDocDocx(){
 // ── Mode dispatcher functions (unified toolbar → mode-specific) ──
 function modeUndo(){
   if(currentMode==='doc'){
-    // Flush current edit state before undoing
-    clearTimeout(docUndoPushTimer);
-    if(docEditingBlockId){
-      const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
-      if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
-    }
-    // Don't docPushUndo() here — docUndo() already saves current state to redoStack
+    docFlushEditing();
     docUndo();
   } else { undo(); }
 }
@@ -4797,50 +4786,74 @@ function handleInsertedFiles(files){
 }
 
 // ── Doc undo/redo ──
+//
+// Architecture:
+//   docPushUndo()  — snapshot current state to undo stack (called before edits)
+//   docUndo()      — restore previous different state from undo stack
+//   docRedo()      — restore next different state from redo stack
+//
+// Content comparison uses docContentKey() which strips the `updated` timestamp,
+// so snapshots that differ only in timestamp are treated as identical.
+//
+// Persistence: stacks are saved to sessionStorage (survives refresh, cleared on tab close).
+// docSaveUndoStacks() is called after every stack mutation.
+// docRestoreUndoStacks() is called when entering doc mode.
+//
+// Guard: docUndoRedoInProgress prevents docPushUndo() from firing during
+// renderDocMode() re-focus cycles triggered by undo/redo.
+
 const DOC_MAX_UNDO=50;
 let docUndoStack=[];
 let docRedoStack=[];
-function docSaveUndoStacks(){
-  try{
-    // Limit persisted stacks to last 20 entries to avoid sessionStorage quota
-    const u=docUndoStack.slice(-20);
-    const r=docRedoStack.slice(-20);
-    sessionStorage.setItem('sloth_doc_undo',JSON.stringify(u));
-    sessionStorage.setItem('sloth_doc_redo',JSON.stringify(r));
-  }catch(e){
-    // Quota exceeded — try smaller
-    try{
-      sessionStorage.setItem('sloth_doc_undo',JSON.stringify(docUndoStack.slice(-5)));
-      sessionStorage.setItem('sloth_doc_redo',JSON.stringify(docRedoStack.slice(-5)));
-    }catch(e2){}
-  }
-}
-function docRestoreUndoStacks(){
-  try{
-    const u=sessionStorage.getItem('sloth_doc_undo');
-    const r=sessionStorage.getItem('sloth_doc_redo');
-    if(u) docUndoStack=JSON.parse(u);
-    if(r) docRedoStack=JSON.parse(r);
-  }catch(e){}
-}
+let docUndoRedoInProgress=false;
+
+// ── Snapshot & comparison ──
 
 function docSnapshotDoc(){
   if(!currentDoc) return null;
   return JSON.parse(JSON.stringify(currentDoc));
 }
-// Content-only fingerprint for undo comparison (ignores `updated` timestamp)
+
 function docContentKey(doc){
   if(!doc) return '';
   const copy=Object.assign({},doc);
   delete copy.updated;
   return JSON.stringify(copy);
 }
-let docUndoRedoInProgress=false;
+
+function docStackHasDifferent(stack){
+  const curKey=docContentKey(currentDoc);
+  for(let i=stack.length-1;i>=0;i--){
+    if(docContentKey(stack[i])!==curKey) return true;
+  }
+  return false;
+}
+
+// Pop first snapshot from stack whose content differs from current state.
+function docPopDifferent(stack){
+  const curKey=docContentKey(currentDoc);
+  while(stack.length){
+    const candidate=stack.pop();
+    if(docContentKey(candidate)!==curKey) return candidate;
+  }
+  return null;
+}
+
+// ── Flush editing DOM → model ──
+
+function docFlushEditing(){
+  clearTimeout(docUndoPushTimer);
+  if(!docEditingBlockId) return;
+  const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
+  if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
+}
+
+// ── Stack operations ──
+
 function docPushUndo(){
   if(docUndoRedoInProgress) return;
   const snap=docSnapshotDoc();
   if(!snap) return;
-  // Skip if content identical to top of stack
   const key=docContentKey(snap);
   if(docUndoStack.length>0 && docContentKey(docUndoStack[docUndoStack.length-1])===key) return;
   docUndoStack.push(snap);
@@ -4849,16 +4862,11 @@ function docPushUndo(){
   docUpdateUndoUI();
   docSaveUndoStacks();
 }
+
 function docUndo(){
   if(!docUndoStack.length) return;
   docUndoRedoInProgress=true;
-  const curKey=docContentKey(currentDoc);
-  // Skip past snapshots with identical content
-  let snap=null;
-  while(docUndoStack.length){
-    const candidate=docUndoStack.pop();
-    if(docContentKey(candidate)!==curKey){ snap=candidate; break; }
-  }
+  const snap=docPopDifferent(docUndoStack);
   if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); docSaveUndoStacks(); return; }
   const current=docSnapshotDoc();
   if(current) docRedoStack.push(current);
@@ -4870,15 +4878,11 @@ function docUndo(){
   docUndoRedoInProgress=false;
   docSaveUndoStacks();
 }
+
 function docRedo(){
   if(!docRedoStack.length) return;
   docUndoRedoInProgress=true;
-  const curKey=docContentKey(currentDoc);
-  let snap=null;
-  while(docRedoStack.length){
-    const candidate=docRedoStack.pop();
-    if(docContentKey(candidate)!==curKey){ snap=candidate; break; }
-  }
+  const snap=docPopDifferent(docRedoStack);
   if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); docSaveUndoStacks(); return; }
   const current=docSnapshotDoc();
   if(current) docUndoStack.push(current);
@@ -4890,25 +4894,39 @@ function docRedo(){
   docUndoRedoInProgress=false;
   docSaveUndoStacks();
 }
-function docHasRealUndo(){
-  const curKey=docContentKey(currentDoc);
-  for(let i=docUndoStack.length-1;i>=0;i--){
-    if(docContentKey(docUndoStack[i])!==curKey) return true;
+
+// ── Persistence (sessionStorage) ──
+
+function docSaveUndoStacks(){
+  try{
+    const u=docUndoStack.slice(-20);
+    const r=docRedoStack.slice(-20);
+    sessionStorage.setItem('sloth_doc_undo',JSON.stringify(u));
+    sessionStorage.setItem('sloth_doc_redo',JSON.stringify(r));
+  }catch(e){
+    try{
+      sessionStorage.setItem('sloth_doc_undo',JSON.stringify(docUndoStack.slice(-5)));
+      sessionStorage.setItem('sloth_doc_redo',JSON.stringify(docRedoStack.slice(-5)));
+    }catch(e2){}
   }
-  return false;
 }
-function docHasRealRedo(){
-  const curKey=docContentKey(currentDoc);
-  for(let i=docRedoStack.length-1;i>=0;i--){
-    if(docContentKey(docRedoStack[i])!==curKey) return true;
-  }
-  return false;
+
+function docRestoreUndoStacks(){
+  try{
+    const u=sessionStorage.getItem('sloth_doc_undo');
+    const r=sessionStorage.getItem('sloth_doc_redo');
+    if(u) docUndoStack=JSON.parse(u);
+    if(r) docRedoStack=JSON.parse(r);
+  }catch(e){}
 }
+
+// ── UI ──
+
 function docUpdateUndoUI(){
   const ub=document.getElementById('undoBtn');
   const rb=document.getElementById('redoBtn');
-  const canUndo=docHasRealUndo();
-  const canRedo=docHasRealRedo();
+  const canUndo=docStackHasDifferent(docUndoStack);
+  const canRedo=docStackHasDifferent(docRedoStack);
   if(ub){ ub.style.opacity=canUndo?'1':'0.35'; ub.style.color=canUndo?'#fff':'#555'; }
   if(rb){ rb.style.opacity=canRedo?'1':'0.35'; rb.style.color=canRedo?'#fff':'#555'; }
 }
@@ -8845,12 +8863,7 @@ renderApp();
 // ── Save doc on page unload/tab close ──
 window.addEventListener('beforeunload',function(){
   if(currentMode==='doc'&&currentDoc){
-    // Flush editing state to model
-    if(docEditingBlockId){
-      const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
-      if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
-    }
-    // Save stacks as-is (don't docPushUndo — it clears redoStack)
+    docFlushEditing();
     docSaveUndoStacks();
     docSaveNow();
   }
