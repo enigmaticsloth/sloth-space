@@ -86,6 +86,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .deck-action-btn.primary:hover { background:#6775A0; }
 .slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; position:relative; touch-action:none; }
 .slide-panel, .slide-panel *, .slide-frame *, #slideCanvas, #slideCanvas * { touch-action:none; /* lock ALL elements inside slide — no zoom/scroll/resize */ }
+.doc-canvas, .doc-canvas *, .workspace-canvas, .workspace-canvas * { touch-action:pan-y; /* re-enable vertical scroll for doc & workspace modes */ }
 /* Slide transition animations (swipe/navigate) */
 .slide-enter-left { animation:slideInLeft 0.28s ease forwards; }
 .slide-enter-right { animation:slideInRight 0.28s ease forwards; }
@@ -406,9 +407,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="table"] .table-add-row:hover { color:#aaa; border-color:#666; }
 
 /* Drag handle */
-.doc-block-handle { position:absolute; right:4px; top:4px; width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#666; border-radius:4px; z-index:5; background:rgba(255,255,255,0.04); }
+.doc-block-handle { position:absolute; left:4px; top:50%; transform:translateY(-50%); width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#666; border-radius:4px; z-index:5; background:rgba(255,255,255,0.04); }
 .doc-block[data-type="image"] .doc-block-handle,
-.doc-block[data-type="table"] .doc-block-handle { background:rgba(0,0,0,0.5); color:#aaa; padding:2px; }
+.doc-block[data-type="table"] .doc-block-handle { left:auto; right:4px; top:4px; transform:none; background:rgba(0,0,0,0.5); color:#aaa; padding:2px; }
 .doc-block:hover .doc-block-handle, .doc-block.selected .doc-block-handle { opacity:1; }
 .doc-block-handle:hover { color:#ccc; background:rgba(255,255,255,0.1); }
 .doc-block-handle:active { cursor:grabbing; }
