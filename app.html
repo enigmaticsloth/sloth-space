@@ -1886,6 +1886,8 @@ document.addEventListener('keydown',function(e){
       const ae=document.activeElement;
       if(ae&&ae.isContentEditable){
         ae.blur();
+        // Lock text block back to non-editable
+        if(ae.classList.contains('doc-block')) ae.contentEditable='false';
         if(docEditingBlockId) docEditingBlockId=null;
         e.preventDefault();
         return;
@@ -5106,9 +5108,11 @@ function renderDocMode(){
     const placeholder=block.type.startsWith('heading')?'Heading':block.type==='quote'?'Quote...':block.type==='code'?'Code...':'Type something...';
     const numAttr=block.type==='numbered'?` data-number="${numberedCounter}"`:'';
 
+    const isEditing=(docEditingBlockId===block.id);
     return `<div class="doc-block${selected}" data-type="${block.type}" data-block-id="${block.id}"${numAttr}
-      contenteditable="true"
+      contenteditable="${isEditing?'true':'false'}"
       data-placeholder="${placeholder}"
+      onmousedown="docTextBlockMousedown(event,'${block.id}')"
       onfocus="docFocusBlock('${block.id}')"
       onblur="docBlurBlock('${block.id}')"
       oninput="docInputBlock('${block.id}')"
@@ -5164,6 +5168,25 @@ function renderBlockContent(block){
 
 let docLastClickedBlock=null;
 let docClickTimer=null;
+// First click on text block → select only (no edit). Second click → enter edit mode.
+function docTextBlockMousedown(event, blockId){
+  if(event.target.closest('.doc-block-handle')) return;
+  if(docSelectedBlockId!==blockId){
+    // First click: just select, block is contenteditable=false so no focus happens naturally
+    docSelectBlock(blockId, event);
+    return;
+  }
+  // Second click: block already selected → make editable and focus
+  if(!docEditingBlockId||docEditingBlockId!==blockId){
+    const el=event.currentTarget;
+    if(el){
+      el.contentEditable='true';
+      // Focus after a microtask so the browser picks up the contenteditable change
+      setTimeout(()=>el.focus(),0);
+    }
+  }
+}
+
 function docSelectBlock(blockId, e){
   const wasSelected=(docSelectedBlockId===blockId);
   docSelectedBlockId=blockId;
@@ -5195,6 +5218,8 @@ function docBlurBlock(blockId){
   blockFromPlainText(block, text);
   currentDoc.updated=new Date().toISOString();
   docEditingBlockId=null;
+  // Lock block back to non-editable
+  el.contentEditable='false';
   // Auto-save to workspace
   docAutoSave();
 }
