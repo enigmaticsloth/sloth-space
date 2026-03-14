@@ -223,24 +223,30 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   background-size:400% 400%; animation:monet-shift 12s ease infinite; }
 @keyframes monet-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
 .welcome-overlay.hidden { display:none; }
-.welcome-box { text-align:center; width:96%; max-width:1100px; max-height:92vh; overflow-y:auto; padding:0; background:rgba(22,22,22,0.88); backdrop-filter:blur(16px); border:1px solid #2a2a2a; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,0.5); display:flex; }
+.welcome-box { text-align:center; width:96%; max-width:1280px; max-height:92vh; overflow-y:auto; padding:0; background:rgba(22,22,22,0.88); backdrop-filter:blur(16px); border:1px solid #2a2a2a; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,0.5); display:flex; }
 .wb-left { flex:1; min-width:0; padding:28px 32px; overflow-y:auto; }
-.wb-right { width:440px; flex-shrink:0; border-left:1px solid #2a2a2a; border-radius:0 16px 16px 0; overflow:hidden; display:flex; flex-direction:column; background:rgba(16,16,16,0.6); position:relative; }
-.wb-right-config { position:absolute; inset:0; background:rgba(16,16,16,0.95); padding:22px 20px; overflow-y:auto; display:none; flex-direction:column; z-index:2; }
-.wb-right-config.active { display:flex; }
-.wb-right-config .wrc-title { font-size:13px; color:#e0e0e0; font-weight:600; margin-bottom:14px; text-align:center; }
-.wb-right-config .wrc-done-btn { width:100%; padding:10px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:Arial; margin-top:12px; transition:transform 0.15s; }
-.wb-right-config .wrc-done-btn:hover { transform:translateY(-1px); }
+.wb-right { width:380px; flex-shrink:0; border-left:1px solid #2a2a2a; border-radius:0 16px 16px 0; overflow:hidden; display:flex; flex-direction:column; background:rgba(16,16,16,0.6); }
+/* Config panel — slides in from the left */
+.wb-config { width:0; overflow:hidden; flex-shrink:0; border-right:0 solid #2a2a2a; border-radius:16px 0 0 16px; background:rgba(18,18,18,0.92); transition:width 0.35s ease, padding 0.35s ease, border-right-width 0.35s ease; padding:0; }
+.wb-config.active { width:360px; min-width:360px; padding:22px 20px; border-right-width:1px; overflow-y:auto; }
+.wb-config .wrc-title { font-size:13px; color:#e0e0e0; font-weight:600; margin-bottom:14px; text-align:center; white-space:nowrap; }
+.wb-config .wrc-done-btn { width:100%; padding:10px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:Arial; margin-top:12px; transition:transform 0.15s; white-space:nowrap; }
+.wb-config .wrc-done-btn:hover { transform:translateY(-1px); }
 /* Demo panel */
 .demo-panel { flex:1; display:flex; flex-direction:column; padding:18px; gap:10px; }
 .demo-label { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; text-align:center; margin-bottom:4px; }
 .demo-slide-area { flex:5 1 0; min-height:0; border-radius:10px; overflow:hidden; position:relative; background:#1a1a1a; border:1px solid #333; }
-.demo-slide-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center; opacity:0; transition:opacity 0.8s ease; }
+.demo-slide-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center; opacity:0; transition:opacity 0.5s ease, transform 0.5s ease; transform:translateX(0); }
 .demo-slide-inner.visible { opacity:1; }
+.demo-slide-inner.slide-out { opacity:0; transform:translateX(-100%); transition:opacity 0.35s ease, transform 0.35s ease; }
+.demo-slide-inner.slide-in { opacity:0; transform:translateX(100%); transition:none; }
 .demo-slide-inner .ds-icon { margin-bottom:8px; opacity:0.85; }
 .demo-slide-inner .ds-title { font-size:18px; font-weight:700; margin-bottom:5px; }
 .demo-slide-inner .ds-subtitle { font-size:10px; opacity:0.8; }
 .demo-slide-inner .ds-body { font-size:9px; opacity:0.6; margin-top:6px; line-height:1.5; }
+.demo-page-dots { position:absolute; bottom:6px; left:0; right:0; display:flex; justify-content:center; gap:4px; }
+.demo-page-dots span { width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,0.25); transition:background 0.3s; }
+.demo-page-dots span.active { background:rgba(255,255,255,0.7); }
 .demo-chat-area { flex:4 1 0; min-height:0; border-radius:8px; background:#111; border:1px solid #2a2a2a; display:flex; flex-direction:column; overflow:hidden; }
 .demo-messages { flex:1; padding:10px 12px; overflow:hidden; display:flex; flex-direction:column; gap:8px; }
 .demo-msg { font-size:13px; padding:7px 12px; border-radius:8px; max-width:88%; opacity:0; transition:opacity 0.5s ease; line-height:1.5; }
@@ -399,8 +405,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .deck-action-btn { padding:3px 7px; font-size:9px; }
   .welcome-box { flex-direction:column; max-width:740px; }
   .wb-right { display:none; }
-  /* On tablet, show config panel as modal overlay when active */
-  .wb-right-config.active { display:flex; position:fixed; top:5vh; left:5vw; right:5vw; bottom:5vh; border-radius:14px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); }
+  .wb-config { width:0; min-width:0; border-right:0; border-radius:0; }
+  .wb-config.active { position:fixed; top:5vh; left:5vw; right:5vw; bottom:5vh; width:auto; min-width:0; padding:22px 20px; overflow-y:auto; border-radius:14px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); background:rgba(18,18,18,0.97); }
 }
 
 /* ═══════════════════════════════════════════════════ */
@@ -553,7 +559,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .welcome-box { width:96%; padding:0; flex-direction:column; }
   .wb-left { padding:20px 16px; }
   .wb-right { display:none; }
-  .wb-right-config.active { display:flex; position:fixed; top:3vh; left:3vw; right:3vw; bottom:3vh; border-radius:12px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); }
+  .wb-config.active { position:fixed; top:3vh; left:3vw; right:3vw; bottom:3vh; width:auto; min-width:0; padding:20px 16px; overflow-y:auto; border-radius:12px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); background:rgba(18,18,18,0.97); }
   .welcome-box .wb-logo { font-size:32px; }
   .wb-provider-row { flex-direction:column; gap:8px; }
   .wb-products { gap:12px; }
@@ -714,6 +720,64 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 <!-- Welcome screen (first-time setup, Monet theme) -->
 <div class="welcome-overlay" id="welcomeOverlay">
   <div class="welcome-box">
+    <!-- Config panel (left side, slides in when Connect is clicked) -->
+    <div class="wb-config" id="wbConfigPanel">
+      <div class="wrc-title">Choose your AI provider</div>
+      <div class="wb-provider-grid" id="welcomeProviderGrid"></div>
+
+      <div id="welcomeKeyFields" style="display:none;">
+        <div class="wb-input-group">
+          <label id="welcomeKeyLabel">API Key</label>
+          <input type="password" id="welcomeApiKey" placeholder="">
+        </div>
+        <div class="api-cost-warning">
+          <div class="acw-icon">&#9888;</div>
+          <div class="acw-text">
+            <b>API calls cost real money.</b> Each slide edit / generation consumes tokens from your account.
+            We strongly recommend setting a <b>monthly spending cap</b> on your provider's dashboard before using Sloth Space.
+            We are not responsible for any charges incurred.
+          </div>
+        </div>
+      </div>
+
+      <div id="welcomeOllamaFields" style="display:none;">
+        <div class="ollama-guide" id="ollamaGuide"></div>
+        <div class="wb-inline-row" style="margin-top:10px;">
+          <div class="wb-input-group">
+            <label>URL</label>
+            <input type="text" id="welcomeOllamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434" style="margin-bottom:0;">
+          </div>
+          <div class="wb-input-group">
+            <label>Model</label>
+            <input type="text" id="welcomeOllamaModel" placeholder="llama3.1:8b" value="llama3.1:8b" style="margin-bottom:0;">
+          </div>
+        </div>
+      </div>
+
+      <div id="welcomeCustomFields" style="display:none;">
+        <div class="wb-input-group">
+          <label>API URL</label>
+          <input type="text" id="welcomeCustomUrl" placeholder="https://api.example.com/v1/chat/completions">
+        </div>
+        <div class="wb-input-group">
+          <label>API Key</label>
+          <input type="password" id="welcomeCustomKey" placeholder="your-api-key">
+        </div>
+        <div class="wb-inline-row">
+          <div class="wb-input-group">
+            <label>Model</label>
+            <input type="text" id="welcomeCustomModel" placeholder="model-name">
+          </div>
+          <div class="wb-input-group">
+            <label>Router Model</label>
+            <input type="text" id="welcomeCustomRouter" placeholder="small-model">
+          </div>
+        </div>
+      </div>
+
+      <button class="wrc-done-btn" onclick="confirmWelcomeProvider()">Confirm</button>
+    </div>
+
     <div class="wb-left">
     <div class="wb-logo">Sloth Space</div>
     <div class="wb-tagline">Type what you want. Sloth will design it.</div>
@@ -774,6 +838,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
             <div class="ds-subtitle" id="demoSlideSubtitle"></div>
             <div class="ds-body" id="demoSlideBody"></div>
           </div>
+          <div class="demo-page-dots" id="demoPageDots"></div>
         </div>
         <div class="demo-chat-area">
           <div class="demo-messages" id="demoMessages"></div>
@@ -782,63 +847,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
             <span class="demo-prompt-cursor" id="demoCursor"></span>
           </div>
         </div>
-      </div>
-      <!-- Config panel (overlays demo when active) -->
-      <div class="wb-right-config" id="wbRightConfig">
-        <div class="wrc-title">Choose your AI provider</div>
-        <div class="wb-provider-grid" id="welcomeProviderGrid"></div>
-
-        <div id="welcomeKeyFields" style="display:none;">
-          <div class="wb-input-group">
-            <label id="welcomeKeyLabel">API Key</label>
-            <input type="password" id="welcomeApiKey" placeholder="">
-          </div>
-          <div class="api-cost-warning">
-            <div class="acw-icon">&#9888;</div>
-            <div class="acw-text">
-              <b>API calls cost real money.</b> Each slide edit / generation consumes tokens from your account.
-              We strongly recommend setting a <b>monthly spending cap</b> on your provider's dashboard before using Sloth Space.
-              We are not responsible for any charges incurred.
-            </div>
-          </div>
-        </div>
-
-        <div id="welcomeOllamaFields" style="display:none;">
-          <div class="ollama-guide" id="ollamaGuide"></div>
-          <div class="wb-inline-row" style="margin-top:10px;">
-            <div class="wb-input-group">
-              <label>URL</label>
-              <input type="text" id="welcomeOllamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434" style="margin-bottom:0;">
-            </div>
-            <div class="wb-input-group">
-              <label>Model</label>
-              <input type="text" id="welcomeOllamaModel" placeholder="llama3.1:8b" value="llama3.1:8b" style="margin-bottom:0;">
-            </div>
-          </div>
-        </div>
-
-        <div id="welcomeCustomFields" style="display:none;">
-          <div class="wb-input-group">
-            <label>API URL</label>
-            <input type="text" id="welcomeCustomUrl" placeholder="https://api.example.com/v1/chat/completions">
-          </div>
-          <div class="wb-input-group">
-            <label>API Key</label>
-            <input type="password" id="welcomeCustomKey" placeholder="your-api-key">
-          </div>
-          <div class="wb-inline-row">
-            <div class="wb-input-group">
-              <label>Model</label>
-              <input type="text" id="welcomeCustomModel" placeholder="model-name">
-            </div>
-            <div class="wb-input-group">
-              <label>Router Model</label>
-              <input type="text" id="welcomeCustomRouter" placeholder="small-model">
-            </div>
-          </div>
-        </div>
-
-        <button class="wrc-done-btn" onclick="confirmWelcomeProvider()">Confirm</button>
       </div>
     </div><!-- end wb-right -->
   </div>
@@ -1942,7 +1950,7 @@ let welcomeProvider = 'groq';
 const CLOUD_PROVIDERS=['groq','openai','claude','grok']; // providers that need API key
 
 function toggleWelcomeProviders(){
-  const configPanel=document.getElementById('wbRightConfig');
+  const configPanel=document.getElementById('wbConfigPanel');
   const btn=document.getElementById('wbConnectBtn');
   const isOpen=configPanel.classList.contains('active');
   if(!isOpen){
@@ -1993,7 +2001,7 @@ function confirmWelcomeProvider(){
     }
   }
   // Close config panel, update button to Connected
-  const configPanel=document.getElementById('wbRightConfig');
+  const configPanel=document.getElementById('wbConfigPanel');
   configPanel.classList.remove('active');
   const btn=document.getElementById('wbConnectBtn');
   const def=LLM_DEFAULTS[welcomeProvider]||{};
@@ -2486,7 +2494,7 @@ function showWelcome(){
   const overlay=document.getElementById('welcomeOverlay');
   overlay.classList.remove('hidden');
   // Make sure config panel is hidden (show demo)
-  const configPanel=document.getElementById('wbRightConfig');
+  const configPanel=document.getElementById('wbConfigPanel');
   if(configPanel)configPanel.classList.remove('active');
   // If already configured, pre-fill and show Connected state
   if(isConfigured()){
@@ -4403,51 +4411,128 @@ renderApp();
   const DEMOS=[
     {
       prompt:'Create a pitch deck for Sloth Space, an AI presentation tool',
-      aiReply:'Got it! Generating a 6-slide deck with Monet palette \u2014 cover, features, demo, architecture, roadmap, and closing...',
-      slide:{
-        bg:'linear-gradient(135deg,#E8DDD0,#D8CEBE)',
-        icon:'<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2.5" stroke="#4A5D7A" stroke-width="1.5"/><path d="M8 21h8M12 17v4" stroke="#4A5D7A" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="10" r="3" fill="#7886A5" opacity="0.4"/><path d="M9 10l2 2 4-4" stroke="#4A5D7A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-        title:'Sloth Space',titleColor:'#4A5D7A',
-        subtitle:'AI-Native Presentations, Reimagined',subtitleColor:'#7886A5',
-        body:'Just describe what you need.\nSloth turns your words into beautiful slides \u2014 instantly.',bodyColor:'#6B7B6B'
-      }
+      aiReply:'Got it! Generating a 6-slide deck with Monet palette \u2014 cover, features, demo, roadmap, and closing...',
+      slides:[
+        { bg:'linear-gradient(135deg,#E8DDD0,#D8CEBE)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2.5" stroke="#4A5D7A" stroke-width="1.5"/><path d="M8 21h8M12 17v4" stroke="#4A5D7A" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="10" r="3" fill="#7886A5" opacity="0.4"/></svg>',
+          title:'Sloth Space',titleColor:'#4A5D7A',
+          subtitle:'AI-Native Presentations, Reimagined',subtitleColor:'#7886A5',
+          body:'Just describe what you need.\nSloth turns words into slides \u2014 instantly.',bodyColor:'#6B7B6B' },
+        { bg:'linear-gradient(135deg,#D8CEBE,#C8BEAE)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#4A5D7A" stroke-width="1.5"/><path d="M12 3v9l6 3" stroke="#7886A5" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="#4A5D7A"/></svg>',
+          title:'How It Works',titleColor:'#4A5D7A',
+          subtitle:'Three simple steps',subtitleColor:'#7886A5',
+          body:'1. Type a prompt in natural language\n2. AI generates structured slides\n3. Edit style, content, images with chat',bodyColor:'#6B7B6B' },
+        { bg:'linear-gradient(135deg,#4A5D7A,#7886A5)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          title:'Roadmap 2026',titleColor:'#fff',
+          subtitle:'What\'s next for Sloth Space',subtitleColor:'rgba(255,255,255,0.8)',
+          body:'Real-time collaboration \u2022 Template marketplace\nPDF export \u2022 Multi-language support',bodyColor:'rgba(255,255,255,0.55)' }
+      ]
     },
     {
       prompt:'Build a startup investor deck with market analysis and financials',
-      aiReply:'Creating an investor deck with TAM/SAM/SOM breakdown, competitive landscape, revenue projections, and team slides...',
-      slide:{
-        bg:'linear-gradient(135deg,#7886A5,#9BA8C4)',
-        icon:'<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="3" y="12" width="4" height="8" rx="1" fill="rgba(255,255,255,0.5)"/><rect x="10" y="8" width="4" height="12" rx="1" fill="rgba(255,255,255,0.6)"/><rect x="17" y="4" width="4" height="16" rx="1" fill="rgba(255,255,255,0.8)"/><path d="M3 4l7 4 5-2 6 1" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="3" cy="4" r="1.5" fill="#fff"/><circle cx="10" cy="8" r="1.5" fill="#fff"/><circle cx="15" cy="6" r="1.5" fill="#fff"/><circle cx="21" cy="7" r="1.5" fill="#fff"/></svg>',
-        title:'Series A Funding',titleColor:'#fff',
-        subtitle:'NovaMind \u2014 Redefining Personalized Learning',subtitleColor:'rgba(255,255,255,0.85)',
-        body:'$4.2B TAM \u2022 3x YoY Growth \u2022 12K Active Users\n85% Retention \u2022 $1.8M ARR',bodyColor:'rgba(255,255,255,0.6)'
-      }
+      aiReply:'Creating an investor deck \u2014 TAM breakdown, competitive landscape, revenue model, and team overview...',
+      slides:[
+        { bg:'linear-gradient(135deg,#7886A5,#9BA8C4)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><rect x="3" y="12" width="4" height="8" rx="1" fill="rgba(255,255,255,0.5)"/><rect x="10" y="8" width="4" height="12" rx="1" fill="rgba(255,255,255,0.65)"/><rect x="17" y="4" width="4" height="16" rx="1" fill="rgba(255,255,255,0.8)"/></svg>',
+          title:'Series A Funding',titleColor:'#fff',
+          subtitle:'NovaMind \u2014 Personalized Learning at Scale',subtitleColor:'rgba(255,255,255,0.85)',
+          body:'$4.2B TAM \u2022 3x YoY Growth \u2022 12K Users\n85% Retention \u2022 $1.8M ARR',bodyColor:'rgba(255,255,255,0.6)' },
+        { bg:'linear-gradient(135deg,#6775A0,#8895B8)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/><path d="M12 3a9 9 0 0 1 0 18" fill="rgba(255,255,255,0.2)"/><path d="M12 3a9 9 0 0 1 7.8 4.5" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>',
+          title:'Market Opportunity',titleColor:'#fff',
+          subtitle:'EdTech is exploding globally',subtitleColor:'rgba(255,255,255,0.8)',
+          body:'K-12 segment growing 18% CAGR\nEnterprise training $380B by 2028\nAI tutoring adoption up 240% YoY',bodyColor:'rgba(255,255,255,0.55)' },
+        { bg:'linear-gradient(135deg,#5A6E95,#7886A5)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="3" stroke="#fff" stroke-width="1.3"/><circle cx="16" cy="8" r="3" stroke="#fff" stroke-width="1.3"/><circle cx="12" cy="16" r="3" stroke="#fff" stroke-width="1.3"/><path d="M8 11v2a4 4 0 0 0 4 4M16 11v2a4 4 0 0 1-4 4" stroke="rgba(255,255,255,0.4)" stroke-width="1"/></svg>',
+          title:'The Team',titleColor:'#fff',
+          subtitle:'Backed by ex-Google, Stanford, and YC alumni',subtitleColor:'rgba(255,255,255,0.8)',
+          body:'CEO: 10yr ML experience \u2022 CTO: ex-Google Brain\nHead of Product: Stanford CS \u2022 15 engineers',bodyColor:'rgba(255,255,255,0.55)' }
+      ]
     },
     {
       prompt:'Design a product launch presentation with bold visuals',
-      aiReply:'Building a launch deck with Seurat-inspired accents \u2014 hero slide, key features, pricing tiers, and call to action...',
-      slide:{
-        bg:'linear-gradient(135deg,#2D4A3E,#3A5A4E)',
-        icon:'<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#E8C56D" opacity="0.3" stroke="#E8C56D" stroke-width="1.5" stroke-linejoin="round"/></svg>',
-        title:'Introducing Arc',titleColor:'#E8C56D',
-        subtitle:'The Smartest Way to Manage Your Workflow',subtitleColor:'#A8D5A2',
-        body:'Automate \u2022 Collaborate \u2022 Ship Faster\nFrom idea to production in half the time.',bodyColor:'rgba(255,255,255,0.5)'
-      }
+      aiReply:'Building a launch deck with Seurat-inspired accents \u2014 hero slide, features, pricing, and call to action...',
+      slides:[
+        { bg:'linear-gradient(135deg,#2D4A3E,#3A5A4E)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#E8C56D" opacity="0.3" stroke="#E8C56D" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+          title:'Introducing Arc',titleColor:'#E8C56D',
+          subtitle:'The Smartest Way to Manage Your Workflow',subtitleColor:'#A8D5A2',
+          body:'Automate \u2022 Collaborate \u2022 Ship Faster\nFrom idea to production in half the time.',bodyColor:'rgba(255,255,255,0.5)' },
+        { bg:'linear-gradient(135deg,#3A5A4E,#4A6A5E)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" fill="#E8C56D" opacity="0.3" stroke="#E8C56D" stroke-width="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="#A8D5A2" opacity="0.3" stroke="#A8D5A2" stroke-width="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="#A8D5A2" opacity="0.3" stroke="#A8D5A2" stroke-width="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.5" fill="#E8C56D" opacity="0.3" stroke="#E8C56D" stroke-width="1.2"/></svg>',
+          title:'Key Features',titleColor:'#E8C56D',
+          subtitle:'Everything your team needs in one place',subtitleColor:'#A8D5A2',
+          body:'Smart task routing \u2022 Real-time dashboards\nAI-powered prioritization \u2022 50+ integrations',bodyColor:'rgba(255,255,255,0.5)' },
+        { bg:'linear-gradient(135deg,#4A6A5E,#2D4A3E)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12 2v4m0 12v4m-7-11H1m22 0h-4" stroke="#E8C56D" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="5" stroke="#A8D5A2" stroke-width="1.5"/><circle cx="12" cy="12" r="2" fill="#E8C56D" opacity="0.5"/></svg>',
+          title:'Pricing',titleColor:'#E8C56D',
+          subtitle:'Start free. Scale as you grow.',subtitleColor:'#A8D5A2',
+          body:'Free: 3 users \u2022 Pro: $12/mo per seat\nEnterprise: custom pricing \u2022 14-day trial',bodyColor:'rgba(255,255,255,0.5)' }
+      ]
     },
     {
       prompt:'Make a quarterly business review with KPIs and team highlights',
-      aiReply:'Generating Q4 review \u2014 executive summary, revenue dashboard, customer metrics, OKR scorecard, and next quarter outlook...',
-      slide:{
-        bg:'linear-gradient(135deg,#3A2E4A,#5A4E6A)',
-        icon:'<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="#E8D5A3" stroke-width="1.5"/><path d="M8 12h8M8 8h5M8 16h6" stroke="#E8D5A3" stroke-width="1.2" stroke-linecap="round"/><circle cx="18" cy="6" r="3.5" fill="#5A4E6A" stroke="#A8D5A2" stroke-width="1.2"/><path d="M17 6l1 1 2-2" stroke="#A8D5A2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-        title:'Q4 Business Review',titleColor:'#E8D5A3',
-        subtitle:'FY2026 \u2014 Exceeding Every Benchmark',subtitleColor:'rgba(232,213,163,0.7)',
-        body:'Revenue +23% \u2022 NPS 78 \u2022 Churn < 2%\nNew Markets: APAC, LATAM \u2022 Team +40%',bodyColor:'rgba(255,255,255,0.5)'
-      }
+      aiReply:'Generating Q4 review \u2014 executive summary, revenue dashboard, OKR scorecard, and next quarter outlook...',
+      slides:[
+        { bg:'linear-gradient(135deg,#3A2E4A,#5A4E6A)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="#E8D5A3" stroke-width="1.5"/><path d="M8 12h8M8 8h5M8 16h6" stroke="#E8D5A3" stroke-width="1.2" stroke-linecap="round"/></svg>',
+          title:'Q4 Business Review',titleColor:'#E8D5A3',
+          subtitle:'FY2026 \u2014 Exceeding Every Benchmark',subtitleColor:'rgba(232,213,163,0.7)',
+          body:'Revenue +23% \u2022 NPS 78 \u2022 Churn < 2%\nNew Markets: APAC, LATAM \u2022 Team +40%',bodyColor:'rgba(255,255,255,0.5)' },
+        { bg:'linear-gradient(135deg,#4A3E5A,#6A5E7A)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><rect x="3" y="14" width="4" height="6" rx="1" fill="#A8D5A2" opacity="0.6"/><rect x="10" y="10" width="4" height="10" rx="1" fill="#E8D5A3" opacity="0.6"/><rect x="17" y="6" width="4" height="14" rx="1" fill="#D4A0C0" opacity="0.6"/><path d="M3 6l7 2 4-3 7 1" stroke="#E8D5A3" stroke-width="1.2" stroke-linecap="round"/></svg>',
+          title:'Revenue Dashboard',titleColor:'#E8D5A3',
+          subtitle:'All metrics trending upward',subtitleColor:'rgba(232,213,163,0.7)',
+          body:'MRR $420K (+18% QoQ) \u2022 LTV $8,200\nCAC payback 4.2mo \u2022 Gross margin 82%',bodyColor:'rgba(255,255,255,0.5)' },
+        { bg:'linear-gradient(135deg,#5A4E6A,#3A2E4A)',
+          icon:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#A8D5A2" stroke-width="1.5"/><path d="M8 12l3 3 5-6" stroke="#A8D5A2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          title:'Q1 2027 Outlook',titleColor:'#E8D5A3',
+          subtitle:'Ambitious goals, strong momentum',subtitleColor:'rgba(232,213,163,0.7)',
+          body:'Launch enterprise tier \u2022 Hire 12 engineers\nExpand EMEA \u2022 Target $600K MRR',bodyColor:'rgba(255,255,255,0.5)' }
+      ]
     }
   ];
   let demoIdx=0;
   let animTimer=null;
+
+  function renderSlide(s,area,inner){
+    area.style.background=s.bg;
+    const iconEl=document.getElementById('demoSlideIcon');
+    if(iconEl) iconEl.innerHTML=s.icon||'';
+    document.getElementById('demoSlideTitle').textContent=s.title;
+    document.getElementById('demoSlideTitle').style.color=s.titleColor;
+    document.getElementById('demoSlideSubtitle').textContent=s.subtitle;
+    document.getElementById('demoSlideSubtitle').style.color=s.subtitleColor;
+    document.getElementById('demoSlideBody').textContent=s.body;
+    document.getElementById('demoSlideBody').style.color=s.bodyColor;
+  }
+
+  function updateDots(total,current){
+    const dots=document.getElementById('demoPageDots');
+    if(!dots)return;
+    dots.innerHTML=Array.from({length:total},(_,i)=>`<span class="${i===current?'active':''}"></span>`).join('');
+  }
+
+  function flipToSlide(s,area,inner,cb){
+    // Slide out left
+    inner.classList.remove('visible');
+    inner.classList.add('slide-out');
+    setTimeout(()=>{
+      // Prep new content off-screen right
+      inner.classList.remove('slide-out');
+      inner.classList.add('slide-in');
+      renderSlide(s,area,inner);
+      // Force reflow then animate in
+      inner.offsetHeight;
+      inner.classList.remove('slide-in');
+      inner.style.transition='opacity 0.5s ease, transform 0.5s ease';
+      inner.style.transform='translateX(0)';
+      inner.classList.add('visible');
+      if(cb) animTimer=setTimeout(cb,2200);
+    },380);
+  }
 
   function runDemo(){
     const overlay=document.getElementById('welcomeOverlay');
@@ -4461,15 +4546,15 @@ renderApp();
     const msgsEl=document.getElementById('demoMessages');
     const slideInner=document.getElementById('demoSlideInner');
     const slideArea=document.getElementById('demoSlideArea');
-    const titleEl=document.getElementById('demoSlideTitle');
-    const subEl=document.getElementById('demoSlideSubtitle');
-    const bodyEl=document.getElementById('demoSlideBody');
     if(!promptEl||!msgsEl)return;
     // Reset
     promptEl.textContent='';
     msgsEl.innerHTML='';
-    slideInner.classList.remove('visible');
+    slideInner.classList.remove('visible','slide-out','slide-in');
+    slideInner.style.transform='';
+    slideInner.style.transition='';
     slideArea.style.background='#1a1a1a';
+    updateDots(demo.slides.length,0);
     // Phase 1: Type prompt
     let pi=0;
     function typePrompt(){
@@ -4478,7 +4563,6 @@ renderApp();
         pi++;
         animTimer=setTimeout(typePrompt,18+Math.random()*12);
       }else{
-        // Phase 2: Show user message
         animTimer=setTimeout(showUserMsg,400);
       }
     }
@@ -4489,7 +4573,6 @@ renderApp();
       um.textContent=demo.prompt;
       msgsEl.appendChild(um);
       requestAnimationFrame(()=>{ um.classList.add('visible'); });
-      // Phase 3: Show AI reply
       animTimer=setTimeout(showAiReply,800);
     }
     function showAiReply(){
@@ -4498,26 +4581,30 @@ renderApp();
       am.textContent=demo.aiReply;
       msgsEl.appendChild(am);
       requestAnimationFrame(()=>{ am.classList.add('visible'); });
-      // Phase 4: Show slide
-      animTimer=setTimeout(showSlide,1000);
+      animTimer=setTimeout(showFirstSlide,1000);
     }
-    function showSlide(){
-      slideArea.style.background=demo.slide.bg;
-      const iconEl=document.getElementById('demoSlideIcon');
-      if(iconEl) iconEl.innerHTML=demo.slide.icon||'';
-      titleEl.textContent=demo.slide.title;
-      titleEl.style.color=demo.slide.titleColor;
-      subEl.textContent=demo.slide.subtitle;
-      subEl.style.color=demo.slide.subtitleColor;
-      bodyEl.textContent=demo.slide.body;
-      bodyEl.style.color=demo.slide.bodyColor;
+    function showFirstSlide(){
+      renderSlide(demo.slides[0],slideArea,slideInner);
+      updateDots(demo.slides.length,0);
       slideInner.classList.add('visible');
-      // Wait then loop
-      animTimer=setTimeout(runDemo,4000);
+      // Flip through remaining slides
+      let si=1;
+      function nextSlide(){
+        if(si<demo.slides.length){
+          updateDots(demo.slides.length,si);
+          flipToSlide(demo.slides[si],slideArea,slideInner,()=>{
+            si++;
+            nextSlide();
+          });
+        }else{
+          // Done with all slides, move to next demo
+          animTimer=setTimeout(runDemo,2500);
+        }
+      }
+      animTimer=setTimeout(nextSlide,2200);
     }
     typePrompt();
   }
-  // Start demo loop after a short delay
   setTimeout(runDemo,1200);
 })();
 </script>
