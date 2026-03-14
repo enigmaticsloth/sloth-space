@@ -307,9 +307,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mc-sheet-cell:last-child { border-right:none; }
 .mc-sheet-row.header .mc-sheet-cell { color:rgba(255,255,255,0.5); font-weight:600; }
 
-/* Workspace card: wide, horizontal layout on desktop */
-.mode-card-wide { max-width:100% !important; flex-direction:row; display:flex; margin-top:4px; }
-.mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:200px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
+/* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop */
+.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin-top:4px; }
+.mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:140px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
 .mode-card-wide .mode-card-info { text-align:left; padding:16px 20px; display:flex; align-items:center; gap:14px; }
 .mode-card-wide .mode-card-icon { margin:0; flex-shrink:0; }
 .mode-card-wide .mode-card-name { margin-bottom:2px; }
@@ -1170,10 +1170,13 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         </div>
       </div>
 
+      <!-- Tagline hint -->
+      <div style="color:#555;font-size:12px;font-style:italic;align-self:center;margin-right:8px;white-space:nowrap;">Type what you want.<br>Sloth will design it.</div>
+
       <!-- Doc -->
       <div class="mode-card" onclick="pickMode('doc')">
         <div class="mode-card-demo">
-          <span class="mode-card-badge soon">Coming Soon</span>
+          <span class="mode-card-badge ready">Ready</span>
           <div class="mc-doc-preview">
             <div class="mc-dh"></div>
             <div class="mc-dp w90"></div>
@@ -2688,6 +2691,10 @@ function isInlineEditing(){
 function renderApp(){
   // Skip re-render while user is inline-editing text (would destroy cursor + edit state)
   if(isInlineEditing())return;
+
+  // If in doc or workspace mode, don't render slide UI — render doc instead
+  if(currentMode==='doc'){ renderDocMode(); return; }
+  if(currentMode==='workspace'){ renderWorkspaceMode(); return; }
 
   // Auto-save on every render (deck changes trigger render)
   autoSave();
@@ -4834,40 +4841,40 @@ function applyStyleOverrides(styleObj){
 }
 
 // ── Pass 1: small fast model decides intent ──
-const ROUTER_PROMPT=`You are an intent router for Sloth Space, a presentation app.
+const ROUTER_PROMPT=`You are an intent router for Sloth Space, a content creation app with multiple modes (slide, doc, sheet, workspace).
 You will receive the user's message and context. Classify the intent.
 
 Output ONLY a JSON object with "intent" and optional fields.
 
 INTENTS (pick one):
 
-"style" — visual style changes: colors, fonts, font sizes, backgrounds, bold, italic, underline, spacing, moving/resizing regions. NOT content changes.
-Examples: "背景改藍色", "字型改Georgia", "標題加粗", "字大一點", "change background to dark blue", "make title red", "把標題移到中間", "body放大", "標題復位"
+"style" — visual style changes: colors, fonts, font sizes, backgrounds, bold, italic, underline, spacing, moving/resizing regions. NOT content changes. (Slide mode only)
+Examples: "背景改藍色", "字型改Georgia", "標題加粗", "字大一點", "change background to dark blue", "make title red"
 
-"image" — anything about images on slides: place, move, resize, delete, scale, crop, fit.
-Examples: "放到第3頁右邊", "圖片大一點", "刪除這張圖片", "move image left", "remove the photo"
+"image" — anything about images on slides: place, move, resize, delete, scale, crop, fit. (Slide mode only)
+Examples: "放到第3頁右邊", "圖片大一點", "刪除這張圖片", "move image left"
 
-"deck_edit" — edit content across ALL slides at once: translate, batch change, apply to all pages.
-Examples: "全部翻成英文", "所有頁面加上公司logo文字", "translate to English", "change all slides"
+"deck_edit" — edit content across ALL slides at once OR edit entire doc content. (Slide: batch edit; Doc: rewrite/restructure)
+Examples: "全部翻成英文", "所有頁面加上公司logo文字", "translate to English", "重新整理這篇文章"
 
-"content_edit" — edit content of a SPECIFIC region or slide: rewrite, add detail, change text, delete text, modify specific section.
-Must include: {"intent":"content_edit","slide":N or null,"region":"regionId" or null,"delete":true/false}
-slide: 1-indexed number if user specifies (e.g. "第三頁"→3, "slide 2"→2), null if not specified.
-region: one of [title, subtitle, heading, body, left, right, quote, table, description, footnote, tagline, date, author, role, source, contact] or null if unclear.
-delete: true ONLY if the user explicitly wants to DELETE/CLEAR/REMOVE the content (not modify it).
-Examples: "改標題", "第三頁的內容豐富一點", "刪掉這段", "rewrite the body text", "subtitle改成xxx"
+"content_edit" — edit content of a SPECIFIC region/slide or specific doc block.
+For slides: {"intent":"content_edit","slide":N or null,"region":"regionId" or null,"delete":true/false}
+For docs: {"intent":"content_edit"}
+Examples: "改標題", "第三頁的內容豐富一點", "rewrite the body text"
 
-"generate" — create new slides/deck, add new slides, or significantly restructure.
-Examples: "做一份AI簡報", "加三頁", "重新生成", "做吧", "make a 5-page pitch deck"
+"generate" — create new content: slides/deck, doc/article, add new content.
+Examples: "做一份AI簡報", "加三頁", "寫一篇文章", "generate an article about stem cells", "做吧", "make a 5-page pitch deck", "寫一篇幹細胞的文章"
 
 "chat" — just conversation, greetings, questions, no action needed.
 Examples: "你好", "這是什麼app", "hello", "what can you do"
 
 RULES:
-- When the user has a deck loaded AND gives a TOPIC or confirms ("好","OK","做吧","go"), choose "generate".
+- Check the [Context] for the current mode (slide/doc/sheet/workspace).
+- In DOC mode: if the user gives a TOPIC or asks to write/generate content → "generate". If they ask to edit existing content → "content_edit" or "deck_edit".
+- In SLIDE mode: standard slide-related routing as before.
+- When the user gives a TOPIC or confirms ("好","OK","做吧","go"), choose "generate".
 - When in doubt between "content_edit" and "generate": if editing existing content→content_edit, if creating new→generate.
-- When in doubt between "style" and "content_edit": if about appearance→style, if about text content→content_edit.
-- "image" takes priority when the message is about images, even if it also mentions slides.
+- "image" and "style" only apply in slide mode. In doc mode, route to "generate" or "content_edit" instead.
 
 Output ONLY the JSON object.`;
 
@@ -5355,11 +5362,13 @@ async function sendMessage(){
     const routerMsgs=chatHistory.slice(-6);
     // Add context so router can make informed decisions
     const ctx=[];
-    if(currentDeck) ctx.push('User has a deck loaded with '+currentDeck.slides.length+' slides.');
-    if(hasImageOnCurrentSlide()) ctx.push('Current slide has floating images.');
+    ctx.push(`Current mode: ${currentMode}.`);
+    if(currentMode==='doc'&&currentDoc) ctx.push('User is in Doc mode editing "'+currentDoc.title+'" with '+currentDoc.blocks.length+' blocks.');
+    if(currentMode==='slide'&&currentDeck) ctx.push('User has a deck loaded with '+currentDeck.slides.length+' slides.');
+    if(currentMode==='slide'&&hasImageOnCurrentSlide()) ctx.push('Current slide has floating images.');
     if(selectedRegion) ctx.push(`User has selected region "${selectedRegion.regionId}" (${selectedRegion.role}) on slide ${selectedRegion.slideIdx+1}.`);
     if(wsRefs.length>0) ctx.push('User referenced workspace files: '+wsRefs.map(f=>f.title).join(', ')+'.');
-    if(!currentDeck) ctx.push('No deck loaded yet.');
+    if(currentMode==='slide'&&!currentDeck) ctx.push('No deck loaded yet.');
     if(ctx.length>0) routerMsgs.push({role:'system',content:'[Context: '+ctx.join(' ')+']'});
 
     statusDiv.textContent='Routing...';
@@ -5518,9 +5527,17 @@ async function sendMessage(){
         chatHistory.push({role:'assistant',content:'請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。'});
       }
 
+    }else if(intent==='generate'&&currentMode==='doc'){
+      // ── DOC GENERATE: create doc blocks instead of slides ──
+      await doDocGenerate(statusDiv,text,wsContext);
+
     }else if(intent==='generate'){
       // ── GENERATE: create/modify slides ──
       await doGenerate(statusDiv,wsContext);
+
+    }else if(currentMode==='doc'&&(intent==='content_edit'||intent==='deck_edit')){
+      // ── DOC EDIT: edit doc blocks via AI ──
+      await doDocGenerate(statusDiv,text,wsContext);
 
     }else{
       // ── CHAT: general conversation ──
@@ -5598,6 +5615,82 @@ async function doGenerate(statusDiv,wsContext){
   currentSlide=0;
   addMessage(`✓ Generated ${deck.slides.length} slides (${currentPreset})`,'ai');
   renderApp();
+}
+
+// ── Doc generation (blocks instead of slides) ──
+const DOC_GEN_PROMPT=`You are Sloth Space Doc Mode, an AI document writer. Output ONLY valid JSON — no text, no markdown, no code fences.
+
+OUTPUT FORMAT:
+{
+  "title": "Document Title",
+  "blocks": [
+    {"type":"heading1","text":"Section Title"},
+    {"type":"paragraph","text":"Body text here..."},
+    {"type":"heading2","text":"Sub-heading"},
+    {"type":"paragraph","text":"More content..."},
+    {"type":"quote","text":"Important quote here"},
+    {"type":"list","text":"First bullet point"},
+    {"type":"list","text":"Second bullet point"},
+    {"type":"divider","text":""},
+    {"type":"caption","text":"Figure 1: Description"}
+  ]
+}
+
+BLOCK TYPES: heading1, heading2, heading3, paragraph, quote, code, list, numbered, divider, caption
+- Use heading1 for main title and major sections
+- Use heading2/heading3 for subsections
+- Each paragraph should be one focused idea (not too long)
+- Use list/numbered for enumerations
+- Use quote for key insights or important statements
+- Use divider to separate major sections
+- Write in the user's language
+- For academic/scientific content, use proper structure with introduction, methods, results, discussion
+- Make content detailed and substantive, not placeholder text`;
+
+async function doDocGenerate(statusDiv,userText,wsContext){
+  statusDiv.textContent='Writing document...';
+
+  let editContext='';
+  if(currentDoc&&currentDoc.blocks.length>1){
+    // Existing doc — provide current content for editing
+    const currentBlocks=currentDoc.blocks.map(b=>({type:b.type,text:blockPlainText(b)}));
+    editContext=`\n\n## EDITING MODE\nThe user already has this document. Modify it based on their instruction.\nKeep existing content unless told to change it. You may add, remove, or rewrite blocks.\n\n[CURRENT DOC]\n${JSON.stringify({title:currentDoc.title,blocks:currentBlocks})}`;
+  }
+
+  const wsExtra=wsContext||'';
+  const genHistory=chatHistory.slice(-6);
+  const raw=await callLLM(DOC_GEN_PROMPT+editContext+wsExtra,genHistory,{json:true,max_tokens:8192});
+  chatHistory.push({role:'assistant',content:raw});
+
+  let docData;
+  try{
+    docData=JSON.parse(raw);
+  }catch(e){
+    const extracted=extractJSON(raw);
+    if(extracted) docData=extracted;
+    else throw new Error('AI returned invalid JSON for doc generation');
+  }
+
+  if(!docData.blocks||!Array.isArray(docData.blocks)){
+    throw new Error('AI response missing blocks array');
+  }
+
+  // Convert to proper block schema
+  const newBlocks=docData.blocks.map(b=>
+    createBlock(b.type||'paragraph', b.text||'', b.meta||{})
+  );
+
+  if(!currentDoc){
+    currentDoc=docCreateNew(docData.title||userText||'Untitled');
+  }
+  if(docData.title) currentDoc.title=docData.title;
+  currentDoc.blocks=newBlocks;
+  currentDoc.updated=new Date().toISOString();
+
+  statusDiv.remove();
+  addMessage(`✓ Generated document "${currentDoc.title}" (${newBlocks.length} blocks)`,'ai');
+  renderDocMode();
+  docAutoSave();
 }
 
 // ═══════════════════════════════════════════
