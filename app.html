@@ -3599,49 +3599,96 @@ function showWelcomeFromPicker(){
 
 let currentMode='slide'; // 'slide' | 'doc' | 'sheet'
 
-function pickMode(mode){
-  if(mode==='sheet') return; // not yet implemented
-  // Save current doc before switching away
+// ── Unified mode lifecycle helpers ──
+function modeSaveCurrent(){
+  // Flush-save whatever mode we're leaving
   if(currentMode==='doc'&&currentDoc) docSaveNow();
-  if(mode==='workspace'){ enterWorkspaceMode(); return; }
+  // (slide auto-saves via autoSave() on every renderApp)
+}
+
+function modeShowUI(mode){
+  // Single source of truth for showing/hiding mode-specific panels
+  const slideCanvas=document.getElementById('slideCanvas');
+  const slideBar=document.querySelector('.slide-bar');
+  const nameBar=document.getElementById('modeNameBar');
+  const docCanvas=document.getElementById('docCanvas');
+  const wsCanvas=document.getElementById('workspaceCanvas');
+
+  // Hide everything first
+  if(slideCanvas) slideCanvas.style.display='none';
+  if(slideBar) slideBar.style.display='none';
+  if(docCanvas) docCanvas.style.display='none';
+  if(wsCanvas) wsCanvas.style.display='none';
+
+  // Name bar always visible
+  if(nameBar) nameBar.style.display='';
+
+  // Show mode-specific panels
+  if(mode==='slide'){
+    if(slideCanvas) slideCanvas.style.display='';
+    if(slideBar) slideBar.style.display='';
+  } else if(mode==='doc'){
+    let dc=docCanvas;
+    if(!dc){
+      dc=document.createElement('div');
+      dc.id='docCanvas';
+      dc.className='doc-canvas';
+      document.querySelector('.slide-panel').appendChild(dc);
+    }
+    dc.style.display='';
+  } else if(mode==='workspace'){
+    let wc=wsCanvas;
+    if(!wc){
+      wc=document.createElement('div');
+      wc.id='workspaceCanvas';
+      wc.className='workspace-canvas';
+      document.getElementById('slideCanvas').parentElement.insertBefore(wc,document.getElementById('slideCanvas'));
+    }
+    wc.style.display='';
+  }
+}
+
+function modeEnter(mode){
+  // Universal mode entry — call this for all mode switches
+  modeSaveCurrent();
   currentMode=mode;
   document.getElementById('modePickerOverlay').classList.add('hidden');
   sessionStorage.setItem('sloth_active','1');
   sessionStorage.setItem('sloth_mode',mode);
   updateModeBadge(mode);
+  modeShowUI(mode);
+  updateToolbarForMode(mode);
+  // Mode-specific initialization
   if(mode==='slide'){
-    enterSlideMode();
+    updateModeNameBar('slide');
+    renderApp();
   } else if(mode==='doc'){
-    enterDocMode();
+    // Restore doc: memory → localStorage → workspace → new
+    if(!currentDoc){
+      try{
+        const saved=localStorage.getItem('sloth_current_doc');
+        if(saved){
+          const parsed=JSON.parse(saved);
+          if(parsed&&parsed.blocks&&parsed.blocks.length) currentDoc=parsed;
+        }
+      }catch(e){}
+      if(!currentDoc) currentDoc=docCreateNew('Untitled Document');
+    }
+    updateModeNameBar('doc');
+    renderDocMode();
+  } else if(mode==='workspace'){
+    updateModeNameBar('workspace');
+    renderWorkspaceMode();
   }
 }
 
+function pickMode(mode){
+  if(mode==='sheet') return; // not yet implemented
+  modeEnter(mode);
+}
+
 function enterWorkspaceMode(){
-  currentMode='workspace';
-  document.getElementById('modePickerOverlay').classList.add('hidden');
-  sessionStorage.setItem('sloth_active','1');
-  sessionStorage.setItem('sloth_mode','workspace');
-  updateModeBadge('workspace');
-  // Hide slide & doc chrome, keep name bar
-  document.getElementById('slideCanvas').style.display='none';
-  const nameBar=document.getElementById('modeNameBar');
-  if(nameBar) nameBar.style.display='';
-  const slideBar=document.querySelector('.slide-bar');
-  if(slideBar) slideBar.style.display='none';
-  const docCanvas=document.getElementById('docCanvas');
-  if(docCanvas) docCanvas.style.display='none';
-  // Show workspace canvas
-  let wsCanvas=document.getElementById('workspaceCanvas');
-  if(!wsCanvas){
-    wsCanvas=document.createElement('div');
-    wsCanvas.id='workspaceCanvas';
-    wsCanvas.className='workspace-canvas';
-    document.getElementById('slideCanvas').parentElement.insertBefore(wsCanvas,document.getElementById('slideCanvas'));
-  }
-  wsCanvas.style.display='';
-  updateToolbarForMode('workspace');
-  updateModeNameBar('workspace');
-  renderWorkspaceMode();
+  modeEnter('workspace');
 }
 
 let wsSelectedIds=new Set(); // multi-select state
@@ -3793,34 +3840,47 @@ function wsBatchDuplicate(){
   addMessage(`✓ Duplicated ${count} file${count>1?'s':''}`,'system');
 }
 
+// ── Workspace item loaders — dispatch table for loading items by type ──
+const wsItemLoaders={
+  doc(item){
+    currentDoc=null; // clear stale data
+    const loaded=docLoadFromWorkspace(item.id);
+    if(!loaded){ addMessage('Could not load document.','system'); return false; }
+    return true;
+  },
+  slides(item){
+    // TODO: load slide deck from workspace item
+    // slideLoadFromWorkspace(item);
+    return true;
+  },
+  sheet(item){
+    // TODO: load sheet from workspace item
+    return true;
+  }
+};
+
 function openWorkspaceItem(index){
   const files=wsLoad();
   if(!files[index]) return;
   const item=files[index];
   const mode=item.type||'slide';
-  // Load the item data
-  if(mode==='doc'){
-    // Save current doc first if in doc mode
-    if(currentMode==='doc'&&currentDoc) docSaveNow();
-    // Clear current doc so enterDocMode won't reuse stale data
-    currentDoc=null;
-    const loaded=docLoadFromWorkspace(item.id);
-    if(!loaded){
-      addMessage('Could not load document.','system');
-      return;
-    }
-    // If already in doc mode, just re-render; otherwise switch
-    if(currentMode==='doc'){
-      updateModeNameBar('doc');
-      renderDocMode();
-    } else {
-      pickMode('doc');
-    }
-  } else if(mode==='slide'){
-    // TODO: load slide deck data
-    pickMode(mode);
+  const targetMode=(mode==='slides')?'slide':mode; // normalize 'slides' → 'slide'
+
+  // Save current state before loading new item
+  modeSaveCurrent();
+
+  // Load item data via dispatch table
+  const loader=wsItemLoaders[mode]||wsItemLoaders[targetMode];
+  if(loader&&!loader(item)) return; // loader returned false = load failed
+
+  // Enter or refresh the target mode
+  if(currentMode===targetMode){
+    // Already in the right mode — just refresh UI
+    updateModeNameBar(targetMode);
+    if(targetMode==='doc') renderDocMode();
+    else if(targetMode==='slide') renderApp();
   } else {
-    pickMode(mode);
+    modeEnter(targetMode);
   }
 }
 
@@ -3867,17 +3927,7 @@ function switchToMode(mode){
   document.getElementById('modeSwitchMenu').style.display='none';
   if(mode===currentMode) return;
   if(mode==='sheet'){ addMessage('Sheet mode coming soon!','system'); return; }
-  // Save current mode's state before switching
-  if(currentMode==='doc'&&currentDoc){
-    docSaveNow(); // flush save immediately
-  }
-  // Switch directly without going through mode picker
-  sessionStorage.setItem('sloth_mode',mode);
-  updateModeBadge(mode);
-  updateToolbarForMode(mode);
-  if(mode==='slide') enterSlideMode();
-  else if(mode==='doc') enterDocMode();
-  else if(mode==='workspace') enterWorkspaceMode();
+  modeEnter(mode);
 }
 
 // ── Universal name bar — adapts per mode ──
@@ -4461,60 +4511,11 @@ document.addEventListener('contextmenu',function(e){
 });
 
 function enterSlideMode(){
-  // Show all slide-specific chrome
-  document.getElementById('slideCanvas').style.display='';
-  const nameBar=document.getElementById('modeNameBar');
-  if(nameBar) nameBar.style.display='';
-  const slideBar=document.querySelector('.slide-bar');
-  if(slideBar) slideBar.style.display='';
-  // Hide doc & workspace
-  const docCanvas=document.getElementById('docCanvas');
-  if(docCanvas) docCanvas.style.display='none';
-  const wsCanvas=document.getElementById('workspaceCanvas');
-  if(wsCanvas) wsCanvas.style.display='none';
-  currentMode='slide';
-  updateToolbarForMode('slide');
-  updateModeNameBar('slide');
-  renderApp();
+  modeEnter('slide');
 }
 
 function enterDocMode(){
-  // Hide slide canvas & slide bar, keep name bar visible
-  document.getElementById('slideCanvas').style.display='none';
-  const nameBar=document.getElementById('modeNameBar');
-  if(nameBar) nameBar.style.display='';
-  const slideBar=document.querySelector('.slide-bar');
-  if(slideBar) slideBar.style.display='none';
-  const wsCanvas=document.getElementById('workspaceCanvas');
-  if(wsCanvas) wsCanvas.style.display='none';
-  // Show doc canvas
-  let docCanvas=document.getElementById('docCanvas');
-  if(!docCanvas){
-    docCanvas=document.createElement('div');
-    docCanvas.id='docCanvas';
-    docCanvas.className='doc-canvas';
-    document.querySelector('.slide-panel').appendChild(docCanvas);
-  }
-  docCanvas.style.display='';
-  currentMode='doc';
-  updateToolbarForMode('doc');
-  // Restore doc: memory → localStorage → workspace → new
-  if(!currentDoc){
-    try{
-      const saved=localStorage.getItem('sloth_current_doc');
-      if(saved){
-        const parsed=JSON.parse(saved);
-        if(parsed&&parsed.blocks&&parsed.blocks.length){
-          currentDoc=parsed;
-        }
-      }
-    }catch(e){}
-    if(!currentDoc){
-      currentDoc=docCreateNew('Untitled Document');
-    }
-  }
-  updateModeNameBar('doc');
-  renderDocMode();
+  modeEnter('doc');
 }
 
 // ═══════════════════════════════════════════
