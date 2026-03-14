@@ -184,9 +184,15 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .drop-overlay-inner .drop-hint { font-size:11px; color:var(--text2); font-family:Arial; margin-top:6px; }
 
 /* Region selection */
-.region-box { cursor:pointer; transition:outline 0.15s,box-shadow 0.15s; }
+.region-box { cursor:pointer; transition:outline 0.15s,box-shadow 0.15s; user-select:text; -webkit-user-select:text; }
 .region-box:hover { outline:2px dashed rgba(255,255,255,0.25); outline-offset:2px; }
-.region-box.selected { outline:2px solid #5B9BD5; outline-offset:2px; box-shadow:0 0 8px rgba(91,155,213,0.4); cursor:move; }
+.region-box.selected { outline:2px solid #5B9BD5; outline-offset:2px; box-shadow:0 0 8px rgba(91,155,213,0.4); }
+.region-box.selected.fc-move-mode { cursor:move; }
+/* Inline text editing */
+.region-box.inline-editing { outline:2px solid #4CAF50!important; outline-offset:2px!important; box-shadow:0 0 10px rgba(76,175,80,0.3)!important; cursor:text!important; }
+.region-box.inline-editing [contenteditable=true] { outline:none; cursor:text; caret-color:#4CAF50; min-height:1em; }
+.region-box.inline-editing [contenteditable=true]:focus { background:rgba(76,175,80,0.05); border-radius:2px; }
+.region-box.inline-editing td[contenteditable=true]:focus, .region-box.inline-editing th[contenteditable=true]:focus { background:rgba(76,175,80,0.12)!important; }
 /* Free-form Canvas resize handles */
 .fc-handle { position:absolute; width:10px; height:10px; background:#5B9BD5; border:1.5px solid #fff; border-radius:2px; z-index:10; pointer-events:auto; }
 .fc-handle-se { bottom:-5px; right:-5px; cursor:se-resize; }
@@ -194,6 +200,12 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .fc-handle-ne { top:-5px; right:-5px; cursor:ne-resize; }
 .fc-handle-nw { top:-5px; left:-5px; cursor:nw-resize; }
 .fc-dragging * { user-select:none!important; -webkit-user-select:none!important; }
+.fc-move-mode { outline:2px dashed #FFB84D!important; outline-offset:3px!important; box-shadow:0 0 12px rgba(255,184,77,0.5)!important; cursor:move!important; animation:fc-move-pulse 1s ease-in-out infinite; }
+@keyframes fc-move-pulse { 0%,100%{outline-color:#FFB84D;} 50%{outline-color:#FF8C00;} }
+/* Text selection tooltip */
+.text-sel-tooltip { position:fixed; z-index:250; background:#1a1a1a; border:1px solid #444; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.5); display:flex; gap:2px; padding:3px; animation:ctx-fade-in 0.12s ease; }
+.text-sel-tooltip button { background:transparent; border:none; color:#ccc; font-size:11px; padding:5px 10px; border-radius:6px; cursor:pointer; white-space:nowrap; }
+.text-sel-tooltip button:hover { background:#333; color:#fff; }
 .selection-bar { display:flex; align-items:center; gap:8px; padding:2px 10px; font-size:10px; color:#666; font-family:Arial; }
 .selection-tag { background:#1a1a2e; color:#5B9BD5; border:1px solid #2a3a5e; padding:1px 8px; border-radius:3px; font-size:10px; font-weight:600; }
 .selection-clear { background:transparent; border:none; color:#555; cursor:pointer; font-size:10px; padding:1px 4px; }
@@ -634,6 +646,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   /* --- Contextual AI menu: bottom sheet on mobile --- */
   .ctx-ai-menu { position:fixed !important; left:0 !important; right:0 !important; bottom:0 !important; top:auto !important; max-width:100% !important; width:100% !important; border-radius:14px 14px 0 0 !important; max-height:60vh; overflow-y:auto; animation:ctx-slide-up 0.2s ease !important; }
   @keyframes ctx-slide-up { from{transform:translateY(100%);} to{transform:translateY(0);} }
+  .text-sel-tooltip button { font-size:13px; padding:8px 14px; }
 }
 
 /* Very small phones */
@@ -1121,6 +1134,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 <!-- Contextual AI Menu (positioned dynamically near selected region) -->
 <div class="ctx-ai-menu" id="ctxAiMenu" style="display:none;"></div>
+<div class="text-sel-tooltip" id="textSelTooltip" style="display:none;">
+  <button onclick="copySelectionToChat()">✦ Ask AI about this</button>
+  <button onclick="copySelectionToClipboard()">📋 Copy</button>
+</div>
 
 <script>
 // ═══════════════════════════════════════════
@@ -1389,11 +1406,35 @@ function updateUndoRedoUI(){
 }
 // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
 document.addEventListener('keydown',function(e){
+  if(isInlineEditing())return; // let browser handle undo/redo in contenteditable
   if((e.ctrlKey||e.metaKey)&&!e.altKey){
     if(e.key==='z'&&!e.shiftKey){ e.preventDefault(); undo(); return; }
     if((e.key==='z'&&e.shiftKey)||e.key==='y'){ e.preventDefault(); redo(); return; }
   }
 });
+
+function handleRegionClick(slideIdx,regionId,role,label,event){
+  // If inline editing is active, don't interfere
+  if(isInlineEditing())return;
+  // If user selected text, don't trigger region selection — let them copy
+  const sel=window.getSelection();
+  if(sel&&sel.toString().trim().length>0){
+    // Text was highlighted — don't interfere
+    return;
+  }
+  // If in move mode and we already have this region selected, ignore (drag handles it)
+  if(fcMoveMode&&selectedRegion&&selectedRegion.regionId===regionId){
+    return;
+  }
+  selectRegion(slideIdx,regionId,role,label,event);
+}
+
+function handleRegionDblClick(slideIdx,regionId,role){
+  // Double-click → enter inline editing mode
+  if(isInlineEditing()&&inlineEdit.regionId===regionId)return; // already editing
+  if(role==='image')return; // can't inline-edit images
+  enterInlineEdit(slideIdx,regionId);
+}
 
 function selectRegion(slideIdx,regionId,role,label,clickEvent){
   selectedRegion={slideIdx,regionId,role,label};
@@ -1406,9 +1447,11 @@ function selectRegion(slideIdx,regionId,role,label,clickEvent){
   if(clickEvent&&!fcDrag&&!fcJustDragged) showCtxAiMenu(slideIdx,regionId,role,label,clickEvent);
 }
 function clearSelection(){
+  if(isInlineEditing()) commitInlineEdit();
   selectedRegion=null;
   document.getElementById('selectionBar').style.display='none';
   hideCtxAiMenu();
+  exitMoveMode();
   updateFontSizeIndicator();
   renderApp();
 }
@@ -1455,6 +1498,8 @@ function initFreeformCanvas(){
 
   canvas.addEventListener('mousedown',function(e){
     if(!currentDeck||!selectedRegion)return;
+    // Don't start drag while inline editing
+    if(isInlineEditing())return;
     const handle=e.target.closest('.fc-handle');
     const regionEl=e.target.closest('.region-box.selected');
     if(!handle&&!regionEl)return;
@@ -1517,6 +1562,7 @@ function initFreeformCanvas(){
   // Touch support for mobile
   canvas.addEventListener('touchstart',function(e){
     if(!currentDeck||!selectedRegion)return;
+    if(isInlineEditing())return;
     const t=e.touches[0];
     const handle=t.target.closest?.('.fc-handle')||document.elementFromPoint(t.clientX,t.clientY)?.closest('.fc-handle');
     const regionEl=document.elementFromPoint(t.clientX,t.clientY)?.closest('.region-box.selected');
@@ -1570,6 +1616,97 @@ function initFreeformCanvas(){
     fcDrag=null;
   });
 }
+
+let fcMoveMode=false; // visual move mode indicator
+
+function enterMoveMode(){
+  fcMoveMode=true;
+  // Add visual indicator to the selected region
+  const selEl=document.querySelector('.region-box.selected');
+  if(selEl){
+    selEl.classList.add('fc-move-mode');
+  }
+  addMessage('✥ Move mode: drag the selected region to reposition it. Click elsewhere to exit.','system');
+}
+
+function exitMoveMode(){
+  fcMoveMode=false;
+  document.querySelectorAll('.fc-move-mode').forEach(el=>el.classList.remove('fc-move-mode'));
+}
+
+// ═══════════════════════════════════════════
+// TEXT SELECTION TOOLTIP — Quick actions on highlighted text
+// ═══════════════════════════════════════════
+let textSelTimeout=null;
+
+function showTextSelTooltip(){
+  const sel=window.getSelection();
+  if(!sel||sel.isCollapsed||!sel.toString().trim())return hideTextSelTooltip();
+  // Check if selection is inside a region-box
+  const anchor=sel.anchorNode;
+  const regionEl=anchor?.parentElement?.closest?.('.region-box')||anchor?.closest?.('.region-box');
+  if(!regionEl)return hideTextSelTooltip();
+
+  const tooltip=document.getElementById('textSelTooltip');
+  const range=sel.getRangeAt(0);
+  const rect=range.getBoundingClientRect();
+  tooltip.style.display='flex';
+  let x=rect.left+rect.width/2-tooltip.offsetWidth/2;
+  let y=rect.top-tooltip.offsetHeight-6;
+  // Keep within viewport
+  if(x<8)x=8;
+  if(x+tooltip.offsetWidth>window.innerWidth-8)x=window.innerWidth-tooltip.offsetWidth-8;
+  if(y<8){ y=rect.bottom+6; } // flip below if no room above
+  tooltip.style.left=x+'px';
+  tooltip.style.top=y+'px';
+}
+
+function hideTextSelTooltip(){
+  const tooltip=document.getElementById('textSelTooltip');
+  if(tooltip) tooltip.style.display='none';
+}
+
+function copySelectionToChat(){
+  const sel=window.getSelection();
+  const text=sel?.toString()?.trim();
+  if(!text)return;
+  hideTextSelTooltip();
+  const input=document.getElementById('chatInput');
+  // Pre-fill with the selected text in quotes and place cursor for instruction
+  input.value=`"${text}" ← `;
+  input.focus();
+  // Place cursor at end
+  input.selectionStart=input.selectionEnd=input.value.length;
+  // Clear the text selection
+  sel.removeAllRanges();
+}
+
+function copySelectionToClipboard(){
+  const sel=window.getSelection();
+  const text=sel?.toString()?.trim();
+  if(!text)return;
+  navigator.clipboard.writeText(text).then(()=>{
+    hideTextSelTooltip();
+    addMessage(`📋 Copied: "${text.slice(0,50)}${text.length>50?'...':''}"`, 'system');
+  }).catch(()=>{
+    // Fallback
+    hideTextSelTooltip();
+  });
+  sel.removeAllRanges();
+}
+
+// Listen for text selection changes
+document.addEventListener('selectionchange',function(){
+  clearTimeout(textSelTimeout);
+  textSelTimeout=setTimeout(showTextSelTooltip,300);
+});
+
+// Hide tooltip on scroll or click outside
+document.addEventListener('mousedown',function(e){
+  if(e.target.closest('.text-sel-tooltip'))return;
+  // Small delay so selectionchange fires first
+  setTimeout(hideTextSelTooltip,50);
+});
 
 // ═══════════════════════════════════════════
 // CONTEXTUAL AI MENU — Smart actions on region click
@@ -1639,6 +1776,12 @@ function generateCtxSuggestions(role,regionId,content){
   if(isList){
     suggestions.push({icon:'✨',text:'Make each point stronger',hint:'More specific, data-driven',action:`Rewrite each bullet point in the ${regionId} to be more specific and data-driven`});
   }
+
+  // ── Direct edit & move ──
+  if(!isImage){
+    suggestions.push({icon:'✏️',text:'Edit text directly',hint:'Double-click or tap here',action:`__edit__${regionId}`});
+  }
+  suggestions.push({icon:'✥',text:'Move this region',hint:'Drag to reposition',action:`__move__${regionId}`});
 
   // ── Layout change suggestions ──
   suggestions.push({icon:'🔀',text:'Change this slide\'s layout',hint:'Try a different arrangement',action:`Suggest a better layout for this slide and change it`});
@@ -1738,6 +1881,15 @@ function execCtxAction(action){
   if(action.startsWith('__reset_bounds__')){
     const regionId=action.replace('__reset_bounds__','');
     resetRegionBounds(currentSlide,regionId);
+    return;
+  }
+  if(action.startsWith('__move__')){
+    enterMoveMode();
+    return;
+  }
+  if(action.startsWith('__edit__')){
+    const regionId=action.replace('__edit__','');
+    if(selectedRegion) enterInlineEdit(selectedRegion.slideIdx,regionId);
     return;
   }
   // Normal AI actions: inject into chat input and send
@@ -1900,7 +2052,7 @@ function renderSlide(slide,idx,p,total){
     const isSel=selectedRegion&&selectedRegion.slideIdx===idx&&selectedRegion.regionId===r.id;
     const selClass=isSel?'region-box selected':'region-box';
     const roleLabel=r.role.charAt(0).toUpperCase()+r.role.slice(1);
-    html+=`<div class="${selClass}" data-region="${r.id}" data-slide="${idx}" onclick="event.stopPropagation();selectRegion(${idx},'${r.id}','${r.role}','${roleLabel}',event)" style="position:absolute;left:${ax}px;top:${ay}px;width:${bw}px;height:${bh}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
+    html+=`<div class="${selClass}" data-region="${r.id}" data-slide="${idx}" onmouseup="event.stopPropagation();handleRegionClick(${idx},'${r.id}','${r.role}','${roleLabel}',event)" ondblclick="event.stopPropagation();handleRegionDblClick(${idx},'${r.id}','${r.role}')" style="position:absolute;left:${ax}px;top:${ay}px;width:${bw}px;height:${bh}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
     html+=rc(c,r.role,p,r,regionColor,regionFontSize);
     // Resize handles on selected region
     if(isSel){
@@ -1968,7 +2120,161 @@ function renderChatOnboarding(){
   msgs.appendChild(div);
 }
 
+// ═══════════════════════════════════════════
+// INLINE TEXT EDITING — Edit region text directly on the slide
+// ═══════════════════════════════════════════
+let inlineEdit=null; // {slideIdx, regionId, active:true}
+
+function enterInlineEdit(slideIdx,regionId){
+  if(inlineEdit?.active) commitInlineEdit(); // commit previous edit first
+  const slide=currentDeck?.slides[slideIdx];
+  if(!slide)return;
+  const content=slide.content[regionId];
+  // Only support inline edit for string, list, and table content
+  if(!content)return;
+
+  inlineEdit={slideIdx,regionId,active:true};
+  pushUndo();
+  hideCtxAiMenu();
+
+  // Find the region element and make it editable
+  const regionEl=document.querySelector(`.region-box[data-region="${regionId}"][data-slide="${slideIdx}"]`);
+  if(!regionEl)return;
+
+  // Add editing class for visual feedback
+  regionEl.classList.add('inline-editing');
+
+  if(typeof content==='string'){
+    // Simple text: make the inner div contenteditable
+    const textDiv=regionEl.querySelector('div');
+    if(!textDiv)return;
+    textDiv.contentEditable='true';
+    textDiv.focus();
+    // Place cursor at end
+    const range=document.createRange();
+    const sel=window.getSelection();
+    range.selectNodeContents(textDiv);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    // Listen for blur and keydown
+    textDiv.addEventListener('blur',onInlineEditBlur);
+    textDiv.addEventListener('keydown',onInlineEditKeydown);
+  }else if(typeof content==='object'&&content.type==='list'){
+    // List: make each bullet item editable via a simple editable div
+    const itemDivs=regionEl.querySelectorAll('div[style*="display:flex"] > span:last-child');
+    itemDivs.forEach(span=>{
+      span.contentEditable='true';
+      span.addEventListener('blur',onInlineEditBlur);
+      span.addEventListener('keydown',onInlineEditKeydown);
+    });
+    if(itemDivs.length>0) itemDivs[0].focus();
+  }else if(typeof content==='object'&&content.type==='table'){
+    // Table: make cells editable
+    const cells=regionEl.querySelectorAll('td, th');
+    cells.forEach(cell=>{
+      cell.contentEditable='true';
+      cell.style.cursor='text';
+      cell.addEventListener('blur',onInlineEditBlur);
+      cell.addEventListener('keydown',onInlineEditKeydown);
+    });
+    if(cells.length>0) cells[0].focus();
+  }
+}
+
+function onInlineEditBlur(e){
+  // Small delay to check if focus moved to another editable element in the same region
+  setTimeout(()=>{
+    if(!inlineEdit?.active)return;
+    const regionEl=document.querySelector(`.region-box[data-region="${inlineEdit.regionId}"][data-slide="${inlineEdit.slideIdx}"]`);
+    if(regionEl&&regionEl.contains(document.activeElement))return; // still editing within the region
+    commitInlineEdit();
+  },150);
+}
+
+function onInlineEditKeydown(e){
+  if(e.key==='Escape'){
+    e.preventDefault();
+    commitInlineEdit();
+    return;
+  }
+  // Allow all normal text editing keys (arrows, backspace, delete, typing, etc.)
+  // Stop propagation so slide keyboard shortcuts (arrow keys for navigation) don't interfere
+  e.stopPropagation();
+
+  // Tab in tables: move to next cell
+  if(e.key==='Tab'&&inlineEdit?.active){
+    const slide=currentDeck?.slides[inlineEdit.slideIdx];
+    if(slide&&typeof slide.content[inlineEdit.regionId]==='object'&&slide.content[inlineEdit.regionId].type==='table'){
+      e.preventDefault();
+      const cells=document.querySelectorAll(`.region-box[data-region="${inlineEdit.regionId}"] td[contenteditable], .region-box[data-region="${inlineEdit.regionId}"] th[contenteditable]`);
+      const arr=Array.from(cells);
+      const idx=arr.indexOf(e.target);
+      const next=e.shiftKey?arr[idx-1]:arr[idx+1];
+      if(next) next.focus();
+    }
+  }
+}
+
+function commitInlineEdit(){
+  if(!inlineEdit?.active)return;
+  const {slideIdx,regionId}=inlineEdit;
+  const slide=currentDeck?.slides[slideIdx];
+  if(!slide){inlineEdit=null;return;}
+
+  const regionEl=document.querySelector(`.region-box[data-region="${regionId}"][data-slide="${slideIdx}"]`);
+  const content=slide.content[regionId];
+
+  if(regionEl&&typeof content==='string'){
+    const textDiv=regionEl.querySelector('div[contenteditable]');
+    if(textDiv){
+      // Get the text content (strip HTML from any paste)
+      slide.content[regionId]=textDiv.innerText||textDiv.textContent||'';
+      textDiv.contentEditable='false';
+      textDiv.removeEventListener('blur',onInlineEditBlur);
+      textDiv.removeEventListener('keydown',onInlineEditKeydown);
+    }
+  }else if(regionEl&&typeof content==='object'&&content.type==='list'){
+    const itemSpans=regionEl.querySelectorAll('span[contenteditable]');
+    const newItems=Array.from(itemSpans).map(s=>s.innerText||s.textContent||'').filter(t=>t.trim());
+    slide.content[regionId]={...content,items:newItems};
+    itemSpans.forEach(span=>{
+      span.contentEditable='false';
+      span.removeEventListener('blur',onInlineEditBlur);
+      span.removeEventListener('keydown',onInlineEditKeydown);
+    });
+  }else if(regionEl&&typeof content==='object'&&content.type==='table'){
+    const headerCells=regionEl.querySelectorAll('th[contenteditable]');
+    const dataCells=regionEl.querySelectorAll('td[contenteditable]');
+    const newHeaders=Array.from(headerCells).map(c=>c.innerText||c.textContent||'');
+    const colCount=newHeaders.length||content.headers.length;
+    const allData=Array.from(dataCells).map(c=>c.innerText||c.textContent||'');
+    const newRows=[];
+    for(let i=0;i<allData.length;i+=colCount){
+      newRows.push(allData.slice(i,i+colCount));
+    }
+    slide.content[regionId]={...content,headers:newHeaders.length?newHeaders:content.headers,rows:newRows};
+    [...headerCells,...dataCells].forEach(cell=>{
+      cell.contentEditable='false';
+      cell.removeEventListener('blur',onInlineEditBlur);
+      cell.removeEventListener('keydown',onInlineEditKeydown);
+    });
+  }
+
+  if(regionEl) regionEl.classList.remove('inline-editing');
+  inlineEdit=null;
+  autoSave();
+  renderApp();
+}
+
+function isInlineEditing(){
+  return !!(inlineEdit?.active);
+}
+
 function renderApp(){
+  // Skip re-render while user is inline-editing text (would destroy cursor + edit state)
+  if(isInlineEditing())return;
+
   // Auto-save on every render (deck changes trigger render)
   autoSave();
 
@@ -4906,6 +5212,7 @@ chatInput.addEventListener('keydown',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(document.activeElement===chatInput)return;
+  if(isInlineEditing())return; // don't hijack arrow keys during inline edit
   if(e.key==='ArrowRight'&&currentDeck){goSlide(Math.min(currentSlide+1,currentDeck.slides.length-1));e.preventDefault();}
   if(e.key==='ArrowLeft'&&currentDeck){goSlide(Math.max(currentSlide-1,0));e.preventDefault();}
 });
