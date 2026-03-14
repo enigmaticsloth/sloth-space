@@ -1516,39 +1516,15 @@ function initFreeformCanvas(){
     return {slideEl,scale,rect:slideEl.getBoundingClientRect()};
   }
 
-  // ── Helper: place region centered at a screen coordinate ──
-  function placeRegionAt(clientX,clientY){
-    const info=getSlideInfo();
-    if(!info)return;
-    const slideIdx=selectedRegion.slideIdx;
-    const regionId=selectedRegion.regionId;
-    const origBounds=getRegionBounds(slideIdx,regionId);
-    if(!origBounds)return;
-    const p=PRESETS[currentPreset];
-    const mx=p.spacing.margin.left, my=p.spacing.margin.top;
-    const newX=(clientX-info.rect.left)/info.scale-mx-origBounds.w/2;
-    const newY=(clientY-info.rect.top)/info.scale-my-origBounds.h/2;
-    pushUndo();
-    setRegionBounds(slideIdx,regionId,{x:Math.round(newX),y:Math.round(newY),w:origBounds.w,h:origBounds.h});
-    exitMoveMode();
-    addMessage('✓ Region placed.','system');
-    autoSave();
-    renderApp();
-  }
-
-  // ── Helper: is point inside the slide area? ──
-  function isInsideSlide(clientX,clientY){
-    const info=getSlideInfo();
-    if(!info)return false;
-    const r=info.rect;
-    return clientX>=r.left&&clientX<=r.right&&clientY>=r.top&&clientY<=r.bottom;
-  }
 
   // ── MOUSE ──
   canvas.addEventListener('mousedown',function(e){
     if(!currentDeck||!selectedRegion||isInlineEditing())return;
+    // Move mode is handled by global fcMovePlaceClick — skip canvas handler
+    if(fcMoveMode)return;
+
     const handle=e.target.closest('.fc-handle');
-    const onSelectedRegion=!!e.target.closest('.region-box.selected');
+    if(!handle)return; // only resize handles use canvas mousedown now
 
     const info=getSlideInfo();
     if(!info)return;
@@ -1557,49 +1533,26 @@ function initFreeformCanvas(){
     const origBounds=getRegionBounds(slideIdx,regionId);
     if(!origBounds)return;
 
-    // Move mode
-    if(fcMoveMode&&!handle){
-      if(onSelectedRegion){
-        // Drag-to-move: grab the region and follow the mouse
-        e.preventDefault();e.stopPropagation();
-        document.body.classList.add('fc-dragging');
-        fcDrag={type:'move',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,scale:info.scale};
-      }else if(isInsideSlide(e.clientX,e.clientY)){
-        // Click empty slide area: instant place
-        e.preventDefault();e.stopPropagation();
-        placeRegionAt(e.clientX,e.clientY);
-      }
-      return;
-    }
-
     // Resize handle drag (always available on selected regions)
-    if(handle){
-      e.preventDefault();e.stopPropagation();
-      document.body.classList.add('fc-dragging');
-      fcDrag={type:'resize',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,dir:handle.dataset.dir,scale:info.scale};
-    }
+    e.preventDefault();e.stopPropagation();
+    document.body.classList.add('fc-dragging');
+    fcDrag={type:'resize',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,dir:handle.dataset.dir,scale:info.scale};
   });
 
   document.addEventListener('mousemove',function(e){
-    if(!fcDrag)return;
+    if(!fcDrag||fcDrag.type!=='resize')return;
     e.preventDefault();
     const dx=(e.clientX-fcDrag.startX)/fcDrag.scale;
     const dy=(e.clientY-fcDrag.startY)/fcDrag.scale;
     const ob=fcDrag.origBounds;
-
-    if(fcDrag.type==='move'){
-      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:ob.x+dx,y:ob.y+dy,w:ob.w,h:ob.h});
-      renderApp();
-    }else if(fcDrag.type==='resize'){
-      let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
-      const d=fcDrag.dir;
-      if(d.includes('e'))nw=Math.max(60,ob.w+dx);
-      if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
-      if(d.includes('s'))nh=Math.max(30,ob.h+dy);
-      if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
-      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
-      renderApp();
-    }
+    let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
+    const d=fcDrag.dir;
+    if(d.includes('e'))nw=Math.max(60,ob.w+dx);
+    if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
+    if(d.includes('s'))nh=Math.max(30,ob.h+dy);
+    if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
+    setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
+    renderApp();
   });
 
   document.addEventListener('mouseup',function(e){
@@ -1609,23 +1562,20 @@ function initFreeformCanvas(){
       pushUndo(); autoSave();
       fcJustDragged=true; setTimeout(()=>{fcJustDragged=false;},100);
     }
-    const wasMove=fcDrag.type==='move';
     fcDrag=null;
     document.body.classList.remove('fc-dragging');
-    // After a move drag, auto-exit move mode
-    if(wasMove&&moved&&fcMoveMode){
-      exitMoveMode();
-      addMessage('✓ Region placed.','system');
-    }
   });
 
   // ── TOUCH ──
   canvas.addEventListener('touchstart',function(e){
     if(!currentDeck||!selectedRegion||isInlineEditing())return;
+    // Move mode is handled by global fcMovePlaceTouch — skip canvas handler
+    if(fcMoveMode)return;
+
     const t=e.touches[0];
     const el=document.elementFromPoint(t.clientX,t.clientY);
     const handle=el?.closest('.fc-handle');
-    const onSelectedRegion=!!el?.closest('.region-box.selected');
+    if(!handle)return; // only resize handles
 
     const info=getSlideInfo();
     if(!info)return;
@@ -1634,75 +1584,142 @@ function initFreeformCanvas(){
     const origBounds=getRegionBounds(slideIdx,regionId);
     if(!origBounds)return;
 
-    // Move mode
-    if(fcMoveMode&&!handle){
-      if(onSelectedRegion){
-        e.preventDefault();
-        fcDrag={type:'move',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,scale:info.scale};
-      }else if(isInsideSlide(t.clientX,t.clientY)){
-        e.preventDefault();
-        placeRegionAt(t.clientX,t.clientY);
-      }
-      return;
-    }
-
-    // Resize handle drag
-    if(handle){
-      e.preventDefault();
-      fcDrag={type:'resize',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,dir:handle.dataset.dir,scale:info.scale};
-    }
+    e.preventDefault();
+    fcDrag={type:'resize',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,dir:handle.dataset.dir,scale:info.scale};
   },{passive:false});
 
   document.addEventListener('touchmove',function(e){
-    if(!fcDrag)return;
+    if(!fcDrag||fcDrag.type!=='resize')return;
     e.preventDefault();
     const t=e.touches[0];
     const dx=(t.clientX-fcDrag.startX)/fcDrag.scale;
     const dy=(t.clientY-fcDrag.startY)/fcDrag.scale;
     const ob=fcDrag.origBounds;
-
-    if(fcDrag.type==='move'){
-      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:ob.x+dx,y:ob.y+dy,w:ob.w,h:ob.h});
-      renderApp();
-    }else if(fcDrag.type==='resize'){
-      let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
-      const d=fcDrag.dir;
-      if(d.includes('e'))nw=Math.max(60,ob.w+dx);
-      if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
-      if(d.includes('s'))nh=Math.max(30,ob.h+dy);
-      if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
-      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
-      renderApp();
-    }
+    let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
+    const d=fcDrag.dir;
+    if(d.includes('e'))nw=Math.max(60,ob.w+dx);
+    if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
+    if(d.includes('s'))nh=Math.max(30,ob.h+dy);
+    if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
+    setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
+    renderApp();
   },{passive:false});
 
   document.addEventListener('touchend',function(e){
     if(!fcDrag)return;
-    const wasMove=fcDrag.type==='move';
     pushUndo(); autoSave();
     fcDrag=null;
-    if(wasMove&&fcMoveMode){
-      exitMoveMode();
-      addMessage('✓ Region placed.','system');
-    }
   });
 }
 
-let fcMoveMode=false; // visual move mode indicator
-let fcMovePickedUp=false; // true once user starts dragging in move mode
+let fcMoveMode=false;
+let fcMoveOrigin=null; // {slideIdx, regionId, origBounds} saved on enter
 
 function enterMoveMode(){
+  if(!selectedRegion)return;
+  const slideIdx=selectedRegion.slideIdx;
+  const regionId=selectedRegion.regionId;
+  const origBounds=getRegionBounds(slideIdx,regionId);
+  if(!origBounds)return;
   fcMoveMode=true;
-  fcMovePickedUp=false;
+  fcMoveOrigin={slideIdx,regionId,origBounds:{...origBounds}};
   const selEl=document.querySelector('.region-box.selected');
   if(selEl) selEl.classList.add('fc-move-mode');
-  addMessage('✥ Move mode: drag to reposition, or click where you want to place it.','system');
+  // Listen for passive mouse follow
+  document.addEventListener('mousemove',fcMoveFollowMouse);
+  document.addEventListener('touchmove',fcMoveFollowTouch,{passive:false});
+  // Listen for click-to-place (use capture + timeout so current click doesn't fire)
+  setTimeout(()=>{
+    document.addEventListener('mousedown',fcMovePlaceClick,true);
+    document.addEventListener('mouseup',fcMoveSuppressUp,true);
+    document.addEventListener('click',fcMoveSuppressUp,true);
+    document.addEventListener('touchstart',fcMovePlaceTouch,true);
+    document.addEventListener('keydown',fcMoveCancelKey,true);
+  },50);
+  addMessage('✥ Move mode: move cursor to reposition, click to place. Esc to cancel.','system');
 }
 
-function exitMoveMode(){
+function exitMoveMode(cancelled,keepSuppressUp){
+  if(!fcMoveMode)return;
   fcMoveMode=false;
-  fcMovePickedUp=false;
+  document.removeEventListener('mousemove',fcMoveFollowMouse);
+  document.removeEventListener('touchmove',fcMoveFollowTouch);
+  document.removeEventListener('mousedown',fcMovePlaceClick,true);
+  if(!keepSuppressUp){
+    document.removeEventListener('mouseup',fcMoveSuppressUp,true);
+    document.removeEventListener('click',fcMoveSuppressUp,true);
+  }
+  document.removeEventListener('touchstart',fcMovePlaceTouch,true);
+  document.removeEventListener('keydown',fcMoveCancelKey,true);
   document.querySelectorAll('.fc-move-mode').forEach(el=>el.classList.remove('fc-move-mode'));
+  if(cancelled&&fcMoveOrigin){
+    // Restore original position
+    setRegionBounds(fcMoveOrigin.slideIdx,fcMoveOrigin.regionId,fcMoveOrigin.origBounds);
+    renderApp();
+  }
+  fcMoveOrigin=null;
+}
+
+// Passive follow: region tracks mouse cursor (no button held)
+function fcMoveFollowMouse(e){
+  if(!fcMoveMode||!fcMoveOrigin||fcDrag)return;
+  _fcMoveFollow(e.clientX,e.clientY);
+}
+function fcMoveFollowTouch(e){
+  if(!fcMoveMode||!fcMoveOrigin||fcDrag)return;
+  e.preventDefault();
+  const t=e.touches[0];
+  _fcMoveFollow(t.clientX,t.clientY);
+}
+function _fcMoveFollow(clientX,clientY){
+  const canvas=document.getElementById('slideCanvas');
+  if(!canvas)return;
+  const slideEl=canvas.querySelector('[style*="position:relative"]');
+  if(!slideEl)return;
+  const p=PRESETS[currentPreset];
+  const scale=slideEl.offsetWidth/p.slide.width;
+  const rect=slideEl.getBoundingClientRect();
+  const mx=p.spacing.margin.left, my=p.spacing.margin.top;
+  const ob=fcMoveOrigin.origBounds;
+  const newX=(clientX-rect.left)/scale-mx-ob.w/2;
+  const newY=(clientY-rect.top)/scale-my-ob.h/2;
+  setRegionBounds(fcMoveOrigin.slideIdx,fcMoveOrigin.regionId,{x:Math.round(newX),y:Math.round(newY),w:ob.w,h:ob.h});
+  renderApp();
+}
+
+// Click to place
+function fcMovePlaceClick(e){
+  if(!fcMoveMode)return;
+  e.preventDefault();e.stopPropagation();
+  pushUndo();autoSave();
+  addMessage('✓ Region placed.','system');
+  // Don't remove mouseup/click suppress yet — let fcMoveSuppressUp handle the follow-up events
+  const keepSuppressUp=true;
+  exitMoveMode(false,keepSuppressUp);
+  fcJustDragged=true;setTimeout(()=>{fcJustDragged=false;},150);
+}
+function fcMovePlaceTouch(e){
+  if(!fcMoveMode)return;
+  e.preventDefault();e.stopPropagation();
+  pushUndo();autoSave();
+  addMessage('✓ Region placed.','system');
+  exitMoveMode(false);
+  fcJustDragged=true;setTimeout(()=>{fcJustDragged=false;},150);
+}
+// Suppress mouseup/click after placing so region onmouseup doesn't open context menu
+function fcMoveSuppressUp(e){
+  e.preventDefault();e.stopPropagation();
+  // Remove self after one use (placed already, just cleaning up)
+  document.removeEventListener('mouseup',fcMoveSuppressUp,true);
+  document.removeEventListener('click',fcMoveSuppressUp,true);
+}
+function fcMoveCancelKey(e){
+  if(!fcMoveMode)return;
+  if(e.key==='Escape'){
+    e.preventDefault();e.stopPropagation();
+    addMessage('✥ Move cancelled.','system');
+    exitMoveMode(true);
+  }
 }
 
 // ═══════════════════════════════════════════
