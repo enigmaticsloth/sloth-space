@@ -2254,11 +2254,12 @@ function docBlockClickAction(blockId, e){
 
   const bar=document.createElement('div');
   bar.className='doc-block-actions';
+  bar.dataset.blockId=blockId;
   bar.innerHTML=`
-    <button onclick="docCtxAI('rewrite','Rewrite concisely');this.closest('.doc-block-actions').remove()">✨ Rewrite</button>
-    <button onclick="docCtxAI('expand','Expand with more detail');this.closest('.doc-block-actions').remove()">📝 Expand</button>
-    <button onclick="docCtxAI('translate','Translate to English');this.closest('.doc-block-actions').remove()">🌐 Translate</button>
-    <button onclick="docCtxAI('tone','Make more professional');this.closest('.doc-block-actions').remove()">🎯 Tone</button>
+    <button onclick="docCtxAI('rewrite','Rewrite concisely','${blockId}');this.closest('.doc-block-actions').remove()">✨ Rewrite</button>
+    <button onclick="docCtxAI('expand','Expand with more detail','${blockId}');this.closest('.doc-block-actions').remove()">📝 Expand</button>
+    <button onclick="docCtxAI('translate','Translate to English','${blockId}');this.closest('.doc-block-actions').remove()">🌐 Translate</button>
+    <button onclick="docCtxAI('tone','Make more professional','${blockId}');this.closest('.doc-block-actions').remove()">🎯 Tone</button>
     <button onclick="this.closest('.doc-block-actions').remove()">✕</button>
   `;
   blockEl.after(bar);
@@ -2881,9 +2882,12 @@ function renderApp(){
     `<button class="${pr.id===currentPreset?'active':''}" onclick="setPreset('${pr.id}')">${pr.name}</button>`
   ).join('');
 
-  // Hide toolbar when no deck loaded
-  const toolbarEl=document.getElementById('unifiedToolbar');
-  if(toolbarEl) toolbarEl.style.display=currentDeck?'flex':'none';
+  // Toolbar visibility is controlled by updateToolbarForMode(), not here.
+  // Only hide toolbar in slide mode when no deck is loaded.
+  if(currentMode==='slide'){
+    const toolbarEl=document.getElementById('unifiedToolbar');
+    if(toolbarEl) toolbarEl.style.display=currentDeck?'flex':'none';
+  }
 
   // Onboarding: show prompt chips in empty chat
   renderChatOnboarding();
@@ -3796,10 +3800,26 @@ function openWorkspaceItem(index){
   const mode=item.type||'slide';
   // Load the item data
   if(mode==='doc'){
-    docLoadFromWorkspace(item.id);
-    pickMode('doc');
+    // Save current doc first if in doc mode
+    if(currentMode==='doc'&&currentDoc) docSaveNow();
+    // Clear current doc so enterDocMode won't reuse stale data
+    currentDoc=null;
+    const loaded=docLoadFromWorkspace(item.id);
+    if(!loaded){
+      addMessage('Could not load document.','system');
+      return;
+    }
+    // If already in doc mode, just re-render; otherwise switch
+    if(currentMode==='doc'){
+      updateModeNameBar('doc');
+      renderDocMode();
+    } else {
+      pickMode('doc');
+    }
+  } else if(mode==='slide'){
+    // TODO: load slide deck data
+    pickMode(mode);
   } else {
-    // TODO: load slide/sheet data
     pickMode(mode);
   }
 }
@@ -3867,7 +3887,7 @@ function updateModeNameBar(mode){
   if(mode==='slide'){
     nameInput.placeholder='Untitled Presentation';
     nameInput.value=currentDeck?.title||'';
-    nameInput.oninput=function(){ if(currentDeck) currentDeck.title=this.value; };
+    nameInput.oninput=function(){ if(currentDeck){ currentDeck.title=this.value.trim()||'Untitled'; autoSave(); }};
   } else if(mode==='doc'){
     nameInput.placeholder='Untitled Document';
     nameInput.value=currentDoc?.title||'';
@@ -4391,8 +4411,8 @@ function docCtxAction(action){
   docAutoSave();
 }
 
-async function docCtxAI(action, instruction){
-  const bid=docCtxMenuBlockId;
+async function docCtxAI(action, instruction, explicitBlockId){
+  const bid=explicitBlockId||docCtxMenuBlockId;
   docHideContextMenu();
   if(!bid) return;
   const block=docGetBlock(bid);
@@ -5052,10 +5072,15 @@ function docApplyTypeMenuSelection(blockId){
 // ── Drag & drop reorder (with swap animation) ──
 let docDragBlockId=null;
 let docDragLastOver=null; // track last hovered block for animation
+let docDragStartY=null; // for dead zone
+let docDragActivated=false; // drag only activates after dead zone exceeded
+const DOC_DRAG_DEAD_ZONE=18; // px threshold before drag activates
 
 function docDragStart(event, blockId){
   docDragBlockId=blockId;
   docDragLastOver=null;
+  docDragStartY=event.clientY;
+  docDragActivated=false;
   event.dataTransfer.effectAllowed='move';
   event.dataTransfer.setData('text/plain', blockId);
   docPushUndo();
@@ -5069,6 +5094,11 @@ function docDragOver(event){
   event.preventDefault();
   event.dataTransfer.dropEffect='move';
   if(!docDragBlockId) return;
+  // Dead zone: don't activate drag swap until mouse moves enough
+  if(!docDragActivated){
+    if(docDragStartY!==null&&Math.abs(event.clientY-docDragStartY)<DOC_DRAG_DEAD_ZONE) return;
+    docDragActivated=true;
+  }
   const page=document.getElementById('docPage');
   if(!page) return;
   const blocks=[...page.querySelectorAll('.doc-block')];
@@ -5176,12 +5206,14 @@ function docDrop(event){
     }
   }
 
-  // Move block in data
+  // Move block in data — clamp to adjacent swap only (max 1 position move)
   const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
   if(srcIdx===-1){ docDragBlockId=null; return; }
+  let rawInsert=targetIdx===-1?0:(targetIdx>=srcIdx?targetIdx:targetIdx+1);
+  // Clamp: only allow moving 1 position up or down
+  const clampedInsert=Math.max(srcIdx-1, Math.min(srcIdx+1, rawInsert));
   const [moved]=currentDoc.blocks.splice(srcIdx,1);
-  const insertAt=targetIdx===-1?0:(targetIdx>=srcIdx?targetIdx:targetIdx+1);
-  currentDoc.blocks.splice(insertAt,0,moved);
+  currentDoc.blocks.splice(clampedInsert,0,moved);
   currentDoc.updated=new Date().toISOString();
 
   // Clean up drag classes and inline styles
@@ -5534,7 +5566,15 @@ function setAuthUser(user){
       saveConfig();
     }
     if(restored&&isConfigured()){
-      enterSlides();
+      // Respect the current mode — don't force slide mode on auth sync
+      const savedMode=sessionStorage.getItem('sloth_mode');
+      if(savedMode&&savedMode!=='slide'){
+        // Already in a mode (doc/workspace), just hide welcome
+        document.getElementById('welcomeOverlay').classList.add('hidden');
+        sessionStorage.setItem('sloth_active','1');
+      } else {
+        enterSlides();
+      }
       addMessage('☁️ Settings synced from cloud.','system');
     }
     // Also sync workspace files from cloud
@@ -6406,7 +6446,19 @@ async function sendMessage(){
     // Add context so router can make informed decisions
     const ctx=[];
     ctx.push(`Current mode: ${currentMode}.`);
-    if(currentMode==='doc'&&currentDoc) ctx.push('User is in Doc mode editing "'+currentDoc.title+'" with '+currentDoc.blocks.length+' blocks.');
+    if(currentMode==='doc'&&currentDoc){
+      ctx.push('User is in Doc mode editing "'+currentDoc.title+'" with '+currentDoc.blocks.length+' blocks.');
+      // Tell AI which block is selected/being edited
+      const activeBlockId=docEditingBlockId||docSelectedBlockId;
+      if(activeBlockId){
+        const activeBlock=docGetBlock(activeBlockId);
+        if(activeBlock){
+          const blockText=blockPlainText(activeBlock);
+          const blockIdx=currentDoc.blocks.findIndex(b=>b.id===activeBlockId);
+          ctx.push(`User has selected block #${blockIdx+1} (type: ${activeBlock.type}): "${blockText.substring(0,200)}${blockText.length>200?'...':''}". If the user asks to edit/rewrite/modify text, apply changes to THIS block.`);
+        }
+      }
+    }
     if(currentMode==='slide'&&currentDeck) ctx.push('User has a deck loaded with '+currentDeck.slides.length+' slides.');
     if(currentMode==='slide'&&hasImageOnCurrentSlide()) ctx.push('Current slide has floating images.');
     if(selectedRegion) ctx.push(`User has selected region "${selectedRegion.regionId}" (${selectedRegion.role}) on slide ${selectedRegion.slideIdx+1}.`);
@@ -7623,13 +7675,7 @@ document.addEventListener('keydown',e=>{
 });
 initToolbar();
 initFreeformCanvas();
-// Deck name input — update title on change
-document.getElementById('deckNameInput').addEventListener('input',function(){
-  if(currentDeck){
-    currentDeck.title=this.value.trim()||'Untitled';
-    autoSave();
-  }
-});
+// Deck name input — handled by updateModeNameBar() per mode
 document.querySelectorAll('.popup').forEach(p=>{
   p.addEventListener('click',e=>e.stopPropagation());
 });
