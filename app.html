@@ -1882,21 +1882,32 @@ document.addEventListener('keydown',function(e){
   const isCE=e.target.isContentEditable;
   const isInput=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||isCE);
 
-  if(isInlineEditing()) return; // let browser handle undo/redo in contenteditable
-
-  // ── Undo/Redo ──
+  // ── Undo/Redo — always intercept in both slide and doc modes ──
   if((e.ctrlKey||e.metaKey)&&!e.altKey){
     if(e.key==='z'&&!e.shiftKey){
+      if(isInlineEditing()) return; // slide inline edit: let browser handle
       e.preventDefault();
-      if(currentMode==='doc') docUndo(); else undo();
+      if(currentMode==='doc'){
+        // Flush any pending undo snapshot from typing
+        clearTimeout(docUndoPushTimer);
+        if(docEditingBlockId){
+          const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
+          if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
+        }
+        docPushUndo();
+        docUndo();
+      } else { undo(); }
       return;
     }
     if((e.key==='z'&&e.shiftKey)||e.key==='y'){
+      if(isInlineEditing()) return; // slide inline edit: let browser handle
       e.preventDefault();
       if(currentMode==='doc') docRedo(); else redo();
       return;
     }
   }
+
+  if(isInlineEditing()) return; // let browser handle other keys in slide inline edit
 
   // ── Escape — deselect in both modes ──
   if(e.key==='Escape'){
@@ -2447,59 +2458,16 @@ function showDocCtxAiMenu(blockId, clickEvent){
     suggestions.push({icon:'🗑️',text:'Remove divider',hint:'',action:`__doc_delete__${blockId}`,danger:true});
   }
 
-  // Build menu HTML (same structure as slide ctx menu)
-  const menu=document.getElementById('ctxAiMenu');
-  let html=`<div class="ctx-ai-header">
-    <span class="ctx-region-name">Block ${blockIdx+1}: ${typeLabel}</span>
-    <button class="ctx-close" onclick="event.stopPropagation();hideCtxAiMenu()">×</button>
-  </div>`;
-  html+=`<div class="ctx-ai-actions">`;
-  let afterFirstDivider=false;
-  suggestions.forEach(s=>{
-    if(s.type==='divider'){
-      if(!afterFirstDivider){
-        html+=`<div class="ctx-ai-divider"><span class="ctx-section-label">✦ AI Suggestions</span></div>`;
-        afterFirstDivider=true;
-      } else {
-        html+=`<div class="ctx-ai-divider"></div>`;
-      }
-      return;
-    }
-    const cls=s.danger?'ctx-ai-btn danger':'ctx-ai-btn';
-    const dangerStyle=s.danger?'color:#D55B5B;':'';
-    html+=`<button class="${cls}" style="${dangerStyle}" onclick="event.stopPropagation();execDocCtxAction('${s.action.replace(/'/g,"\\'")}')">
-      <span class="ctx-btn-icon">${s.icon}</span>
-      <span class="ctx-btn-text">${s.text}<span class="ctx-btn-hint">${s.hint||''}</span></span>
-    </button>`;
+  const blockEl=document.querySelector(`[data-block-id="${blockId}"]`);
+  renderCtxMenuPopup({
+    title: `Block ${blockIdx+1}: ${typeLabel}`,
+    suggestions,
+    execFn: 'execDocCtxAction',
+    placeholder: 'Ask AI to change this block...',
+    customExecCode: `execDocCtxCustom('${blockId}')`,
+    clickEvent,
+    anchorEl: blockEl
   });
-  html+=`</div>`;
-  // Custom AI input at bottom
-  html+=`<div class="ctx-ai-input">
-    <input type="text" id="ctxDocInput" placeholder="Ask AI to change this block..." onkeydown="if(event.key==='Enter'){event.stopPropagation();execDocCtxCustom('${blockId}');}">
-    <button onclick="event.stopPropagation();execDocCtxCustom('${blockId}')">Go</button>
-  </div>`;
-  menu.innerHTML=html;
-
-  // Position near click
-  menu.style.display='block';
-  const menuW=menu.offsetWidth;
-  const menuH=menu.offsetHeight;
-  const vw=window.innerWidth;
-  const vh=window.innerHeight;
-  let x=clickEvent.clientX+8;
-  let y=clickEvent.clientY-20;
-  if(x+menuW>vw-10) x=vw-menuW-10;
-  if(x<10) x=10;
-  if(y+menuH>vh-10) y=vh-menuH-10;
-  if(y<10) y=10;
-  menu.style.position='fixed';
-  menu.style.left=x+'px';
-  menu.style.top=y+'px';
-
-  setTimeout(()=>{
-    const inp=document.getElementById('ctxDocInput');
-    if(inp) inp.focus();
-  },100);
 }
 
 function execDocCtxAction(action){
@@ -2508,7 +2476,11 @@ function execDocCtxAction(action){
   if(action.startsWith('__doc_edit__')){
     const bid=action.replace('__doc_edit__','');
     const el=document.querySelector(`[data-block-id="${bid}"]`);
-    if(el){ el.contentEditable='true'; setTimeout(()=>el.focus(),0); }
+    if(el){
+      docEditingBlockId=bid;
+      el.contentEditable='true';
+      setTimeout(()=>el.focus(),0);
+    }
     return;
   }
   if(action.startsWith('__doc_delete__')){
@@ -2579,7 +2551,7 @@ function execDocCtxAction(action){
 }
 
 function execDocCtxCustom(blockId){
-  const inp=document.getElementById('ctxDocInput');
+  const inp=document.getElementById('ctxMenuInput');
   if(!inp||!inp.value.trim()) return;
   hideCtxAiMenu();
   docCtxAI('custom', inp.value.trim(), blockId);
@@ -2601,49 +2573,26 @@ function docCaptionClick(event, blockId){
   document.getElementById('selectionBar').style.display='flex';
   document.getElementById('selectionTag').textContent=`Block ${blockIdx+1}: ${typeLabel} → Caption${caption?(` — "${caption.substring(0,40)}${caption.length>40?'...':''}"`):''}`;
 
-  // Build caption-specific AI menu
-  const menu=document.getElementById('ctxAiMenu');
+  // Build caption-specific suggestions
   const suggestions=[];
   if(caption.trim()){
+    suggestions.push({type:'divider'});
     suggestions.push({icon:'✨',text:'Rewrite caption',hint:'Shorter, punchier',action:`__doc_caption_ai__rewrite__Rewrite this caption more concisely__${blockId}`});
     suggestions.push({icon:'📝',text:'Expand caption',hint:'Add more detail',action:`__doc_caption_ai__expand__Expand this caption with more descriptive detail__${blockId}`});
     suggestions.push({icon:'🌐',text:'Translate caption',hint:'To English',action:`__doc_caption_ai__translate__Translate this caption to English__${blockId}`});
   }
   suggestions.push({icon:'🗑️',text:'Hide caption',hint:'Remove caption',action:`__doc_caption_off__${blockId}`,danger:true});
 
-  let html=`<div class="ctx-ai-header">
-    <span class="ctx-region-name">${typeLabel} Caption</span>
-    <button class="ctx-close" onclick="event.stopPropagation();hideCtxAiMenu()">×</button>
-  </div>`;
-  html+=`<div class="ctx-ai-actions">`;
-  if(caption.trim()) html+=`<div class="ctx-ai-divider"><span class="ctx-section-label">✦ AI Suggestions</span></div>`;
-  suggestions.forEach(s=>{
-    const cls=s.danger?'ctx-ai-btn danger':'ctx-ai-btn';
-    const dangerStyle=s.danger?'color:#D55B5B;':'';
-    html+=`<button class="${cls}" style="${dangerStyle}" onclick="event.stopPropagation();execDocCtxAction('${s.action.replace(/'/g,"\\'")}')">
-      <span class="ctx-btn-icon">${s.icon}</span>
-      <span class="ctx-btn-text">${s.text}<span class="ctx-btn-hint">${s.hint||''}</span></span>
-    </button>`;
+  const capEl=event.target.closest('.doc-figure-caption')||document.querySelector(`[data-block-id="${blockId}"]`);
+  renderCtxMenuPopup({
+    title: `${typeLabel} Caption`,
+    suggestions,
+    execFn: 'execDocCtxAction',
+    placeholder: 'Ask AI to change this caption...',
+    customExecCode: `execDocCaptionCustom('${blockId}')`,
+    clickEvent: event,
+    anchorEl: capEl
   });
-  html+=`</div>`;
-  html+=`<div class="ctx-ai-input">
-    <input type="text" id="ctxDocInput" placeholder="Ask AI to change this caption..." onkeydown="if(event.key==='Enter'){event.stopPropagation();execDocCaptionCustom('${blockId}');}">
-    <button onclick="event.stopPropagation();execDocCaptionCustom('${blockId}')">Go</button>
-  </div>`;
-  menu.innerHTML=html;
-
-  menu.style.display='block';
-  const menuW=menu.offsetWidth, menuH=menu.offsetHeight;
-  const vw=window.innerWidth, vh=window.innerHeight;
-  let x=event.clientX+8, y=event.clientY-20;
-  if(x+menuW>vw-10) x=vw-menuW-10;
-  if(x<10) x=10;
-  if(y+menuH>vh-10) y=vh-menuH-10;
-  if(y<10) y=10;
-  menu.style.position='fixed';
-  menu.style.left=x+'px';
-  menu.style.top=y+'px';
-  setTimeout(()=>{ const inp=document.getElementById('ctxDocInput'); if(inp) inp.focus(); },100);
 }
 
 async function docCaptionAI(action, instruction, blockId){
@@ -2674,7 +2623,7 @@ Output ONLY the new caption text. No quotes, no explanation.`;
 }
 
 function execDocCaptionCustom(blockId){
-  const inp=document.getElementById('ctxDocInput');
+  const inp=document.getElementById('ctxMenuInput');
   if(!inp||!inp.value.trim()) return;
   hideCtxAiMenu();
   docCaptionAI('custom', inp.value.trim(), blockId);
@@ -2785,53 +2734,68 @@ function generateCtxSuggestions(role,regionId,content){
 }
 
 function showCtxAiMenu(slideIdx,regionId,role,label,clickEvent){
-  const menu=document.getElementById('ctxAiMenu');
   const content=getRegionContent(slideIdx,regionId);
-  const preview=getContentPreview(content);
   const suggestions=generateCtxSuggestions(role,regionId,content);
+  // Find the clicked region element on the canvas for anchoring
+  const regionEl=document.querySelector(`[data-region="${regionId}"]`);
+  renderCtxMenuPopup({
+    title: label,
+    suggestions,
+    execFn: 'execCtxAction',
+    placeholder: 'Ask AI to change this...',
+    customExecCode: 'execCtxCustom()',
+    clickEvent,
+    anchorEl: regionEl
+  });
+}
 
-  // Build menu HTML
+// ── Shared context menu renderer (used by slide, doc, and caption menus) ──
+function renderCtxMenuPopup({title, suggestions, execFn, placeholder, customExecCode, clickEvent, anchorEl}){
+  const menu=document.getElementById('ctxAiMenu');
   let html=`<div class="ctx-ai-header">
-    <span class="ctx-region-name">${label}</span>
+    <span class="ctx-region-name">${title}</span>
     <button class="ctx-close" onclick="event.stopPropagation();hideCtxAiMenu()">×</button>
   </div>`;
   html+=`<div class="ctx-ai-actions">`;
   let afterFirstDivider=false;
-  suggestions.forEach((s,i)=>{
+  suggestions.forEach(s=>{
     if(s.type==='divider'){
-      if(!afterFirstDivider){
-        // First divider: label the AI section
-        html+=`<div class="ctx-ai-divider"><span class="ctx-section-label">✦ AI Suggestions</span></div>`;
-        afterFirstDivider=true;
-      }else{
-        html+=`<div class="ctx-ai-divider"></div>`;
-      }
+      html+=afterFirstDivider?`<div class="ctx-ai-divider"></div>`
+        :`<div class="ctx-ai-divider"><span class="ctx-section-label">✦ AI Suggestions</span></div>`;
+      afterFirstDivider=true;
       return;
     }
     const cls=s.danger?'ctx-ai-btn danger':'ctx-ai-btn';
-    const dangerStyle=s.danger?'color:#D55B5B;':'';
-    html+=`<button class="${cls}" style="${dangerStyle}" onclick="event.stopPropagation();execCtxAction('${s.action.replace(/'/g,"\\'")}')">
+    const ds=s.danger?'color:#D55B5B;':'';
+    html+=`<button class="${cls}" style="${ds}" onclick="event.stopPropagation();${execFn}('${s.action.replace(/'/g,"\\'")}')">
       <span class="ctx-btn-icon">${s.icon}</span>
       <span class="ctx-btn-text">${s.text}<span class="ctx-btn-hint">${s.hint||''}</span></span>
     </button>`;
   });
   html+=`</div>`;
-  // Custom AI input at bottom
   html+=`<div class="ctx-ai-input">
-    <input type="text" id="ctxCustomInput" placeholder="Ask AI to change this..." onkeydown="if(event.key==='Enter'){event.stopPropagation();execCtxCustom();}">
-    <button onclick="event.stopPropagation();execCtxCustom()">Go</button>
+    <input type="text" id="ctxMenuInput" placeholder="${placeholder||'Ask AI to change this...'}" onkeydown="if(event.key==='Enter'){event.stopPropagation();${customExecCode}}">
+    <button onclick="event.stopPropagation();${customExecCode}">Go</button>
   </div>`;
   menu.innerHTML=html;
 
-  // Position near the click — relative to viewport
+  // Position: anchor to element's right side, fallback to click position
   menu.style.display='block';
-  const menuW=menu.offsetWidth;
-  const menuH=menu.offsetHeight;
-  const vw=window.innerWidth;
-  const vh=window.innerHeight;
-  let x=clickEvent.clientX+8;
-  let y=clickEvent.clientY-20;
-  // Keep within viewport
+  const menuW=menu.offsetWidth, menuH=menu.offsetHeight;
+  const vw=window.innerWidth, vh=window.innerHeight;
+  let x,y;
+  if(anchorEl){
+    const rect=anchorEl.getBoundingClientRect();
+    x=rect.right+8; // right side of block
+    y=rect.top;      // aligned to top of block
+    // If no room on right, try left side
+    if(x+menuW>vw-10) x=rect.left-menuW-8;
+    // If still no room, fall back to centered below
+    if(x<10){ x=Math.max(10, (rect.left+rect.right)/2 - menuW/2); y=rect.bottom+8; }
+  } else {
+    x=clickEvent.clientX+8;
+    y=clickEvent.clientY-20;
+  }
   if(x+menuW>vw-10) x=vw-menuW-10;
   if(x<10) x=10;
   if(y+menuH>vh-10) y=vh-menuH-10;
@@ -2839,12 +2803,7 @@ function showCtxAiMenu(slideIdx,regionId,role,label,clickEvent){
   menu.style.position='fixed';
   menu.style.left=x+'px';
   menu.style.top=y+'px';
-
-  // Focus custom input after a tick
-  setTimeout(()=>{
-    const inp=document.getElementById('ctxCustomInput');
-    if(inp) inp.focus();
-  },100);
+  setTimeout(()=>{ const inp=document.getElementById('ctxMenuInput'); if(inp) inp.focus(); },100);
 }
 
 function hideCtxAiMenu(){
@@ -2886,7 +2845,7 @@ function execCtxAction(action){
 }
 
 function execCtxCustom(){
-  const inp=document.getElementById('ctxCustomInput');
+  const inp=document.getElementById('ctxMenuInput');
   if(!inp||!inp.value.trim())return;
   hideCtxAiMenu();
   const input=document.getElementById('chatInput');
@@ -4633,8 +4592,16 @@ function exportDocDocx(){
 
 // ── Mode dispatcher functions (unified toolbar → mode-specific) ──
 function modeUndo(){
-  if(currentMode==='doc') docUndo();
-  else undo();
+  if(currentMode==='doc'){
+    // Flush current edit state before undoing
+    clearTimeout(docUndoPushTimer);
+    if(docEditingBlockId){
+      const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
+      if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
+    }
+    docPushUndo();
+    docUndo();
+  } else { undo(); }
 }
 function modeRedo(){
   if(currentMode==='doc') docRedo();
@@ -5526,6 +5493,8 @@ function docPageClick(event){
 }
 
 function docFocusBlock(blockId){
+  // Push undo snapshot when user starts editing a new block
+  if(docEditingBlockId!==blockId) docPushUndo();
   docEditingBlockId=blockId;
   docSelectBlock(blockId);
   docUpdateToolbarState();
@@ -5558,6 +5527,7 @@ function docExtractText(el){
   return text;
 }
 
+let docUndoPushTimer=null;
 function docInputBlock(blockId){
   const el=document.querySelector(`[data-block-id="${blockId}"]`);
   if(!el) return;
@@ -5566,6 +5536,10 @@ function docInputBlock(blockId){
   const text=docExtractText(el);
   blockFromPlainText(block, text);
   currentDoc.updated=new Date().toISOString();
+
+  // Debounced undo snapshot: push undo every 1.5s of typing
+  clearTimeout(docUndoPushTimer);
+  docUndoPushTimer=setTimeout(()=>docPushUndo(),1500);
 
   // Auto-save on every content change (debounced)
   docAutoSave();
