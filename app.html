@@ -2739,28 +2739,31 @@ async function sendMessage(){
   }
 
   try{
-    // ── PASS 0: Style edit? (lightweight LLM, no deck regeneration) ──
-    // Skip style check if this is clearly a content edit (saves an API call)
-    const clearlyContentEdit=isContentEdit(text)&&!/色|color|background|bg|font|字[型體]|底線|underline|bold|italic|粗體|斜體/i.test(text);
-    if(isStyleRequest(text)&&!clearlyContentEdit){
+    // ── PASS 0: Style edit? (LLM interprets any language/phrasing) ──
+    // Style check takes PRIORITY when isStyleRequest matches — never skip it for content edit
+    // The old bug: "背景都改成莫內藍" was skipped because "改成" matched isContentEdit()
+    if(isStyleRequest(text)){
       statusDiv.textContent='Interpreting style...';
-      // Add selection context so LLM knows which region is targeted
       let styleInput=text;
       if(selectedRegion){
         styleInput+=`\n[USER HAS SELECTED: slide ${selectedRegion.slideIdx+1}, region "${selectedRegion.regionId}" (${selectedRegion.role}). Apply changes to this region unless they specify otherwise.]`;
       }
-      const styleRaw=await callLLM(STYLE_PROMPT,[{role:'user',content:styleInput}],{temperature:0,max_tokens:128,json:true});
-      const styleObj=JSON.parse(styleRaw);
-      if(!styleObj.none){
-        const msgs=applyStyleOverrides(styleObj);
-        chatHistory.push({role:'assistant',content:`[style: ${msgs.join(', ')}]`});
-        statusDiv.remove();
-        addMessage(`✓ ${msgs.join(', ')}`,'ai');
-        renderApp();
-        sendBtn.disabled=false;sendBtn.textContent='Send';
-        return;
+      try{
+        const styleRaw=await callLLM(STYLE_PROMPT,[{role:'user',content:styleInput}],{temperature:0,max_tokens:128,json:true});
+        const styleObj=JSON.parse(styleRaw);
+        if(!styleObj.none){
+          const msgs=applyStyleOverrides(styleObj);
+          chatHistory.push({role:'assistant',content:`[style: ${msgs.join(', ')}]`});
+          statusDiv.remove();
+          addMessage(`✓ ${msgs.join(', ')}`,'ai');
+          renderApp();
+          sendBtn.disabled=false;sendBtn.textContent='Send';
+          return;
+        }
+      }catch(styleErr){
+        console.warn('Style LLM failed, falling through:',styleErr);
       }
-      // If style interpreter said "none", fall through
+      // If style interpreter said "none" or failed, fall through to content edit
     }
 
     // ── PASS 0.4: Deck-wide content edit? (all slides at once) ──
@@ -3741,19 +3744,29 @@ let touchStartY=0;
 const slideCanvas=document.getElementById('slideCanvas');
 const slidePanel=document.querySelector('.slide-panel');
 
-// Block ALL default touch behavior on the entire slide area (zoom, scroll, etc.)
+// Block zoom but preserve tap-to-click on slide regions
 slidePanel.addEventListener('touchstart',function(e){
   touchStartX=e.touches[0].clientX;
   touchStartY=e.touches[0].clientY;
-  e.preventDefault(); // block browser zoom
+  // Only preventDefault if multi-touch (pinch zoom) — single finger preserved for tap
+  if(e.touches.length>1) e.preventDefault();
 },{passive:false});
 slidePanel.addEventListener('touchmove',function(e){
-  e.preventDefault(); // block browser zoom/scroll during drag
+  e.preventDefault(); // block zoom/scroll during any drag
 },{passive:false});
 slidePanel.addEventListener('touchend',function(e){
+  const endX=e.changedTouches[0].clientX;
+  const endY=e.changedTouches[0].clientY;
+  const dx=endX-touchStartX;
+  const dy=endY-touchStartY;
+  // Small movement = tap → simulate click so selectRegion() fires
+  if(Math.abs(dx)<15&&Math.abs(dy)<15){
+    const el=document.elementFromPoint(endX,endY);
+    if(el) el.click(); // fire the onclick handler on the tapped region
+    return;
+  }
+  // Large horizontal movement = swipe → navigate slides
   if(!currentDeck)return;
-  const dx=e.changedTouches[0].clientX-touchStartX;
-  const dy=e.changedTouches[0].clientY-touchStartY;
   if(Math.abs(dx)<50||Math.abs(dy)>Math.abs(dx))return;
   if(dx<0&&currentSlide<currentDeck.slides.length-1){
     goSlide(currentSlide+1);
