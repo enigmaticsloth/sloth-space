@@ -79,7 +79,12 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .deck-action-btn:hover { color:var(--text); border-color:#555; }
 .deck-action-btn.primary { background:#7886A5; color:#fff; border-color:#7886A5; font-weight:600; }
 .deck-action-btn.primary:hover { background:#6775A0; }
-.slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; }
+.slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; position:relative; }
+/* Slide transition animations (swipe/navigate) */
+.slide-enter-left { animation:slideInLeft 0.28s ease forwards; }
+.slide-enter-right { animation:slideInRight 0.28s ease forwards; }
+@keyframes slideInLeft { from{transform:translateX(25%);opacity:0.3;} to{transform:translateX(0);opacity:1;} }
+@keyframes slideInRight { from{transform:translateX(-25%);opacity:0.3;} to{transform:translateX(0);opacity:1;} }
 .slide-bar { display:flex; align-items:center; gap:6px; margin-top:8px; padding-bottom:4px; width:100%; justify-content:center; flex-shrink:0; }
 .slide-nav { display:flex; gap:3px; flex-wrap:wrap; }
 .slide-nav button { background:transparent; color:var(--text2); border:1px solid transparent; width:26px; height:26px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
@@ -382,19 +387,29 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     flex:1; min-height:0; overflow:hidden;
   }
 
-  /* --- Slide panel: top-aligned, shrink to content --- */
+  /* --- Slide panel: top-aligned, INCOMPRESSIBLE --- */
   .slide-panel {
-    flex:0 0 auto; /* don't grow — take only what slide needs */
+    flex:0 0 auto; /* never grow, never shrink */
+    flex-shrink:0 !important;
     align-items:center;
     justify-content:flex-start; /* TOP-ALIGNED */
     padding:4px 4px 0;
-    overflow:hidden;
-    min-height:0;
+    overflow:visible;
   }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }
   .deck-name-input { font-size:12px; }
   .deck-actions { display:none; }
-  .slide-frame { border-radius:6px; }
+
+  /* Slide frame: fixed size, never squished, with swipe animation */
+  .slide-frame {
+    border-radius:6px;
+    flex-shrink:0 !important;
+    position:relative;
+    overflow:hidden;
+  }
+  .slide-frame {
+    flex-shrink:0 !important;
+  }
 
   /* --- Page dots: small circles, active = filled --- */
   .slide-bar { gap:4px; margin-top:4px; padding-bottom:2px; }
@@ -409,9 +424,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .slide-nav button:hover { background:#555; }
   .slide-info { font-size:8px; }
 
-  /* --- Chat panel: inline flow (not overlay), scrollable flex area --- */
+  /* --- Chat panel: takes remaining space, scrollable, never pushes slide --- */
   .chat-panel {
-    width:100%; flex:1 1 0; min-height:0;
+    width:100%;
+    flex:1 1 0; /* grow into remaining space */
+    min-height:60px; /* always visible — at least shows header + 1 message */
     border-left:none; border-top:1px solid var(--border);
     display:flex; flex-direction:column;
     overflow:hidden;
@@ -1353,7 +1370,9 @@ function renderApp(){
   const cv=document.getElementById('slideCanvas');
   cv.style.width=(p.slide.width*sc)+'px';
   cv.style.height=(p.slide.height*sc)+'px';
-  cv.innerHTML=`<div style="transform:scale(${sc});transform-origin:top left;width:${p.slide.width}px;height:${p.slide.height}px;">${renderSlide(s,currentSlide,p,slides.length)}</div>`;
+  // Apply swipe animation class if navigating
+  const animClass=slideAnimDir>0?'slide-enter-left':slideAnimDir<0?'slide-enter-right':'';
+  cv.innerHTML=`<div class="slide-transition-wrap ${animClass}" style="transform:scale(${sc});transform-origin:top left;width:${p.slide.width}px;height:${p.slide.height}px;">${renderSlide(s,currentSlide,p,slides.length)}</div>`;
 
   document.getElementById('slideNav').innerHTML=slides.map((_,i)=>
     `<button class="${i===currentSlide?'active':''}" onclick="goSlide(${i})">${i+1}</button>`
@@ -1363,7 +1382,16 @@ function renderApp(){
   updateFontSizeIndicator();
 }
 
-function goSlide(i){currentSlide=i;renderApp();}
+// Slide navigation with animation direction tracking
+let slideAnimDir=0; // -1 = going left (prev), +1 = going right (next), 0 = no anim
+
+function goSlide(i){
+  if(i===currentSlide)return;
+  slideAnimDir=i>currentSlide?1:-1;
+  currentSlide=i;
+  renderApp();
+  slideAnimDir=0;
+}
 function setPreset(id){currentPreset=id;renderApp();}
 
 // ═══════════════════════════════════════════
@@ -3622,8 +3650,8 @@ chatInput.addEventListener('keydown',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(document.activeElement===chatInput)return;
-  if(e.key==='ArrowRight'&&currentDeck){currentSlide=Math.min(currentSlide+1,currentDeck.slides.length-1);renderApp();e.preventDefault();}
-  if(e.key==='ArrowLeft'&&currentDeck){currentSlide=Math.max(currentSlide-1,0);renderApp();e.preventDefault();}
+  if(e.key==='ArrowRight'&&currentDeck){goSlide(Math.min(currentSlide+1,currentDeck.slides.length-1));e.preventDefault();}
+  if(e.key==='ArrowLeft'&&currentDeck){goSlide(Math.max(currentSlide-1,0));e.preventDefault();}
 });
 window.addEventListener('resize',renderApp);
 initToolbar();
@@ -3662,9 +3690,9 @@ slideCanvas.addEventListener('touchend',function(e){
   const dy=e.changedTouches[0].clientY-touchStartY;
   if(Math.abs(dx)<50||Math.abs(dy)>Math.abs(dx))return;
   if(dx<0&&currentSlide<currentDeck.slides.length-1){
-    currentSlide++;renderApp();
+    goSlide(currentSlide+1); // swipe left → next slide (with animation)
   }else if(dx>0&&currentSlide>0){
-    currentSlide--;renderApp();
+    goSlide(currentSlide-1); // swipe right → prev slide (with animation)
   }
 },{passive:true});
 
