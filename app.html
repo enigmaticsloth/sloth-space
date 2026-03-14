@@ -4890,12 +4890,27 @@ function docRedo(){
   docUndoRedoInProgress=false;
   docSaveUndoStacks();
 }
+function docHasRealUndo(){
+  const curKey=docContentKey(currentDoc);
+  for(let i=docUndoStack.length-1;i>=0;i--){
+    if(docContentKey(docUndoStack[i])!==curKey) return true;
+  }
+  return false;
+}
+function docHasRealRedo(){
+  const curKey=docContentKey(currentDoc);
+  for(let i=docRedoStack.length-1;i>=0;i--){
+    if(docContentKey(docRedoStack[i])!==curKey) return true;
+  }
+  return false;
+}
 function docUpdateUndoUI(){
-  // Use unified toolbar buttons — white when enabled, dark gray when disabled
   const ub=document.getElementById('undoBtn');
   const rb=document.getElementById('redoBtn');
-  if(ub){ ub.style.opacity=docUndoStack.length?'1':'0.35'; ub.style.color=docUndoStack.length?'#fff':'#555'; }
-  if(rb){ rb.style.opacity=docRedoStack.length?'1':'0.35'; rb.style.color=docRedoStack.length?'#fff':'#555'; }
+  const canUndo=docHasRealUndo();
+  const canRedo=docHasRealRedo();
+  if(ub){ ub.style.opacity=canUndo?'1':'0.35'; ub.style.color=canUndo?'#fff':'#555'; }
+  if(rb){ rb.style.opacity=canRedo?'1':'0.35'; rb.style.color=canRedo?'#fff':'#555'; }
 }
 
 // ── Doc toolbar action functions ──
