@@ -61,6 +61,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .preset-pills button { background:transparent; color:var(--text2); border:1px solid transparent; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; }
 .preset-pills button:hover { color:#999; }
 .preset-pills button.active { color:#ccc; border-color:var(--border); background:var(--surface2); }
+.topbar-exports { display:flex; align-items:center; gap:2px; }
 .export-btn { background:#E8D5A3; color:#6B5E4A; border:1px solid #E8D5A3; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; margin-left:6px; font-weight:600; }
 .export-btn:hover { background:#DECA8E; border-color:#DECA8E; color:#5A4E3A; }
 
@@ -106,7 +107,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .bottom-panel { flex-shrink:0; border-top:1px solid var(--border); background:var(--surface); display:flex; flex-direction:column; }
 
 /* Toolbar */
-.toolbar { display:flex; gap:1px; padding:0 10px; flex-shrink:0; }
+.toolbar { display:flex; gap:1px; padding:0 10px; flex-shrink:0; overflow-x:auto; overflow-y:hidden; align-items:stretch; }
 .tool-btn { flex:0; background:transparent; color:#ddd; border:none; padding:5px 14px; cursor:pointer; font-size:11px; font-family:Arial; position:relative; border-top:1px solid var(--border); white-space:nowrap; }
 .tool-btn:hover { color:#fff; background:var(--surface2); }
 .tool-btn.active-btn { color:#fff; background:var(--surface2); }
@@ -414,6 +415,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .dt-font-size { width:40px; text-align:center; background:#1a1a1a; color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 4px; font-size:10px; font-family:'Courier New',monospace; -webkit-appearance:none; appearance:none; -moz-appearance:textfield; }
 .dt-font-size::-webkit-inner-spin-button, .dt-font-size::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
 /* Insert (+) menu */
+.insert-plus-btn { background:#7886A5 !important; color:#fff !important; border-radius:4px !important; padding:2px 10px !important; font-size:16px !important; font-weight:700 !important; line-height:1.2 !important; margin:2px 0 !important; min-width:28px; text-align:center; }
+.insert-plus-btn:hover { background:#8a9cc0 !important; }
+.insert-group { border-right:none !important; }
 .insert-menu { position:absolute; top:100%; left:0; margin-top:4px; background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:4px 0; z-index:300; box-shadow:0 6px 24px rgba(0,0,0,0.6); min-width:180px; max-height:320px; overflow-y:auto; }
 .insert-menu-title { font-size:9px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:4px 12px 2px; }
 .insert-menu-item { padding:7px 12px; font-size:11px; color:#ccc; cursor:pointer; transition:background 0.1s; white-space:nowrap; }
@@ -967,7 +971,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 <!-- Top bar -->
 <!-- # Goodbye Google. You will never scam me or mess with me again. — Enigmaticsloth -->
-<div class="topbar slides-ui">
+<div class="topbar">
   <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
   <div class="logo" onclick="showModePicker()" style="cursor:pointer;" title="Home">Sloth Space</div>
   <div class="tagline" style="color:#777;">Type what you want. Sloth will design it.</div>
@@ -976,9 +980,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     <span id="modeBadgeLabel">Slide</span>
     <div class="mode-switch-menu" id="modeSwitchMenu" style="display:none;"></div>
   </div>
-  <div class="preset-pills" id="presetPills"></div>
-  <button class="export-btn" onclick="saveSloth()">Export .sloth</button>
-  <button class="export-btn" onclick="exportPPTX()">Export .pptx</button>
+  <div class="preset-pills tb-topbar-slide" id="presetPills"></div>
+  <!-- Unified export area — adapts per mode -->
+  <div class="topbar-exports" id="topbarExports"></div>
   <button class="export-btn" onclick="openSettings()" title="Settings" style="font-size:20px;line-height:1;padding:2px 8px;">&#9881;</button>
   <div class="auth-bar" id="authBar">
     <button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>
@@ -1373,7 +1377,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 </div>
 
 <!-- Middle: slide left + conversation right -->
-<div class="middle slides-ui">
+<div class="middle">
   <div class="slide-panel">
     <div class="deck-name-bar" id="modeNameBar">
       <input type="text" id="deckNameInput" class="deck-name-input" placeholder="Untitled Presentation" spellcheck="false">
@@ -1396,7 +1400,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 </div>
 
 <!-- Bottom: toolbar + tall input -->
-<div class="bottom-panel slides-ui">
+<div class="bottom-panel">
   <div class="selection-bar" id="selectionBar" style="display:none;">
     <span style="color:#444;">Selected:</span>
     <span class="selection-tag" id="selectionTag"></span>
@@ -1458,9 +1462,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       </label>
     </div>
     <!-- Shared: Insert (+) menu -->
-    <div class="dt-group" style="position:relative;">
-      <button class="dt-btn" id="insertPlusBtn" onclick="toggleInsertMenu(event)" title="Insert">
-        <span style="font-size:14px;font-weight:700;line-height:1;">+</span>
+    <div class="dt-group insert-group" style="position:relative;">
+      <button class="dt-btn insert-plus-btn" id="insertPlusBtn" onclick="toggleInsertMenu(event)" title="Insert">
+        <span>+</span>
       </button>
       <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleInsertedFiles(this.files)">
       <div class="insert-menu" id="insertMenu" style="display:none;">
@@ -4110,6 +4114,117 @@ function updateToolbarForMode(mode){
   });
   // Update undo/redo button state for current mode
   modeUpdateUndoUI();
+  // Update topbar elements (preset pills, export buttons)
+  updateTopbarForMode(mode);
+}
+
+// ── Topbar adapts per mode: presets + exports ──
+const MODE_EXPORTS={
+  slide:[
+    {label:'Export .sloth', action:'saveSloth()'},
+    {label:'Export .pptx', action:'exportPPTX()'},
+    {label:'Export PDF', action:'modeExportPDF()'}
+  ],
+  doc:[
+    {label:'Export .sloth', action:'saveSloth()'},
+    {label:'Export .docx', action:'modeExportDocx()'},
+    {label:'Export PDF', action:'modeExportPDF()'}
+  ],
+  sheet:[
+    {label:'Export .sloth', action:'saveSloth()'},
+    {label:'Export .xlsx', action:'modeExportXlsx()'},
+    {label:'Export PDF', action:'modeExportPDF()'}
+  ],
+  workspace:[]
+};
+
+function updateTopbarForMode(mode){
+  // Preset pills: only for slide mode
+  const pills=document.getElementById('presetPills');
+  if(pills) pills.style.display=(mode==='slide')?'':'none';
+
+  // Export buttons: mode-specific
+  const exArea=document.getElementById('topbarExports');
+  if(!exArea) return;
+  const exports=MODE_EXPORTS[mode]||[];
+  exArea.innerHTML=exports.map(e=>
+    `<button class="export-btn" onclick="${e.action}">${e.label}</button>`
+  ).join('');
+}
+
+// ── Export dispatchers ──
+function modeExportPDF(){
+  if(currentMode==='slide') exportSlidePDF();
+  else if(currentMode==='doc') exportDocPDF();
+  else addMessage('PDF export not available for this mode yet.','system');
+}
+function modeExportDocx(){
+  exportDocDocx();
+}
+function modeExportXlsx(){
+  addMessage('Sheet export coming soon!','system');
+}
+
+// Slide PDF export
+function exportSlidePDF(){
+  addMessage('Slide PDF export coming soon! Use Export .pptx for now.','system');
+}
+
+// Doc PDF export
+function exportDocPDF(){
+  if(!currentDoc||!currentDoc.blocks.length){
+    addMessage('No document content to export.','system');
+    return;
+  }
+  // Build simple HTML from doc blocks and print to PDF
+  let html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+escapeHtml(currentDoc.title||'Document')+'</title>';
+  html+='<style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:20px;color:#222;line-height:1.7;}';
+  html+='h1{font-size:28px;margin:24px 0 12px;}h2{font-size:22px;margin:20px 0 10px;}h3{font-size:18px;margin:16px 0 8px;}';
+  html+='blockquote{border-left:3px solid #ccc;padding-left:16px;color:#555;margin:12px 0;}';
+  html+='pre{background:#f5f5f5;padding:12px;border-radius:4px;overflow-x:auto;font-size:13px;}';
+  html+='hr{border:none;border-top:1px solid #ddd;margin:20px 0;}';
+  html+='</style></head><body>';
+  html+='<h1>'+escapeHtml(currentDoc.title||'Untitled Document')+'</h1>';
+  for(const block of currentDoc.blocks){
+    const text=escapeHtml(blockPlainText(block));
+    switch(block.type){
+      case 'heading1': html+='<h1>'+text+'</h1>'; break;
+      case 'heading2': html+='<h2>'+text+'</h2>'; break;
+      case 'heading3': html+='<h3>'+text+'</h3>'; break;
+      case 'quote': html+='<blockquote>'+text+'</blockquote>'; break;
+      case 'code': html+='<pre>'+text+'</pre>'; break;
+      case 'list': html+='<ul><li>'+text+'</li></ul>'; break;
+      case 'numbered': html+='<ol><li>'+text+'</li></ol>'; break;
+      case 'divider': html+='<hr>'; break;
+      default: html+='<p>'+text+'</p>';
+    }
+  }
+  html+='</body></html>';
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  if(w){
+    addMessage('Document opened in new tab. Use your browser\'s Print (Ctrl+P) → Save as PDF.','system');
+  } else {
+    addMessage('Pop-up blocked. Please allow pop-ups for this site.','system');
+  }
+}
+
+// Doc DOCX export (simple plaintext .docx via blob)
+function exportDocDocx(){
+  if(!currentDoc||!currentDoc.blocks.length){
+    addMessage('No document content to export.','system');
+    return;
+  }
+  // Build simple XML-based .docx content
+  const text=currentDoc.blocks.map(b=>blockPlainText(b)).join('\n\n');
+  const blob=new Blob([text],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(currentDoc.title||'Untitled')+'.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  addMessage('Document exported as .txt (full .docx support coming soon).','system');
 }
 
 // ── Mode dispatcher functions (unified toolbar → mode-specific) ──
@@ -7112,25 +7227,40 @@ function exportPPTX(){
 // .sloth FORMAT (zip-based)
 // ═══════════════════════════════════════════
 function saveSloth(){
-  if(!currentDeck){addMessage('Nothing to save yet.','system');return;}
   const zip=new JSZip();
+  let fname='untitled';
+  let contentType=currentMode;
 
-  // manifest.json = the deck data
-  zip.file('manifest.json',JSON.stringify(currentDeck,null,2));
-
-  // meta.json = app state
-  zip.file('meta.json',JSON.stringify({
-    sloth_version:'0.1.0',
-    app:'Sloth Space',
-    created:new Date().toISOString(),
-    preset:currentPreset,
-    currentSlide:currentSlide
-  },null,2));
+  if(currentMode==='slide'){
+    if(!currentDeck){addMessage('Nothing to save yet.','system');return;}
+    zip.file('manifest.json',JSON.stringify(currentDeck,null,2));
+    zip.file('meta.json',JSON.stringify({
+      sloth_version:'0.1.0',
+      app:'Sloth Space',
+      type:'slide',
+      created:new Date().toISOString(),
+      preset:currentPreset,
+      currentSlide:currentSlide
+    },null,2));
+    fname=(currentDeck.title||'deck').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
+  } else if(currentMode==='doc'){
+    if(!currentDoc||!currentDoc.blocks.length){addMessage('Nothing to save yet.','system');return;}
+    zip.file('manifest.json',JSON.stringify(currentDoc,null,2));
+    zip.file('meta.json',JSON.stringify({
+      sloth_version:'0.1.0',
+      app:'Sloth Space',
+      type:'doc',
+      created:new Date().toISOString()
+    },null,2));
+    fname=(currentDoc.title||'document').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
+  } else {
+    addMessage('Nothing to export in this mode.','system');
+    return;
+  }
 
   // chat.json = conversation history (optional, for restore)
   zip.file('chat.json',JSON.stringify(chatHistory.slice(-30),null,2));
 
-  const fname=(currentDeck.title||'deck').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
   zip.generateAsync({type:'blob'}).then(blob=>{
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
