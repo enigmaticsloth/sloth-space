@@ -346,7 +346,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mode-badge-icon { opacity:0.7; }
 
 /* ─── Doc Canvas ─── */
-.doc-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; }
+.doc-canvas { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#141414; padding:40px 20px; touch-action:pan-y; }
 .doc-page { max-width:720px; margin:0 auto; min-height:60vh; padding-bottom:40vh; overflow:hidden; }
 .doc-empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:50vh; text-align:center; }
 
@@ -420,13 +420,13 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .block-type-option:hover { background:var(--surface2); }
 .block-type-option .bto-icon { width:20px; text-align:center; opacity:0.6; }
 
-/* Drag reorder — smooth gap animation */
-.doc-block.drag-active { transition:transform 0.28s cubic-bezier(0.2,0.8,0.3,1); }
-.doc-block.drag-source { opacity:0; height:0 !important; min-height:0 !important; padding:0 !important; margin:0 !important; border:none !important; overflow:hidden; }
-.doc-drag-ghost { position:fixed; pointer-events:none; z-index:10000; opacity:0.85; border-radius:6px; box-shadow:0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(120,134,165,0.4); transform:scale(0.97); transition:transform 0.15s ease, box-shadow 0.15s ease; }
-.doc-drag-ghost.lifting { transform:scale(1.02); box-shadow:0 12px 40px rgba(0,0,0,0.45), 0 0 0 1.5px rgba(120,134,165,0.6); }
-.doc-drop-indicator { height:3px; background:linear-gradient(90deg,transparent,#7886A5,#7886A5,transparent); margin:0; border-radius:2px; pointer-events:none; opacity:0; transition:opacity 0.15s; }
-.doc-drop-indicator.visible { opacity:1; }
+/* Drop indicator for drag reorder */
+.doc-drop-indicator { height:2px; background:#7886A5; margin:0; border-radius:1px; transition:opacity 0.1s; pointer-events:none; }
+
+/* Block drag animation — smooth displacement, no flash */
+.doc-block { transition:transform 0.28s cubic-bezier(0.2,0.8,0.3,1), opacity 0.2s; }
+.doc-block.drag-source { opacity:0.25; transform:scale(0.96); border-color:#7886A5 !important; z-index:10; }
+.doc-block.drag-settling { transition:transform 0.25s cubic-bezier(0.2,0.8,0.3,1); transform:none !important; }
 
 /* Mode switch mini-menu */
 .mode-switch-menu { position:absolute; top:100%; left:0; margin-top:4px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:4px; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,0.5); min-width:130px; }
@@ -5063,7 +5063,7 @@ function renderDocMode(){
       const btnC=float==='none'?' active':'';
       const btnR=float==='right'?' active':'';
       const capClass=hasCaption?'':'hidden-cap';
-      return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)" draggable="true" ondragstart="docDragStart(event,'${block.id}')">
+      return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         ${src?`<img src="${src}" alt="${escapeHtml(alt)}" draggable="false" onclick="event.stopPropagation();docShowImagePopup('${block.id}',this)" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
         <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
@@ -5093,7 +5093,7 @@ function renderDocMode(){
       });
       tableHtml+='</table>';
       tableHtml+=`<button class="table-add-row" onclick="event.stopPropagation();docTableAddRow('${block.id}')">+ Add row</button>`;
-      return `<div class="doc-block${selected} ${floatClass}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)" draggable="true" ondragstart="docDragStart(event,'${block.id}')">
+      return `<div class="doc-block${selected} ${floatClass}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         <div onclick="event.stopPropagation();docShowBlockPopup('${block.id}',this)">${tableHtml}</div>
         <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
@@ -5119,7 +5119,7 @@ function renderDocMode(){
 
   canvas.innerHTML=`
     <div class="doc-page" id="docPage"
-      ondragover="docDragOver(event)" ondrop="docDrop(event)" ondragleave="docDragLeave(event)" ondragend="docDragEnd(event)">
+      ondragover="docDragOver(event)" ondrop="docDrop(event)" ondragleave="docDragLeave(event)">
       ${blocksHtml}
     </div>`;
 
@@ -5497,61 +5497,27 @@ function docApplyTypeMenuSelection(blockId){
   }
 }
 
-// ── Drag & drop reorder (smooth ghost + gap animation) ──
+// ── Drag & drop reorder (smooth displacement animation) ──
 let docDragBlockId=null;
-let docDragGhost=null;
-let docDragSrcHeight=0;
-let docDragInsertIdx=-1; // current visual insert index among non-source blocks
-let docDragOffsetY=0;
+let docDragLastOverId=null;
 let docDragStartY=null;
 let docDragActivated=false;
-let docDragDropped=false; // flag to prevent dragEnd double-firing after successful drop
-const DOC_DRAG_DEAD_ZONE=12;
-const DOC_DRAG_HYSTERESIS=12; // px hysteresis zone around block midpoints
+let docDragLastInsertAfter=null;
+const DOC_DRAG_DEAD_ZONE=18;
+const DOC_DRAG_HYSTERESIS=10; // px hysteresis around midpoints
 
 function docDragStart(event, blockId){
-  // Don't start block drag if user is interacting with editable content inside the block
-  const t=event.target;
-  if(t.isContentEditable&&!t.classList.contains('doc-block-handle')) { event.preventDefault(); return; }
-  if(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT') { event.preventDefault(); return; }
-
   docDragBlockId=blockId;
-  docDragInsertIdx=-1;
+  docDragLastOverId=null;
   docDragStartY=event.clientY;
   docDragActivated=false;
+  docDragLastInsertAfter=null;
   event.dataTransfer.effectAllowed='move';
   event.dataTransfer.setData('text/plain', blockId);
   docPushUndo();
-
-  const srcEl=document.querySelector(`[data-block-id="${blockId}"]`);
-  if(!srcEl) return;
-
-  // Capture height before collapsing
-  docDragSrcHeight=srcEl.offsetHeight+8; // +8 for gap
-  const srcRect=srcEl.getBoundingClientRect();
-  docDragOffsetY=event.clientY-srcRect.top;
-
-  // Create floating ghost clone
-  const ghost=srcEl.cloneNode(true);
-  ghost.className='doc-drag-ghost';
-  ghost.style.width=srcRect.width+'px';
-  ghost.style.left=srcRect.left+'px';
-  ghost.style.top=srcRect.top+'px';
-  ghost.querySelectorAll('[contenteditable]').forEach(el=>el.removeAttribute('contenteditable'));
-  document.body.appendChild(ghost);
-  docDragGhost=ghost;
-
-  // Use a 1x1 transparent pixel as the browser drag image (we use our own ghost)
-  const blank=document.createElement('canvas');
-  blank.width=1; blank.height=1;
-  event.dataTransfer.setDragImage(blank,0,0);
-
-  // Collapse source block & mark others for transition
   setTimeout(()=>{
-    srcEl.classList.add('drag-source');
-    const page=document.getElementById('docPage');
-    if(page) page.querySelectorAll('.doc-block:not(.drag-source)').forEach(b=>b.classList.add('drag-active'));
-    ghost.classList.add('lifting');
+    const el=document.querySelector(`[data-block-id="${blockId}"]`);
+    if(el) el.classList.add('drag-source');
   },0);
 }
 
@@ -5559,60 +5525,81 @@ function docDragOver(event){
   event.preventDefault();
   event.dataTransfer.dropEffect='move';
   if(!docDragBlockId) return;
-
-  // Move ghost to follow cursor
-  if(docDragGhost){
-    docDragGhost.style.top=(event.clientY-docDragOffsetY)+'px';
-  }
-
-  // Dead zone
   if(!docDragActivated){
     if(docDragStartY!==null&&Math.abs(event.clientY-docDragStartY)<DOC_DRAG_DEAD_ZONE) return;
     docDragActivated=true;
   }
-
   const page=document.getElementById('docPage');
   if(!page) return;
-  const blocks=[...page.querySelectorAll('.doc-block:not(.drag-source)')];
-  if(!blocks.length) return;
+  const blocks=[...page.querySelectorAll('.doc-block')];
 
-  // Determine insert index with hysteresis to prevent flicker at boundaries
-  const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
-  const hy=DOC_DRAG_HYSTERESIS;
-  let insertIdx=blocks.length; // default: after last
-  for(let i=0;i<blocks.length;i++){
-    const rect=blocks[i].getBoundingClientRect();
+  // Find closest block with hysteresis
+  let closestBlock=null, closestDist=Infinity, insertAfter=false;
+  for(const block of blocks){
+    if(block.dataset.blockId===docDragBlockId) continue;
+    const rect=block.getBoundingClientRect();
     const midY=rect.top+rect.height/2;
-    // If we already have an insertIdx, require cursor to move past midpoint + hysteresis to change
-    if(docDragInsertIdx>=0){
-      if(i===docDragInsertIdx && event.clientY<midY+hy){ insertIdx=i; break; }
-      if(i===docDragInsertIdx-1 && event.clientY<midY-hy){ insertIdx=i; break; }
-      if(i!==docDragInsertIdx && i!==docDragInsertIdx-1 && event.clientY<midY){ insertIdx=i; break; }
-    } else {
-      if(event.clientY<midY){ insertIdx=i; break; }
+    const dist=Math.abs(event.clientY-midY);
+    if(dist<closestDist){
+      closestDist=dist;
+      closestBlock=block;
+      insertAfter=event.clientY>midY;
     }
   }
 
-  if(insertIdx===docDragInsertIdx) return; // no change
-  docDragInsertIdx=insertIdx;
+  const hoverId=closestBlock?.dataset?.blockId;
+  // Hysteresis: if same block, only flip insertAfter when cursor moves decisively past midpoint
+  if(hoverId===docDragLastOverId && insertAfter!==docDragLastInsertAfter){
+    const rect=closestBlock.getBoundingClientRect();
+    const midY=rect.top+rect.height/2;
+    const dist=Math.abs(event.clientY-midY);
+    if(dist<DOC_DRAG_HYSTERESIS) return; // within hysteresis zone, don't flip
+  }
 
-  // Map DOM blocks to data indices (excluding source)
-  const otherBlocks=currentDoc.blocks.filter(b=>b.id!==docDragBlockId);
+  if(hoverId===docDragLastOverId && insertAfter===docDragLastInsertAfter) return;
+  docDragLastOverId=hoverId;
+  docDragLastInsertAfter=insertAfter;
 
-  // Smoothly translate: blocks at index >= insertIdx shift DOWN by srcHeight, others reset
-  for(let i=0;i<blocks.length;i++){
-    const shouldShift=(i>=insertIdx);
-    // Adjust: if source was before this block's original position, the visual already collapsed it
-    // So we shift DOWN blocks after the insert point to open a gap
-    const dataIdx=currentDoc.blocks.findIndex(b=>b.id===blocks[i].dataset.blockId);
-    const wasBeforeSrc=dataIdx>srcIdx;
-    // Blocks after source already shifted up by srcHeight due to source collapse
-    // We need to open a gap at insertIdx by shifting those blocks down
-    if(shouldShift){
-      blocks[i].style.transform=`translateY(${docDragSrcHeight}px)`;
-    } else {
-      blocks[i].style.transform='';
+  const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
+  const srcEl=document.querySelector(`[data-block-id="${docDragBlockId}"]`);
+  const srcH=srcEl?srcEl.offsetHeight+8:40;
+
+  if(closestBlock&&closestBlock.dataset.blockId!==docDragBlockId){
+    const hoverIdx=currentDoc.blocks.findIndex(b=>b.id===hoverId);
+    // Determine effective target index
+    let targetIdx=insertAfter?hoverIdx:hoverIdx-1;
+    if(targetIdx<0) targetIdx=0;
+    if(targetIdx>=currentDoc.blocks.length) targetIdx=currentDoc.blocks.length-1;
+
+    // Directly set transforms (CSS transition handles smooth animation — no clearing)
+    for(const block of blocks){
+      const bid=block.dataset.blockId;
+      if(bid===docDragBlockId) continue;
+      const idx=currentDoc.blocks.findIndex(b=>b.id===bid);
+      let ty=0;
+      if(srcIdx<hoverIdx||(srcIdx<hoverIdx+1&&insertAfter)){
+        if(idx>srcIdx&&(idx<hoverIdx||(idx===hoverIdx&&insertAfter))) ty=-srcH;
+      } else if(srcIdx>hoverIdx||(srcIdx>hoverIdx-1&&!insertAfter)){
+        if(idx<srcIdx&&(idx>hoverIdx||(idx===hoverIdx&&!insertAfter))) ty=srcH;
+      }
+      block.style.transform=ty?`translateY(${ty}px)`:'';
     }
+    // Move source visually
+    if(srcEl){
+      const srcRect=srcEl.getBoundingClientRect();
+      const targetRect=closestBlock.getBoundingClientRect();
+      const dy=targetRect.top-srcRect.top+(insertAfter?targetRect.height:0)-(insertAfter?0:0);
+      srcEl.style.transform=`scale(0.96) translateY(${dy}px)`;
+    }
+  }
+
+  // Drop indicator
+  page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
+  if(closestBlock){
+    const indicator=document.createElement('div');
+    indicator.className='doc-drop-indicator';
+    if(insertAfter) closestBlock.after(indicator);
+    else closestBlock.before(indicator);
   }
 }
 
@@ -5620,81 +5607,55 @@ function docDragLeave(event){
   const page=document.getElementById('docPage');
   if(!page) return;
   if(event.relatedTarget&&page.contains(event.relatedTarget)) return;
-  // Reset transforms if leaving page
-  page.querySelectorAll('.doc-block:not(.drag-source)').forEach(b=>{
-    b.style.transform='';
-  });
-  docDragInsertIdx=-1;
-}
-
-function docDragEnd(event){
-  // Skip if not a block drag (e.g. text selection in contenteditable) or if docDrop already handled it
-  if(!docDragBlockId||docDragDropped){ docDragDropped=false; return; }
-  // Drag was cancelled (Escape, dropped outside, etc.) — restore original state
-  docDragCleanup();
-  renderDocMode();
-}
-
-function docDragCleanup(){
-  if(docDragGhost){ docDragGhost.remove(); docDragGhost=null; }
-  const page=document.getElementById('docPage');
-  if(page){
-    page.querySelectorAll('.doc-block').forEach(b=>{
-      b.classList.remove('drag-source','drag-active');
-      b.style.transform='';
-    });
-  }
-  docDragBlockId=null;
-  docDragInsertIdx=-1;
+  page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
+  page.querySelectorAll('.doc-block').forEach(b=>{ b.style.transform=''; });
+  docDragLastOverId=null;
+  docDragLastInsertAfter=null;
 }
 
 function docDrop(event){
   event.preventDefault();
-  if(!docDragBlockId||!currentDoc){ docDragCleanup(); return; }
-
   const page=document.getElementById('docPage');
-  if(!page){ docDragCleanup(); return; }
+  if(!page) return;
+  page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
+  if(!docDragBlockId||!currentDoc){ docDragBlockId=null; return; }
 
-  // Calculate final data index from visual insertIdx
+  // Find target position from cursor
+  const blocks=[...page.querySelectorAll('.doc-block')];
+  let targetIdx=-1;
+  for(const block of blocks){
+    if(block.dataset.blockId===docDragBlockId) continue;
+    const rect=block.getBoundingClientRect();
+    const midY=rect.top+rect.height/2;
+    if(event.clientY>midY){
+      targetIdx=currentDoc.blocks.findIndex(b=>b.id===block.dataset.blockId);
+    }
+  }
+
+  // Move block in data — no clamp, move to actual target
   const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
-  if(srcIdx===-1){ docDragCleanup(); return; }
-
-  // otherBlocks is blocks without source, in order
-  const otherIds=currentDoc.blocks.filter(b=>b.id!==docDragBlockId).map(b=>b.id);
-  // insertIdx is position among otherBlocks, so we insert at that position
-  let insertAt=docDragInsertIdx;
-  if(insertAt<0) insertAt=otherIds.length; // default to end
-  if(insertAt>otherIds.length) insertAt=otherIds.length;
-
-  // Remove source and reinsert
+  if(srcIdx===-1){ docDragBlockId=null; return; }
+  let insertAt=targetIdx===-1?0:(targetIdx>=srcIdx?targetIdx:targetIdx+1);
+  if(insertAt===srcIdx){ docDragBlockId=null; renderDocMode(); return; }
   const [moved]=currentDoc.blocks.splice(srcIdx,1);
-  // After removing source, insertAt directly maps to the new array
-  if(insertAt>currentDoc.blocks.length) insertAt=currentDoc.blocks.length;
+  if(insertAt>srcIdx) insertAt--;
   currentDoc.blocks.splice(insertAt,0,moved);
   currentDoc.updated=new Date().toISOString();
 
-  docDragDropped=true; // prevent docDragEnd from double-firing
+  // Settling animation
+  blocks.forEach(b=>{
+    b.classList.remove('drag-source');
+    b.style.transform='';
+    b.classList.add('drag-settling');
+  });
 
-  // Animate ghost to final position then re-render
-  if(docDragGhost){
-    const targetBlocks=[...page.querySelectorAll('.doc-block:not(.drag-source)')];
-    let targetTop=0;
-    if(targetBlocks[insertAt]){
-      targetTop=targetBlocks[insertAt].getBoundingClientRect().top;
-    } else if(targetBlocks.length>0){
-      const last=targetBlocks[targetBlocks.length-1];
-      targetTop=last.getBoundingClientRect().bottom+8;
-    }
-    docDragGhost.style.transition='top 0.18s cubic-bezier(0.2,0.8,0.3,1), opacity 0.18s';
-    docDragGhost.style.top=targetTop+'px';
-    docDragGhost.style.opacity='0.4';
-  }
-
+  docDragBlockId=null;
+  docDragLastOverId=null;
+  docDragLastInsertAfter=null;
   setTimeout(()=>{
-    docDragCleanup();
     renderDocMode();
     docAutoSave();
-  },180);
+  },100);
 }
 
 // ── Doc auto-save ──
