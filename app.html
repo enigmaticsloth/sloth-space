@@ -5064,9 +5064,9 @@ function renderDocMode(){
       const btnC=float==='none'?' active':'';
       const btnR=float==='right'?' active':'';
       const capClass=hasCaption?'':'hidden-cap';
-      return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
+      return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)" draggable="true" ondragstart="docDragStart(event,'${block.id}')">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
-        ${src?`<img src="${src}" alt="${escapeHtml(alt)}" onclick="event.stopPropagation();docShowImagePopup('${block.id}',this)" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
+        ${src?`<img src="${src}" alt="${escapeHtml(alt)}" draggable="false" onclick="event.stopPropagation();docShowImagePopup('${block.id}',this)" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
         <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
           onblur="docSaveFigureCaption('${block.id}',this.textContent)"
           onclick="event.stopPropagation()"
@@ -5094,7 +5094,7 @@ function renderDocMode(){
       });
       tableHtml+='</table>';
       tableHtml+=`<button class="table-add-row" onclick="event.stopPropagation();docTableAddRow('${block.id}')">+ Add row</button>`;
-      return `<div class="doc-block${selected} ${floatClass}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
+      return `<div class="doc-block${selected} ${floatClass}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)" draggable="true" ondragstart="docDragStart(event,'${block.id}')">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         <div onclick="event.stopPropagation();docShowBlockPopup('${block.id}',this)">${tableHtml}</div>
         <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
@@ -5506,6 +5506,10 @@ let docDragActivated=false; // drag only activates after dead zone exceeded
 const DOC_DRAG_DEAD_ZONE=18; // px threshold before drag activates
 
 function docDragStart(event, blockId){
+  // Don't start block drag if user is interacting with editable content inside the block
+  const t=event.target;
+  if(t.isContentEditable&&!t.classList.contains('doc-block-handle')) { event.preventDefault(); return; }
+  if(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT') { event.preventDefault(); return; }
   docDragBlockId=blockId;
   docDragLastOver=null;
   docDragStartY=event.clientY;
@@ -5635,14 +5639,15 @@ function docDrop(event){
     }
   }
 
-  // Move block in data — clamp to adjacent swap only (max 1 position move)
+  // Move block in data to target position
   const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
   if(srcIdx===-1){ docDragBlockId=null; return; }
-  let rawInsert=targetIdx===-1?0:(targetIdx>=srcIdx?targetIdx:targetIdx+1);
-  // Clamp: only allow moving 1 position up or down
-  const clampedInsert=Math.max(srcIdx-1, Math.min(srcIdx+1, rawInsert));
+  let insertAt=targetIdx===-1?0:(targetIdx>=srcIdx?targetIdx:targetIdx+1);
+  if(insertAt===srcIdx){ docDragBlockId=null; renderDocMode(); return; }
   const [moved]=currentDoc.blocks.splice(srcIdx,1);
-  currentDoc.blocks.splice(clampedInsert,0,moved);
+  // After splice, adjust index if moving down
+  if(insertAt>srcIdx) insertAt--;
+  currentDoc.blocks.splice(insertAt,0,moved);
   currentDoc.updated=new Date().toISOString();
 
   // Clean up drag classes and inline styles
