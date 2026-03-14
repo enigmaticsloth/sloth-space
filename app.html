@@ -4803,16 +4803,21 @@ function docSnapshotDoc(){
   if(!currentDoc) return null;
   return JSON.parse(JSON.stringify(currentDoc));
 }
+// Content-only fingerprint for undo comparison (ignores `updated` timestamp)
+function docContentKey(doc){
+  if(!doc) return '';
+  const copy=Object.assign({},doc);
+  delete copy.updated;
+  return JSON.stringify(copy);
+}
 let docUndoRedoInProgress=false;
 function docPushUndo(){
-  if(docUndoRedoInProgress) return; // don't push during undo/redo render cycle
+  if(docUndoRedoInProgress) return;
   const snap=docSnapshotDoc();
   if(!snap) return;
-  // Skip if identical to top of stack (avoid duplicate snapshots)
-  if(docUndoStack.length>0){
-    const top=docUndoStack[docUndoStack.length-1];
-    if(JSON.stringify(top)===JSON.stringify(snap)) return;
-  }
+  // Skip if content identical to top of stack
+  const key=docContentKey(snap);
+  if(docUndoStack.length>0 && docContentKey(docUndoStack[docUndoStack.length-1])===key) return;
   docUndoStack.push(snap);
   if(docUndoStack.length>DOC_MAX_UNDO) docUndoStack.shift();
   docRedoStack=[];
@@ -4821,14 +4826,14 @@ function docPushUndo(){
 function docUndo(){
   if(!docUndoStack.length) return;
   docUndoRedoInProgress=true;
-  const currentStr=JSON.stringify(currentDoc);
-  // Skip past any snapshots identical to current state (dedup)
+  const curKey=docContentKey(currentDoc);
+  // Skip past snapshots with identical content
   let snap=null;
   while(docUndoStack.length){
     const candidate=docUndoStack.pop();
-    if(JSON.stringify(candidate)!==currentStr){ snap=candidate; break; }
+    if(docContentKey(candidate)!==curKey){ snap=candidate; break; }
   }
-  if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); return; } // nothing different to undo to
+  if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); return; }
   const current=docSnapshotDoc();
   if(current) docRedoStack.push(current);
   currentDoc=snap;
@@ -4841,11 +4846,11 @@ function docUndo(){
 function docRedo(){
   if(!docRedoStack.length) return;
   docUndoRedoInProgress=true;
-  const currentStr=JSON.stringify(currentDoc);
+  const curKey=docContentKey(currentDoc);
   let snap=null;
   while(docRedoStack.length){
     const candidate=docRedoStack.pop();
-    if(JSON.stringify(candidate)!==currentStr){ snap=candidate; break; }
+    if(docContentKey(candidate)!==curKey){ snap=candidate; break; }
   }
   if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); return; }
   const current=docSnapshotDoc();
