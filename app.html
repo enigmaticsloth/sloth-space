@@ -384,11 +384,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 /* Drop indicator for drag reorder */
 .doc-drop-indicator { height:2px; background:#7886A5; margin:0; border-radius:1px; transition:opacity 0.1s; pointer-events:none; }
 
-/* Block drag swap animation */
-.doc-block.drag-above { transform:translateY(-4px); transition:transform 0.2s ease; }
-.doc-block.drag-below { transform:translateY(4px); transition:transform 0.2s ease; }
-.doc-block.drag-source { opacity:0.3; transform:scale(0.98); transition:opacity 0.15s, transform 0.15s; }
-.doc-block.drag-settling { transition:transform 0.25s cubic-bezier(0.2,0.8,0.3,1); transform:translateY(0); }
+/* Block drag swap animation — live swap during drag */
+.doc-block { transition:transform 0.25s cubic-bezier(0.2,0.8,0.3,1), opacity 0.2s; }
+.doc-block.drag-above, .doc-block.drag-below { /* transform set via JS for exact pixel displacement */ }
+.doc-block.drag-source { opacity:0.2; background:rgba(120,134,165,0.08); border-color:#7886A5 !important; z-index:10; }
+.doc-block.drag-settling { transition:transform 0.25s cubic-bezier(0.2,0.8,0.3,1); transform:none !important; }
 
 /* Mode switch mini-menu */
 .mode-switch-menu { position:absolute; top:100%; left:0; margin-top:4px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:4px; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,0.5); min-width:130px; }
@@ -407,10 +407,22 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .dt-btn.active { color:#7886A5; background:rgba(120,134,165,0.1); }
 .dt-btn svg { width:14px; height:14px; }
 .dt-sep { width:1px; background:var(--border); margin:0 2px; }
-.dt-select { background:var(--input-bg); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 4px; font-size:10px; font-family:Arial; cursor:pointer; outline:none; }
+.dt-select { background:#1a1a1a; color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 4px; font-size:10px; font-family:Arial; cursor:pointer; outline:none; -webkit-appearance:none; appearance:none; }
 .dt-select:hover { border-color:#555; }
+.dt-select:focus { border-color:#7886A5; }
 .dt-color-swatch { width:16px; height:16px; border-radius:3px; border:1px solid rgba(255,255,255,0.2); cursor:pointer; }
-.dt-font-size { width:36px; text-align:center; background:var(--input-bg); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px; font-size:10px; font-family:'Courier New',monospace; }
+.dt-font-size { width:40px; text-align:center; background:#1a1a1a; color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 4px; font-size:10px; font-family:'Courier New',monospace; -webkit-appearance:none; appearance:none; -moz-appearance:textfield; }
+.dt-font-size::-webkit-inner-spin-button, .dt-font-size::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+/* Insert (+) menu */
+.insert-menu { position:absolute; top:100%; left:0; margin-top:4px; background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:4px 0; z-index:300; box-shadow:0 6px 24px rgba(0,0,0,0.6); min-width:180px; max-height:320px; overflow-y:auto; }
+.insert-menu-title { font-size:9px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:4px 12px 2px; }
+.insert-menu-item { padding:7px 12px; font-size:11px; color:#ccc; cursor:pointer; transition:background 0.1s; white-space:nowrap; }
+.insert-menu-item:hover { background:#2a2a2a; color:#fff; }
+/* Doc block inline AI action bar */
+.doc-block-actions { display:flex; gap:2px; padding:4px 8px; margin:-4px 0 4px; animation:ctx-fade-in 0.12s ease; }
+.doc-block-actions button { background:#1e1e1e; border:1px solid #333; color:#aaa; font-size:10px; padding:4px 10px; border-radius:5px; cursor:pointer; transition:all 0.1s; white-space:nowrap; }
+.doc-block-actions button:hover { background:#2a2a2a; color:#fff; border-color:#555; }
+.doc-block-actions button:last-child { color:#666; border:none; background:transparent; padding:4px 6px; }
 
 /* Doc AI context menu */
 .doc-ctx-menu { position:fixed; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:6px; z-index:300; box-shadow:0 8px 28px rgba(0,0,0,0.5); min-width:180px; backdrop-filter:blur(12px); }
@@ -1363,12 +1375,12 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 <!-- Middle: slide left + conversation right -->
 <div class="middle slides-ui">
   <div class="slide-panel">
-    <div class="deck-name-bar">
+    <div class="deck-name-bar" id="modeNameBar">
       <input type="text" id="deckNameInput" class="deck-name-input" placeholder="Untitled Presentation" spellcheck="false">
-      <div class="deck-actions">
-        <button class="deck-action-btn" onclick="newDeck()">+ New</button>
-        <button class="deck-action-btn" onclick="loadDeck()">Import</button>
-        <button class="deck-action-btn primary" onclick="saveCurrentToCloud()">Save to Cloud</button>
+      <div class="deck-actions" id="modeActions">
+        <button class="deck-action-btn" onclick="modeNew()">+ New</button>
+        <button class="deck-action-btn" onclick="modeImport()">Import</button>
+        <button class="deck-action-btn primary" onclick="modeSaveCloud()">Save to Cloud</button>
       </div>
     </div>
     <div class="slide-frame" id="slideCanvas"></div>
@@ -1445,31 +1457,29 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         <input type="color" id="dtBgColor" value="#1e1e1e" onchange="modeToolbarBgColor(this.value)" style="width:18px;height:18px;border:none;background:none;cursor:pointer;padding:0;">
       </label>
     </div>
-    <!-- Slide-only: image attach + layout -->
-    <div class="dt-group tb-slide-only">
-      <button class="dt-btn" onclick="document.getElementById('imgFileInput').click()" title="Attach image">+ img</button>
-      <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleImageFiles(this.files)">
-      <button class="dt-btn" onclick="togglePopup('layoutPopup',this,event)" title="Layout">
-        Layout
-        <div class="popup" id="layoutPopup">
-          <div class="font-list">
-            <div class="font-item" onclick="insertTag('[layout: content]')">Content</div>
-            <div class="font-item" onclick="insertTag('[layout: two-column]')">Two Column</div>
-            <div class="font-item" onclick="insertTag('[layout: image-top]')">Image Top</div>
-            <div class="font-item" onclick="insertTag('[layout: image-left]')">Image Left</div>
-            <div class="font-item" onclick="insertTag('[layout: image-right]')">Image Right</div>
-            <div class="font-item" onclick="insertTag('[layout: image-bottom]')">Image Bottom</div>
-            <div class="font-item" onclick="insertTag('[layout: quote]')">Quote</div>
-            <div class="font-item" onclick="insertTag('[layout: data-table]')">Data Table</div>
-          </div>
-        </div>
+    <!-- Shared: Insert (+) menu -->
+    <div class="dt-group" style="position:relative;">
+      <button class="dt-btn" id="insertPlusBtn" onclick="toggleInsertMenu(event)" title="Insert">
+        <span style="font-size:14px;font-weight:700;line-height:1;">+</span>
       </button>
-    </div>
-    <!-- Doc-only: Insert -->
-    <div class="dt-group tb-doc-only" style="display:none;">
-      <button class="dt-btn" onclick="docInsertDivider()" title="Insert divider">—</button>
-      <button class="dt-btn" onclick="docInsertImageBlock()" title="Insert image">🖼</button>
-      <button class="dt-btn" onclick="docInsertTablePrompt()" title="Insert table (via AI)">⊞</button>
+      <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleInsertedFiles(this.files)">
+      <div class="insert-menu" id="insertMenu" style="display:none;">
+        <div class="insert-menu-title">Insert</div>
+        <!-- Shared items -->
+        <div class="insert-menu-item" onclick="triggerLocalImageInsert()">🖼 Image (local file)</div>
+        <div class="insert-menu-item" onclick="triggerUrlImageInsert()">🔗 Image (URL)</div>
+        <!-- Doc-only items -->
+        <div class="insert-menu-item tb-doc-only" onclick="docInsertDivider();hideInsertMenu()">— Divider</div>
+        <div class="insert-menu-item tb-doc-only" onclick="docInsertTablePrompt();hideInsertMenu()">⊞ Table (AI)</div>
+        <!-- Slide-only items -->
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: content]');hideInsertMenu()">📄 Layout: Content</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: two-column]');hideInsertMenu()">📑 Layout: Two Column</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-top]');hideInsertMenu()">🖼 Layout: Image Top</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-left]');hideInsertMenu()">◧ Layout: Image Left</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-right]');hideInsertMenu()">◨ Layout: Image Right</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: quote]');hideInsertMenu()">❝ Layout: Quote</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: data-table]');hideInsertMenu()">📊 Layout: Data Table</div>
+      </div>
     </div>
     <!-- Doc-only: Zoom -->
     <div class="dt-group tb-doc-only" style="display:none;">
@@ -2118,12 +2128,15 @@ let textSelTimeout=null;
 function showTextSelTooltip(){
   const sel=window.getSelection();
   if(!sel||sel.isCollapsed||!sel.toString().trim())return hideTextSelTooltip();
-  // Check if selection is inside a region-box
+  // Check if selection is inside a region-box (slide) OR doc-block (doc)
   const anchor=sel.anchorNode;
   const regionEl=anchor?.parentElement?.closest?.('.region-box')||anchor?.closest?.('.region-box');
-  if(!regionEl)return hideTextSelTooltip();
+  const docBlockEl=anchor?.parentElement?.closest?.('.doc-block')||anchor?.closest?.('.doc-block');
+  if(!regionEl&&!docBlockEl)return hideTextSelTooltip();
 
   const tooltip=document.getElementById('textSelTooltip');
+  // Update tooltip buttons based on mode
+  updateSelTooltipForMode(!!docBlockEl);
   const range=sel.getRangeAt(0);
   const rect=range.getBoundingClientRect();
   tooltip.style.display='flex';
@@ -2135,6 +2148,13 @@ function showTextSelTooltip(){
   if(y<8){ y=rect.bottom+6; } // flip below if no room above
   tooltip.style.left=x+'px';
   tooltip.style.top=y+'px';
+}
+function updateSelTooltipForMode(isDoc){
+  const tooltip=document.getElementById('textSelTooltip');
+  if(!tooltip) return;
+  tooltip.innerHTML=isDoc
+    ? '<button onclick="docEditFromSelection()">✏️ AI Edit</button><button onclick="copySelectionToChat()">✦ Ask AI</button><button onclick="copySelectionToClipboard()">📋 Copy</button>'
+    : '<button onclick="editFromSelection()">✏️ Edit</button><button onclick="copySelectionToChat()">✦ Ask AI</button><button onclick="copySelectionToClipboard()">📋 Copy</button>';
 }
 
 function hideTextSelTooltip(){
@@ -2192,6 +2212,66 @@ function copySelectionToClipboard(){
     hideTextSelTooltip();
   });
   sel.removeAllRanges();
+}
+
+// ── Doc block AI edit from selection ──
+function docEditFromSelection(){
+  hideTextSelTooltip();
+  const sel=window.getSelection();
+  const text=sel?.toString()?.trim();
+  if(!text) return;
+  const anchor=sel.anchorNode;
+  const blockEl=anchor?.parentElement?.closest?.('.doc-block')||anchor?.closest?.('.doc-block');
+  if(!blockEl) return;
+  const blockId=blockEl.dataset.blockId;
+  sel.removeAllRanges();
+  // Pre-fill chat with AI edit instruction
+  const input=document.getElementById('chatInput');
+  input.value=`Edit block: "${text.slice(0,60)}${text.length>60?'...':''}" → `;
+  input.focus();
+  input.selectionStart=input.selectionEnd=input.value.length;
+}
+
+// ── Doc block click → AI action tooltip ──
+function docBlockClickAction(blockId, e){
+  // Don't show if user is selecting text
+  const sel=window.getSelection();
+  if(sel&&!sel.isCollapsed) return;
+  // Don't show on drag handle
+  if(e.target.closest('.doc-block-handle')) return;
+
+  const block=currentDoc?.blocks?.find(b=>b.id===blockId);
+  if(!block) return;
+  const text=blockPlainText(block);
+  if(!text.trim()) return; // empty block, no AI actions
+
+  // Show inline AI action bar below the block
+  const blockEl=document.querySelector(`[data-block-id="${blockId}"]`);
+  if(!blockEl) return;
+
+  // Remove existing doc action bars
+  document.querySelectorAll('.doc-block-actions').forEach(el=>el.remove());
+
+  const bar=document.createElement('div');
+  bar.className='doc-block-actions';
+  bar.innerHTML=`
+    <button onclick="docCtxAI('rewrite','Rewrite concisely');this.closest('.doc-block-actions').remove()">✨ Rewrite</button>
+    <button onclick="docCtxAI('expand','Expand with more detail');this.closest('.doc-block-actions').remove()">📝 Expand</button>
+    <button onclick="docCtxAI('translate','Translate to English');this.closest('.doc-block-actions').remove()">🌐 Translate</button>
+    <button onclick="docCtxAI('tone','Make more professional');this.closest('.doc-block-actions').remove()">🎯 Tone</button>
+    <button onclick="this.closest('.doc-block-actions').remove()">✕</button>
+  `;
+  blockEl.after(bar);
+
+  // Auto-dismiss on click outside
+  setTimeout(()=>{
+    document.addEventListener('click',function dismissDocBar(ev){
+      if(!ev.target.closest('.doc-block-actions')){
+        bar.remove();
+        document.removeEventListener('click',dismissDocBar);
+      }
+    });
+  },10);
 }
 
 // Listen for text selection changes
@@ -2776,9 +2856,17 @@ function renderApp(){
   // Skip re-render while user is inline-editing text (would destroy cursor + edit state)
   if(isInlineEditing())return;
 
-  // If in doc or workspace mode, don't render slide UI — render doc instead
-  if(currentMode==='doc'){ renderDocMode(); return; }
-  if(currentMode==='workspace'){ renderWorkspaceMode(); return; }
+  // If in doc or workspace mode, don't render slide UI — enforce mode isolation
+  if(currentMode==='doc'){
+    document.getElementById('slideCanvas').style.display='none';
+    const sb=document.querySelector('.slide-bar'); if(sb) sb.style.display='none';
+    renderDocMode(); return;
+  }
+  if(currentMode==='workspace'){
+    document.getElementById('slideCanvas').style.display='none';
+    const sb=document.querySelector('.slide-bar'); if(sb) sb.style.display='none';
+    renderWorkspaceMode(); return;
+  }
 
   // Auto-save on every render (deck changes trigger render)
   autoSave();
@@ -2794,7 +2882,7 @@ function renderApp(){
   ).join('');
 
   // Hide toolbar when no deck loaded
-  const toolbarEl=document.querySelector('.toolbar');
+  const toolbarEl=document.getElementById('unifiedToolbar');
   if(toolbarEl) toolbarEl.style.display=currentDeck?'flex':'none';
 
   // Onboarding: show prompt chips in empty chat
@@ -3509,6 +3597,8 @@ let currentMode='slide'; // 'slide' | 'doc' | 'sheet'
 
 function pickMode(mode){
   if(mode==='sheet') return; // not yet implemented
+  // Save current doc before switching away
+  if(currentMode==='doc'&&currentDoc) docSaveNow();
   if(mode==='workspace'){ enterWorkspaceMode(); return; }
   currentMode=mode;
   document.getElementById('modePickerOverlay').classList.add('hidden');
@@ -3528,10 +3618,10 @@ function enterWorkspaceMode(){
   sessionStorage.setItem('sloth_active','1');
   sessionStorage.setItem('sloth_mode','workspace');
   updateModeBadge('workspace');
-  // Hide slide & doc chrome
+  // Hide slide & doc chrome, keep name bar
   document.getElementById('slideCanvas').style.display='none';
-  const deckNameBar=document.querySelector('.deck-name-bar');
-  if(deckNameBar) deckNameBar.style.display='none';
+  const nameBar=document.getElementById('modeNameBar');
+  if(nameBar) nameBar.style.display='';
   const slideBar=document.querySelector('.slide-bar');
   if(slideBar) slideBar.style.display='none';
   const docCanvas=document.getElementById('docCanvas');
@@ -3546,6 +3636,7 @@ function enterWorkspaceMode(){
   }
   wsCanvas.style.display='';
   updateToolbarForMode('workspace');
+  updateModeNameBar('workspace');
   renderWorkspaceMode();
 }
 
@@ -3756,6 +3847,10 @@ function switchToMode(mode){
   document.getElementById('modeSwitchMenu').style.display='none';
   if(mode===currentMode) return;
   if(mode==='sheet'){ addMessage('Sheet mode coming soon!','system'); return; }
+  // Save current mode's state before switching
+  if(currentMode==='doc'&&currentDoc){
+    docSaveNow(); // flush save immediately
+  }
   // Switch directly without going through mode picker
   sessionStorage.setItem('sloth_mode',mode);
   updateModeBadge(mode);
@@ -3763,6 +3858,152 @@ function switchToMode(mode){
   if(mode==='slide') enterSlideMode();
   else if(mode==='doc') enterDocMode();
   else if(mode==='workspace') enterWorkspaceMode();
+}
+
+// ── Universal name bar — adapts per mode ──
+function updateModeNameBar(mode){
+  const nameInput=document.getElementById('deckNameInput');
+  if(!nameInput) return;
+  if(mode==='slide'){
+    nameInput.placeholder='Untitled Presentation';
+    nameInput.value=currentDeck?.title||'';
+    nameInput.oninput=function(){ if(currentDeck) currentDeck.title=this.value; };
+  } else if(mode==='doc'){
+    nameInput.placeholder='Untitled Document';
+    nameInput.value=currentDoc?.title||'';
+    nameInput.oninput=function(){ if(currentDoc){ currentDoc.title=this.value; currentDoc.updated=new Date().toISOString(); docAutoSave(); }};
+  } else if(mode==='workspace'){
+    nameInput.placeholder='Workspace';
+    nameInput.value='Workspace';
+    nameInput.oninput=null;
+  }
+}
+
+// ── Mode-dispatched New / Import / Save ──
+function modeNew(){
+  if(currentMode==='slide'){
+    newDeck();
+  } else if(currentMode==='doc'){
+    docNewDocument();
+  } else if(currentMode==='workspace'){
+    // In workspace, open new slide deck by default
+    newDeck();
+    switchToMode('slide');
+  }
+}
+function modeImport(){
+  if(currentMode==='slide'){
+    loadDeck();
+  } else if(currentMode==='doc'){
+    docImport();
+  } else if(currentMode==='workspace'){
+    loadDeck();
+  }
+}
+function modeSaveCloud(){
+  if(currentMode==='slide'){
+    saveCurrentToCloud();
+  } else if(currentMode==='doc'){
+    docSaveToCloud();
+  } else {
+    addMessage('Select a doc or slide to save to cloud.','system');
+  }
+}
+
+// ── Doc: New document ──
+function docNewDocument(){
+  if(currentDoc&&currentDoc.blocks.some(b=>blockPlainText(b).trim())){
+    if(!confirm('Start a new document? Current doc is auto-saved.')) return;
+    docSaveNow();
+  }
+  currentDoc=docCreateNew('Untitled Document');
+  docUndoStack=[];
+  docRedoStack=[];
+  updateModeNameBar('doc');
+  renderDocMode();
+  addMessage('New document started.','system');
+}
+
+// ── Doc: Import (plain text / JSON) ──
+function docImport(){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.txt,.md,.json,.sloth';
+  input.onchange=function(e){
+    const file=e.target.files[0];
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=function(ev){
+      const text=ev.target.result;
+      if(file.name.endsWith('.json')){
+        try{
+          const data=JSON.parse(text);
+          if(data.blocks){
+            currentDoc={ id:blockId(), title:data.title||file.name.replace(/\.json$/,''), blocks:data.blocks, created:new Date().toISOString(), updated:new Date().toISOString() };
+          } else {
+            throw new Error('No blocks');
+          }
+        }catch(err){
+          // Treat as plain text
+          docImportPlainText(file.name, text);
+          return;
+        }
+      } else {
+        docImportPlainText(file.name, text);
+      }
+      updateModeNameBar('doc');
+      renderDocMode();
+      docAutoSave();
+      addMessage(`✓ Imported: "${currentDoc.title}"`,'system');
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+function docImportPlainText(filename, text){
+  const title=filename.replace(/\.(txt|md|json)$/i,'');
+  const lines=text.split('\n').filter(l=>l.trim());
+  const blocks=[];
+  if(lines.length>0){
+    blocks.push(createBlock('heading1', lines[0].replace(/^#+\s*/,'')));
+    for(let i=1;i<lines.length;i++){
+      const line=lines[i];
+      if(line.startsWith('# ')) blocks.push(createBlock('heading1',line.slice(2)));
+      else if(line.startsWith('## ')) blocks.push(createBlock('heading2',line.slice(3)));
+      else if(line.startsWith('### ')) blocks.push(createBlock('heading3',line.slice(4)));
+      else if(line.startsWith('> ')) blocks.push(createBlock('quote',line.slice(2)));
+      else if(line.startsWith('- ')||line.startsWith('* ')) blocks.push(createBlock('list',line.slice(2)));
+      else if(line.startsWith('---')) blocks.push(createBlock('divider',''));
+      else blocks.push(createBlock('paragraph',line));
+    }
+  }
+  if(blocks.length===0) blocks.push(createBlock('paragraph',''));
+  currentDoc={ id:blockId(), title, blocks, created:new Date().toISOString(), updated:new Date().toISOString() };
+}
+
+// ── Doc: Save to Cloud ──
+async function docSaveToCloud(){
+  if(!currentDoc){addMessage('No document to save.','system');return;}
+  docSaveNow(); // flush first
+  if(!supabaseClient||!currentUser){
+    addMessage('Sign in to save to cloud.','system');
+    doLogin();
+    return;
+  }
+  try{
+    const fname=(currentDoc.title||'Untitled').replace(/[^a-zA-Z0-9\u4e00-\u9fff\s-]/g,'').replace(/\s+/g,'_')+'.doc.json';
+    const path=currentUser.id+'/'+fname;
+    const payload=JSON.stringify({
+      type:'doc',
+      doc:currentDoc,
+      savedAt:new Date().toISOString()
+    });
+    const blob=new Blob([payload],{type:'application/json'});
+    const{error}=await supabaseClient.storage.from(CLOUD_BUCKET).upload(path,blob,{upsert:true});
+    if(error) throw error;
+    addMessage(`✓ Doc saved to cloud: "${currentDoc.title||'Untitled'}"`,'system');
+    refreshFileList();
+  }catch(e){addMessage('Cloud save error: '+e.message,'system');}
 }
 
 // ── Toggle toolbar for mode ──
@@ -3866,6 +4107,76 @@ function applyDocZoom(){
   if(label) label.textContent=docZoomLevel+'%';
 }
 
+// ── Insert (+) Menu ──
+function toggleInsertMenu(e){
+  e&&e.stopPropagation();
+  const menu=document.getElementById('insertMenu');
+  if(!menu) return;
+  if(menu.style.display==='none'||!menu.style.display){
+    // Update visibility of mode-specific items
+    menu.querySelectorAll('.tb-slide-only').forEach(el=>{
+      el.style.display=(currentMode==='slide')?'':'none';
+    });
+    menu.querySelectorAll('.tb-doc-only').forEach(el=>{
+      el.style.display=(currentMode==='doc')?'':'none';
+    });
+    menu.style.display='block';
+    // Close on outside click
+    setTimeout(()=>document.addEventListener('click',hideInsertMenu,{once:true}),0);
+  } else {
+    menu.style.display='none';
+  }
+}
+function hideInsertMenu(){
+  const menu=document.getElementById('insertMenu');
+  if(menu) menu.style.display='none';
+}
+function triggerLocalImageInsert(){
+  hideInsertMenu();
+  const input=document.getElementById('imgFileInput');
+  if(input) input.click();
+}
+function triggerUrlImageInsert(){
+  hideInsertMenu();
+  const url=prompt('Image URL:');
+  if(!url||!url.trim()) return;
+  if(currentMode==='doc'){
+    const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
+    docPushUndo();
+    const blk=docInsertBlock(afterId,'image','');
+    blk.meta={src:url.trim(), alt:''};
+    currentDoc.updated=new Date().toISOString();
+    renderDocMode();
+  } else {
+    // Slide mode: stage the URL as an image tag
+    insertTag(`[image: ${url.trim()}]`);
+  }
+}
+function handleInsertedFiles(files){
+  if(!files||!files.length) return;
+  if(currentMode==='doc'){
+    // Doc mode: insert image blocks for each file
+    for(const file of files){
+      const reader=new FileReader();
+      reader.onload=function(e){
+        const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
+        docPushUndo();
+        const blk=docInsertBlock(afterId,'image','');
+        blk.meta={src:e.target.result, alt:file.name};
+        currentDoc.updated=new Date().toISOString();
+        renderDocMode();
+      };
+      reader.readAsDataURL(file);
+    }
+  } else {
+    // Slide mode: use the original handleImageFiles
+    handleImageFiles(files);
+  }
+  // Reset file input
+  const input=document.getElementById('imgFileInput');
+  if(input) input.value='';
+}
+
 // ── Doc undo/redo ──
 const DOC_MAX_UNDO=50;
 let docUndoStack=[];
@@ -3951,16 +4262,8 @@ function docInsertDivider(){
   renderDocMode();
 }
 function docInsertImageBlock(){
-  const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
-  docPushUndo();
-  const blk=docInsertBlock(afterId,'image','');
-  // Prompt for URL
-  const url=prompt('Image URL:');
-  if(url){
-    blk.meta={src:url, alt:''};
-    currentDoc.updated=new Date().toISOString();
-  }
-  renderDocMode();
+  // Now handled by triggerLocalImageInsert / triggerUrlImageInsert via insert menu
+  triggerLocalImageInsert();
 }
 function docInsertTablePrompt(){
   // Use AI to create a table (as a code block placeholder or future table block)
@@ -4140,8 +4443,8 @@ document.addEventListener('contextmenu',function(e){
 function enterSlideMode(){
   // Show all slide-specific chrome
   document.getElementById('slideCanvas').style.display='';
-  const deckNameBar=document.querySelector('.deck-name-bar');
-  if(deckNameBar) deckNameBar.style.display='';
+  const nameBar=document.getElementById('modeNameBar');
+  if(nameBar) nameBar.style.display='';
   const slideBar=document.querySelector('.slide-bar');
   if(slideBar) slideBar.style.display='';
   // Hide doc & workspace
@@ -4151,14 +4454,15 @@ function enterSlideMode(){
   if(wsCanvas) wsCanvas.style.display='none';
   currentMode='slide';
   updateToolbarForMode('slide');
+  updateModeNameBar('slide');
   renderApp();
 }
 
 function enterDocMode(){
-  // Hide all slide-specific chrome
+  // Hide slide canvas & slide bar, keep name bar visible
   document.getElementById('slideCanvas').style.display='none';
-  const deckNameBar=document.querySelector('.deck-name-bar');
-  if(deckNameBar) deckNameBar.style.display='none';
+  const nameBar=document.getElementById('modeNameBar');
+  if(nameBar) nameBar.style.display='';
   const slideBar=document.querySelector('.slide-bar');
   if(slideBar) slideBar.style.display='none';
   const wsCanvas=document.getElementById('workspaceCanvas');
@@ -4174,10 +4478,22 @@ function enterDocMode(){
   docCanvas.style.display='';
   currentMode='doc';
   updateToolbarForMode('doc');
-  // Ensure a current doc exists
+  // Restore doc: memory → localStorage → workspace → new
   if(!currentDoc){
-    currentDoc=docCreateNew('Untitled Document');
+    try{
+      const saved=localStorage.getItem('sloth_current_doc');
+      if(saved){
+        const parsed=JSON.parse(saved);
+        if(parsed&&parsed.blocks&&parsed.blocks.length){
+          currentDoc=parsed;
+        }
+      }
+    }catch(e){}
+    if(!currentDoc){
+      currentDoc=docCreateNew('Untitled Document');
+    }
   }
+  updateModeNameBar('doc');
   renderDocMode();
 }
 
@@ -4290,6 +4606,11 @@ function docConvertBlock(blockId, newType){
 function renderDocMode(){
   const canvas=document.getElementById('docCanvas');
   if(!canvas) return;
+  // Sync doc title to name bar input
+  const nameInput=document.getElementById('deckNameInput');
+  if(nameInput&&document.activeElement!==nameInput&&currentDoc){
+    nameInput.value=currentDoc.title||'';
+  }
   if(!currentDoc||!currentDoc.blocks||currentDoc.blocks.length===0){
     canvas.innerHTML=`
       <div class="doc-page">
@@ -4319,7 +4640,7 @@ function renderDocMode(){
 
     // Divider is special — non-editable
     if(block.type==='divider'){
-      return `<div class="doc-block${selected}" data-type="divider" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}')">
+      return `<div class="doc-block${selected}" data-type="divider" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
       </div>`;
     }
@@ -4328,7 +4649,7 @@ function renderDocMode(){
     if(block.type==='image'){
       const src=block.meta?.src||'';
       const alt=block.meta?.alt||'';
-      return `<div class="doc-block${selected}" data-type="image" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}')">
+      return `<div class="doc-block${selected}" data-type="image" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         ${src?`<img src="${src}" alt="${escapeHtml(alt)}" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
       </div>`;
@@ -4344,7 +4665,7 @@ function renderDocMode(){
       onblur="docBlurBlock('${block.id}')"
       oninput="docInputBlock('${block.id}')"
       onkeydown="docKeydownBlock(event,'${block.id}')"
-      onclick="docSelectBlock('${block.id}')">
+      onclick="docSelectBlock('${block.id}',event)">
       <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder" contenteditable="false">⠿</div>${renderBlockContent(block)}</div>`;
   }).join('\n');
 
@@ -4393,12 +4714,20 @@ function renderBlockContent(block){
 
 // ── Doc block event handlers ──
 
-function docSelectBlock(blockId){
+let docLastClickedBlock=null;
+let docClickTimer=null;
+function docSelectBlock(blockId, e){
+  const wasSelected=(docSelectedBlockId===blockId);
   docSelectedBlockId=blockId;
   document.querySelectorAll('.doc-block').forEach(el=>{
     el.classList.toggle('selected', el.dataset.blockId===blockId);
   });
   docUpdateToolbarState();
+  // Show AI action bar on second click (block already selected/focused)
+  if(wasSelected && e && !e.target.closest('.doc-block-handle') && !e.target.closest('.doc-block-actions')){
+    clearTimeout(docClickTimer);
+    docClickTimer=setTimeout(()=>docBlockClickAction(blockId, e), 200);
+  }
 }
 
 function docFocusBlock(blockId){
@@ -4440,6 +4769,9 @@ function docInputBlock(blockId){
   const text=docExtractText(el);
   blockFromPlainText(block, text);
   currentDoc.updated=new Date().toISOString();
+
+  // Auto-save on every content change (debounced)
+  docAutoSave();
 
   // Slash command detection: if typing starts with /
   if(text.startsWith('/')){
@@ -4755,29 +5087,49 @@ function docDragOver(event){
     }
   }
 
-  // Animate: shift blocks up/down around the drag target
+  // Live swap animation: shift blocks to make room for dragged block
   const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
   const hoverId=closestBlock?.dataset?.blockId;
   if(hoverId!==docDragLastOver){
     docDragLastOver=hoverId;
-    // Clear previous animation classes
+    // Get the dragged block's height for displacement
+    const srcEl=document.querySelector(`[data-block-id="${docDragBlockId}"]`);
+    const srcH=srcEl?srcEl.offsetHeight+8:40; // +8 for margin/gap
+
+    // Clear previous animation
     blocks.forEach(b=>{
       b.classList.remove('drag-above','drag-below');
+      b.style.transform='';
     });
+
     if(closestBlock&&closestBlock.dataset.blockId!==docDragBlockId){
       const hoverIdx=currentDoc.blocks.findIndex(b=>b.id===hoverId);
-      // Shift blocks between source and hover position
+      // Displace blocks between source and target by the source block's height
       for(const block of blocks){
         const bid=block.dataset.blockId;
         if(bid===docDragBlockId) continue;
         const idx=currentDoc.blocks.findIndex(b=>b.id===bid);
         if(srcIdx<hoverIdx){
-          // Dragging down: blocks between src+1..hover shift up
-          if(idx>srcIdx&&idx<=hoverIdx) block.classList.add('drag-above');
+          // Dragging down: shift affected blocks UP by srcH
+          if(idx>srcIdx&&idx<=hoverIdx){
+            block.style.transform=`translateY(-${srcH}px)`;
+            block.classList.add('drag-above');
+          }
         } else {
-          // Dragging up: blocks between hover..src-1 shift down
-          if(idx>=hoverIdx&&idx<srcIdx) block.classList.add('drag-below');
+          // Dragging up: shift affected blocks DOWN by srcH
+          if(idx>=hoverIdx&&idx<srcIdx){
+            block.style.transform=`translateY(${srcH}px)`;
+            block.classList.add('drag-below');
+          }
         }
+      }
+      // Move source block to the target gap visually
+      if(srcEl){
+        const targetEl=closestBlock;
+        const srcRect=srcEl.getBoundingClientRect();
+        const targetRect=targetEl.getBoundingClientRect();
+        const dy=targetRect.top-srcRect.top;
+        srcEl.style.transform=`scale(0.95) translateY(${dy}px)`;
       }
     }
   }
@@ -4795,7 +5147,14 @@ function docDragOver(event){
 function docDragLeave(event){
   const page=document.getElementById('docPage');
   if(!page) return;
+  // Only fully reset if leaving the page element itself
+  if(event.relatedTarget&&page.contains(event.relatedTarget)) return;
   page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
+  page.querySelectorAll('.doc-block').forEach(b=>{
+    b.classList.remove('drag-above','drag-below');
+    b.style.transform='';
+  });
+  docDragLastOver=null;
 }
 
 function docDrop(event){
@@ -4825,9 +5184,10 @@ function docDrop(event){
   currentDoc.blocks.splice(insertAt,0,moved);
   currentDoc.updated=new Date().toISOString();
 
-  // Add settling animation class before re-render
+  // Clean up drag classes and inline styles
   blocks.forEach(b=>{
     b.classList.remove('drag-source','drag-above','drag-below');
+    b.style.transform='';
     b.classList.add('drag-settling');
   });
 
@@ -4844,23 +5204,39 @@ function docDrop(event){
 let docAutoSaveTimer=null;
 function docAutoSave(){
   clearTimeout(docAutoSaveTimer);
-  docAutoSaveTimer=setTimeout(()=>{
-    if(!currentDoc) return;
-    // Save to workspace storage
-    const files=wsLoad();
-    const existing=files.findIndex(f=>f.id===currentDoc.id);
-    const wsDoc={
-      id:currentDoc.id,
-      type:'doc',
-      title:currentDoc.title,
-      created:currentDoc.created,
-      updated:currentDoc.updated,
-      content:{ blocks: currentDoc.blocks }
-    };
-    if(existing>=0) files[existing]=wsDoc;
-    else files.push(wsDoc);
-    wsSave(files);
-  },1000);
+  docAutoSaveTimer=setTimeout(()=>{ docSaveNow(); },800);
+}
+function docSaveNow(){
+  if(!currentDoc) return;
+  // 1. Sync any actively editing block content from DOM → data
+  if(docEditingBlockId){
+    const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
+    if(el){
+      const block=docGetBlock(docEditingBlockId);
+      if(block){
+        const text=docExtractText(el);
+        blockFromPlainText(block, text);
+      }
+    }
+  }
+  // 2. Persist currentDoc to localStorage (survives refresh)
+  try{
+    localStorage.setItem('sloth_current_doc', JSON.stringify(currentDoc));
+  }catch(e){}
+  // 3. Save to workspace storage
+  const files=wsLoad();
+  const existing=files.findIndex(f=>f.id===currentDoc.id);
+  const wsDoc={
+    id:currentDoc.id,
+    type:'doc',
+    title:currentDoc.title,
+    created:currentDoc.created,
+    updated:currentDoc.updated,
+    content:{ blocks: currentDoc.blocks }
+  };
+  if(existing>=0) files[existing]=wsDoc;
+  else files.push(wsDoc);
+  wsSave(files);
 }
 
 // ── Load doc from workspace ──
@@ -7328,6 +7704,18 @@ window.addEventListener('resize',function(){
 });
 
 renderApp();
+
+// ── Save doc on page unload/tab close ──
+window.addEventListener('beforeunload',function(){
+  if(currentMode==='doc'&&currentDoc){
+    docSaveNow();
+  }
+});
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden&&currentMode==='doc'&&currentDoc){
+    docSaveNow();
+  }
+});
 
 // ── Typewriter placeholder animation ──
 (function(){
