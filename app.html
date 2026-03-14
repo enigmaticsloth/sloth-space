@@ -381,55 +381,57 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .auth-bar { margin-left:auto; }
   .product-bar { display:none !important; }
 
-  /* --- Middle: vertical column, slide + chat stacked --- */
+  /* --- Middle: vertical column, no horizontal overflow --- */
   .middle {
     flex-direction:column;
-    flex:1; min-height:0; overflow:hidden;
+    flex:1 1 0; min-height:0;
+    overflow:hidden;
+    overflow-x:hidden !important; /* absolutely no horizontal scroll */
+    width:100% !important; max-width:100vw !important;
   }
 
-  /* --- Slide panel: top-aligned, INCOMPRESSIBLE --- */
+  /* --- Slide panel: top-aligned, FIXED height so it never compresses/expands --- */
   .slide-panel {
-    flex:0 0 auto; /* never grow, never shrink */
-    flex-shrink:0 !important;
+    flex:0 0 36vh; /* fixed height = 36% viewport, never grows or shrinks */
+    width:100%;
     align-items:center;
     justify-content:flex-start; /* TOP-ALIGNED */
-    padding:4px 4px 0;
-    overflow:visible;
+    padding:2px 4px 0;
+    overflow:hidden; /* clip, don't let content push layout */
+    min-height:120px; /* minimum on tiny screens */
   }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }
   .deck-name-input { font-size:12px; }
   .deck-actions { display:none; }
 
-  /* Slide frame: fixed size, never squished, with swipe animation */
+  /* Slide frame: contained within panel, never overflows */
   .slide-frame {
     border-radius:6px;
-    flex-shrink:0 !important;
-    position:relative;
+    flex-shrink:0;
+    max-width:100%;
     overflow:hidden;
-  }
-  .slide-frame {
-    flex-shrink:0 !important;
   }
 
   /* --- Page dots: small circles, active = filled --- */
-  .slide-bar { gap:4px; margin-top:4px; padding-bottom:2px; }
-  .slide-nav { gap:4px; }
+  .slide-bar { gap:4px; margin-top:4px; padding-bottom:2px; flex-shrink:0; }
+  .slide-nav { gap:4px; flex-wrap:nowrap; }
   .slide-nav button {
     width:8px; height:8px; border-radius:50%;
     font-size:0; color:transparent; padding:0;
     border:none; background:#333;
     transition:background 0.2s;
   }
-  .slide-nav button.active { background:#7886A5; } /* filled circle, no width change */
+  .slide-nav button.active { background:#7886A5; }
   .slide-nav button:hover { background:#555; }
   .slide-info { font-size:8px; }
 
-  /* --- Chat panel: takes remaining space, scrollable, never pushes slide --- */
+  /* --- Chat panel: fills remaining vertical space, width locked to 100% --- */
   .chat-panel {
-    width:100%;
-    flex:1 1 0; /* grow into remaining space */
-    min-height:60px; /* always visible — at least shows header + 1 message */
-    border-left:none; border-top:1px solid var(--border);
+    width:100% !important; /* override desktop width:320px */
+    max-width:100vw !important;
+    flex:1 1 0 !important; min-height:40px;
+    flex-shrink:1 !important; /* allow shrink, override desktop flex-shrink:0 */
+    border-left:none !important; border-top:1px solid var(--border);
     display:flex; flex-direction:column;
     overflow:hidden;
   }
@@ -439,7 +441,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     flex-shrink:0;
   }
   .chat-messages {
-    flex:1; min-height:0;
+    flex:1 1 0; min-height:0;
     overflow-y:auto; -webkit-overflow-scrolling:touch;
     padding:6px 10px; gap:4px;
   }
@@ -513,8 +515,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .topbar .logo { font-size:16px; }
   .export-btn { display:none; }
   .deck-action-btn.primary { font-size:8px; padding:2px 6px; }
-  .chat-panel { height:150px; }
-  .input-area textarea { height:60px; }
+  .input-area textarea { height:20vh; min-height:60px; }
 }
 </style>
 </head>
@@ -1348,14 +1349,26 @@ function renderApp(){
   renderChatOnboarding();
 
   const panel=document.querySelector('.slide-panel');
-  const panelW=panel.clientWidth-12;
-  const panelH=panel.clientHeight-70; // account for deck-name-bar + slide-bar + padding
+  const isMobile=window.innerWidth<=600;
+  const panelW=panel.clientWidth-(isMobile?8:12);
+  // On mobile: use 36vh minus chrome (deck-name-bar ~28px + slide-bar ~28px + padding ~8px = ~64px)
+  // On desktop: use actual panel height minus chrome
+  let panelH;
+  if(isMobile){
+    panelH=Math.max(window.innerHeight*0.36-64, 80); // match CSS flex:0 0 36vh
+  }else{
+    panelH=panel.clientHeight-70;
+  }
 
   if(!currentDeck){
-    document.getElementById('slideCanvas').innerHTML=`<div style="width:${panelW}px;height:${panelH}px;background:#131313;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:30px;">
-      <div style="font-size:32px;">🦥</div>
-      <div style="color:#555;font-size:15px;font-family:Arial;text-align:center;">Type what you want in the chat.<br>Sloth will design it.</div>
-      <div style="color:#333;font-size:11px;font-family:Arial;text-align:center;max-width:320px;line-height:1.5;">Try: &quot;Create a 5-slide deck about AI trends&quot; or &quot;Build a startup pitch deck&quot;</div>
+    const emptyH=isMobile?Math.max(panelH,80):panelH;
+    const emptyPad=isMobile?'16px':'30px';
+    const emptyIcon=isMobile?'24px':'32px';
+    const emptyTitle=isMobile?'12px':'15px';
+    document.getElementById('slideCanvas').innerHTML=`<div style="width:${panelW}px;height:${emptyH}px;background:#131313;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:${isMobile?'8px':'14px'};padding:${emptyPad};">
+      <div style="font-size:${emptyIcon};">🦥</div>
+      <div style="color:#555;font-size:${emptyTitle};font-family:Arial;text-align:center;">Type what you want in the chat.<br>Sloth will design it.</div>
+      ${isMobile?'':`<div style="color:#333;font-size:11px;font-family:Arial;text-align:center;max-width:320px;line-height:1.5;">Try: &quot;Create a 5-slide deck about AI trends&quot; or &quot;Build a startup pitch deck&quot;</div>`}
     </div>`;
     document.getElementById('slideNav').innerHTML='';
     document.getElementById('slideInfo').textContent='';
@@ -3702,6 +3715,13 @@ const chatObserver=new MutationObserver(function(){
   chatMsgsEl.scrollTop=chatMsgsEl.scrollHeight;
 });
 chatObserver.observe(chatMsgsEl,{childList:true});
+
+// Re-render on resize/orientation change so slide scales correctly
+let resizeTimer;
+window.addEventListener('resize',function(){
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(renderApp,150);
+});
 
 renderApp();
 </script>
