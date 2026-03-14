@@ -113,6 +113,19 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .undo-redo-btn:disabled { color:#2a2a2a; cursor:default; }
 .undo-redo-btn .undo-label { font-size:9px; margin-left:2px; color:inherit; }
 
+/* Workspace modal */
+.ws-modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:600; display:flex; align-items:center; justify-content:center; }
+.ws-modal { background:var(--surface); border:1px solid var(--border); border-radius:10px; width:90%; max-width:440px; overflow:hidden; }
+.ws-modal-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border); }
+.ws-modal-header h3 { font-size:14px; color:var(--text); font-weight:600; margin:0; }
+.ws-modal-body { padding:16px; display:flex; flex-direction:column; gap:10px; }
+
+/* File type badges in file nav */
+.fn-type-badge { font-size:8px; padding:1px 4px; border-radius:3px; margin-left:4px; font-weight:600; text-transform:uppercase; }
+.fn-type-doc { background:#3D6B4F; color:#C8E6C9; }
+.fn-type-sheet { background:#8B6914; color:#FFE0B2; }
+.fn-type-slides { background:#4A5A7A; color:#C5CAE9; }
+
 /* Onboarding prompt chips in empty chat */
 .chat-onboarding { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; gap:12px; padding:20px 14px; }
 .chat-onboarding-title { font-size:12px; color:#444; font-weight:500; text-align:center; line-height:1.5; }
@@ -343,40 +356,87 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .deck-action-btn { padding:3px 7px; font-size:9px; }
 }
 
-/* Phone */
+/* ═══════════════════════════════════════════ */
+/* PHONE: Instagram-style vertical card UI    */
+/* ═══════════════════════════════════════════ */
 @media(max-width:600px){
-  /* Product bar */
-  .product-bar { padding:2px 0; }
-  .product-tab { padding:4px 12px; font-size:10px; }
+  /* --- Layout: full-screen card feed --- */
+  body { overflow:hidden; }
 
-  /* Topbar: compact */
-  .topbar { padding:6px 10px; gap:8px; flex-wrap:wrap; }
+  /* Topbar: ultra compact — logo left, icons right */
+  .topbar { padding:6px 10px; gap:6px; }
   .topbar .logo { font-size:18px; }
-  .export-btn { padding:3px 6px; font-size:9px; margin-left:3px; }
+  .topbar .tagline { display:none; }
+  .preset-pills { display:none; }
+  .export-btn { display:none; } /* hidden — accessible via menu */
+  .auth-bar { margin-left:auto; }
 
-  /* Middle: full-width stacked */
-  .middle { flex-direction:column; }
-  .slide-panel { padding:2px 2px 4px; }
-  .chat-panel { width:100%; height:180px; border-left:none; border-top:1px solid var(--border); }
+  /* Middle: vertical stack, slide takes most space */
+  .middle { flex-direction:column; position:relative; }
 
-  /* Deck name bar */
-  .deck-name-bar { padding:2px 6px 0; gap:4px; flex-wrap:wrap; }
+  /* Slide panel: full width, flex grow */
+  .slide-panel { padding:2px 4px 0; flex:1; min-height:0; }
+  .deck-name-bar { padding:2px 8px 0; gap:4px; }
   .deck-name-input { font-size:12px; }
-  .deck-actions { width:100%; justify-content:flex-end; }
-  .deck-action-btn { padding:3px 8px; font-size:9px; }
+  .deck-actions { display:none; } /* hidden on mobile — use chat commands or menu */
 
-  /* Bottom panel */
-  .input-area { padding:4px 8px 6px; }
-  .input-area textarea { height:80px; font-size:16px; padding:8px 10px; } /* 16px minimum prevents iOS auto-zoom */
-  .send-btn { padding:0 12px; font-size:10px; height:30px; }
+  /* Slide frame: fill available width */
+  .slide-frame { border-radius:8px; }
 
-  /* Toolbar: scroll horizontal */
-  .toolbar { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .tool-btn { padding:4px 10px; font-size:10px; }
+  /* Slide bar: IG-style dots instead of numbered buttons */
+  .slide-bar { gap:4px; margin-top:6px; padding-bottom:2px; }
+  .slide-nav { gap:2px; }
+  .slide-nav button { width:8px; height:8px; border-radius:50%; font-size:0; color:transparent; padding:0; border:none; background:#333; transition:all 0.2s; }
+  .slide-nav button.active { width:20px; border-radius:4px; background:#7886A5; }
+  .slide-info { font-size:8px; }
 
-  /* Slide bar */
-  .slide-nav button { width:22px; height:22px; font-size:9px; }
-  .slide-info { font-size:9px; }
+  /* Chat panel: collapsed by default, expandable overlay */
+  .chat-panel {
+    position:absolute; bottom:0; left:0; right:0;
+    height:auto; max-height:60vh;
+    border-left:none; border-top:1px solid var(--border);
+    background:var(--surface);
+    transform:translateY(100%);
+    transition:transform 0.25s ease;
+    z-index:200;
+    border-radius:16px 16px 0 0;
+    width:100%;
+  }
+  .chat-panel.mobile-open {
+    transform:translateY(0);
+  }
+  .chat-header {
+    padding:12px 14px 6px; font-size:10px; cursor:pointer;
+    display:flex; align-items:center; justify-content:space-between;
+    position:relative;
+  }
+  .chat-messages { max-height:40vh; padding:6px 10px; gap:4px; }
+  .msg { font-size:11px; padding:5px 8px; }
+
+  /* Chat toggle handle */
+  .chat-header::before {
+    content:''; display:block; width:32px; height:4px; background:#444;
+    border-radius:2px; position:absolute; top:6px; left:50%; transform:translateX(-50%);
+  }
+
+  /* Bottom panel: IG-style input bar */
+  .bottom-panel { border-top:1px solid var(--border); }
+  .toolbar { display:none !important; } /* hidden on mobile — use voice/text commands */
+  .selection-bar { padding:2px 8px; font-size:9px; }
+  .input-area { padding:4px 8px 6px; gap:6px; align-items:center; }
+  .input-area textarea {
+    height:38px; min-height:38px; max-height:100px;
+    font-size:16px; padding:8px 12px;
+    border-radius:20px; /* pill shape like IG */
+    line-height:1.3;
+  }
+  .input-area.collapsed textarea { height:38px; }
+  .input-toggle { display:none; } /* no expand toggle on mobile */
+  .send-btn {
+    padding:0 14px; font-size:11px; height:34px;
+    border-radius:17px; /* pill shape */
+    flex-shrink:0; align-self:center;
+  }
 
   /* File nav sidebar */
   .file-nav { width:85vw; max-width:320px; }
@@ -391,8 +451,15 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .wb-products { gap:12px; }
   .wb-product-icon { width:38px; height:38px; }
 
-  /* Selection bar */
-  .selection-bar { padding:2px 8px; font-size:9px; }
+  /* Workspace modal */
+  .ws-modal { width:95%; }
+
+  /* Onboarding chips: smaller on mobile */
+  .chat-chip { padding:7px 10px; font-size:10px; }
+  .chat-onboarding-title { font-size:11px; }
+
+  /* Product bar hidden on mobile */
+  .product-bar { display:none !important; }
 }
 
 /* Very small phones */
@@ -425,15 +492,46 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 <div class="file-nav-overlay" id="fileNavOverlay" onclick="closeFileNav()"></div>
 <div class="file-nav" id="fileNav">
   <div class="fn-header">
-    <h3>My Files</h3>
+    <h3>Workspace</h3>
     <button class="fn-close" onclick="closeFileNav()">&times;</button>
   </div>
   <div class="fn-tabs">
     <button class="fn-tab active" data-tab="all" onclick="setFileTab('all')">All</button>
-    <button class="fn-tab" data-tab="local" onclick="setFileTab('local')">Local</button>
+    <button class="fn-tab" data-tab="slides" onclick="setFileTab('slides')">Slides</button>
+    <button class="fn-tab" data-tab="docs" onclick="setFileTab('docs')">Docs</button>
+    <button class="fn-tab" data-tab="sheets" onclick="setFileTab('sheets')">Sheets</button>
     <button class="fn-tab" data-tab="cloud" onclick="setFileTab('cloud')">Cloud</button>
   </div>
   <div class="fn-list" id="fileNavList"></div>
+  <div class="fn-actions">
+    <button class="fn-action-btn" onclick="showWsNewDoc()">+ Doc</button>
+    <button class="fn-action-btn" onclick="showWsNewSheet()">+ Sheet</button>
+    <button class="fn-action-btn primary" onclick="newDeck()">+ Slides</button>
+  </div>
+</div>
+
+<!-- New Doc/Sheet modal -->
+<div class="ws-modal-overlay" id="wsModalOverlay" onclick="if(event.target===this)closeWsModal()" style="display:none;">
+  <div class="ws-modal">
+    <div class="ws-modal-header">
+      <h3 id="wsModalTitle">New Document</h3>
+      <button onclick="closeWsModal()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;">&times;</button>
+    </div>
+    <div class="ws-modal-body">
+      <div class="wb-input-group">
+        <label>Title</label>
+        <input type="text" id="wsModalTitleInput" placeholder="My Document">
+      </div>
+      <div class="wb-input-group">
+        <label id="wsModalContentLabel">Content (paste text, each paragraph becomes a block)</label>
+        <textarea id="wsModalContent" style="width:100%;height:150px;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;font-family:Arial;resize:vertical;" placeholder="Paste or type content here..."></textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 16px 16px;">
+      <button class="fn-action-btn" onclick="closeWsModal()">Cancel</button>
+      <button class="fn-action-btn primary" id="wsModalSaveBtn" onclick="saveWsModal()">Create</button>
+    </div>
+  </div>
 </div>
 
 <!-- Top bar -->
@@ -805,6 +903,130 @@ let chatHistory = [];
 let selectedRegion = null; // {slideIdx, regionId, role, label}
 
 // ═══════════════════════════════════════════
+// WORKSPACE — Unified Doc / Sheet / Slide storage
+// ═══════════════════════════════════════════
+// Every file in the workspace is a JSON object with a common header:
+//   { id, type: "doc"|"sheet"|"slides", title, created, updated, content }
+// Doc content:  { blocks: [ { id, type:"paragraph"|"heading"|"list", text } ] }
+// Sheet content: { columns: ["A","B",...], rows: [ [val, val, ...], ... ] }
+// Slides content: standard deck JSON (currentDeck)
+const WS_STORAGE_KEY='sloth_workspace_files';
+
+function wsId(){ return 'f_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); }
+
+function wsLoad(){
+  try{ return JSON.parse(localStorage.getItem(WS_STORAGE_KEY)||'[]'); }catch(e){ return []; }
+}
+function wsSave(files){
+  try{ localStorage.setItem(WS_STORAGE_KEY,JSON.stringify(files)); }catch(e){ console.warn('Workspace save failed:',e); }
+}
+
+function wsGetFile(id){
+  return wsLoad().find(f=>f.id===id)||null;
+}
+
+function wsCreateDoc(title,text){
+  const files=wsLoad();
+  const blocks=text.split(/\n\n+/).filter(Boolean).map((t,i)=>({
+    id:'blk_'+Date.now()+'_'+i,
+    type: /^#{1,3}\s/.test(t)?'heading':'paragraph',
+    text: t.replace(/^#{1,3}\s/,'')
+  }));
+  const doc={
+    id:wsId(), type:'doc', title:title||'Untitled Doc',
+    created:new Date().toISOString(), updated:new Date().toISOString(),
+    content:{ blocks }
+  };
+  files.push(doc);
+  wsSave(files);
+  return doc;
+}
+
+function wsCreateSheet(title,csvOrText){
+  const files=wsLoad();
+  // Parse simple CSV / tab-separated / line-separated table
+  const lines=csvOrText.trim().split('\n').map(l=>l.split(/[,\t]/).map(c=>c.trim()));
+  const columns=lines[0]||[];
+  const rows=lines.slice(1);
+  const sheet={
+    id:wsId(), type:'sheet', title:title||'Untitled Sheet',
+    created:new Date().toISOString(), updated:new Date().toISOString(),
+    content:{ columns, rows }
+  };
+  files.push(sheet);
+  wsSave(files);
+  return sheet;
+}
+
+function wsDeleteFile(id){
+  const files=wsLoad().filter(f=>f.id!==id);
+  wsSave(files);
+}
+
+function wsUpdateFile(id,updates){
+  const files=wsLoad();
+  const idx=files.findIndex(f=>f.id===id);
+  if(idx===-1)return null;
+  Object.assign(files[idx],updates,{updated:new Date().toISOString()});
+  wsSave(files);
+  return files[idx];
+}
+
+// Get all workspace files (docs + sheets) — slides are separate (currentDeck / saves)
+function wsListFiles(typeFilter){
+  const files=wsLoad();
+  if(typeFilter)return files.filter(f=>f.type===typeFilter);
+  return files;
+}
+
+// Serialize a workspace file to plain text for LLM context injection
+function wsFileToContext(file){
+  if(!file)return '';
+  if(file.type==='doc'){
+    return `[WORKSPACE DOC: "${file.title}" (id: ${file.id})]\n` +
+      (file.content.blocks||[]).map(b=> b.type==='heading'?`## ${b.text}`:b.text).join('\n\n');
+  }
+  if(file.type==='sheet'){
+    const c=file.content;
+    let table=c.columns.join('\t')+'\n';
+    table+=(c.rows||[]).map(r=>r.join('\t')).join('\n');
+    return `[WORKSPACE SHEET: "${file.title}" (id: ${file.id})]\n${table}`;
+  }
+  if(file.type==='slides'){
+    return `[WORKSPACE SLIDES: "${file.title}" (id: ${file.id})]\n${JSON.stringify(file.content)}`;
+  }
+  return '';
+}
+
+// Detect workspace file references in user message
+// Patterns: "用[文件名/doc名]", "從[sheet名]抓", "reference [title]", "@doc名", etc.
+function wsDetectReferences(text){
+  const files=wsLoad();
+  if(files.length===0)return [];
+  const matched=[];
+  for(const f of files){
+    const t=f.title.toLowerCase();
+    const words=t.split(/\s+/);
+    // Direct title match (case-insensitive)
+    if(text.toLowerCase().includes(t)){
+      matched.push(f);
+      continue;
+    }
+    // @mention style: @filename
+    if(text.toLowerCase().includes('@'+t.replace(/\s/g,''))){
+      matched.push(f);
+      continue;
+    }
+    // Partial match: if all significant words of title appear in text
+    if(words.length>=2 && words.every(w=>w.length>1 && text.toLowerCase().includes(w))){
+      matched.push(f);
+      continue;
+    }
+  }
+  return matched;
+}
+
+// ═══════════════════════════════════════════
 // UNDO / REDO SYSTEM (snapshot-based)
 // ═══════════════════════════════════════════
 const MAX_UNDO=50;
@@ -1019,10 +1241,10 @@ function renderSlide(slide,idx,p,total){
 // ═══════════════════════════════════════════
 
 const ONBOARDING_PROMPTS=[
-  {icon:'🎯',text:'做一份AI趨勢簡報 5頁',desc:'AI trends deck in Chinese'},
-  {icon:'🚀',text:'Create a startup pitch deck about a food delivery app',desc:'Startup pitch'},
-  {icon:'📊',text:'Make a 3-slide quarterly business review',desc:'Business review'},
-  {icon:'🎓',text:'Design a lecture about climate change for college students',desc:'Educational'},
+  {icon:'🎯',text:'Create a 5-slide deck about AI trends in 2026'},
+  {icon:'🚀',text:'Build a startup pitch deck for a food delivery app'},
+  {icon:'📊',text:'Make a quarterly business review with charts and data'},
+  {icon:'🎓',text:'Design a lecture about climate change for students'},
 ];
 
 function useOnboardingPrompt(text){
@@ -1087,7 +1309,7 @@ function renderApp(){
     document.getElementById('slideCanvas').innerHTML=`<div style="width:${panelW}px;height:${panelH}px;background:#131313;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:30px;">
       <div style="font-size:32px;">🦥</div>
       <div style="color:#555;font-size:15px;font-family:Arial;text-align:center;">Type what you want in the chat.<br>Sloth will design it.</div>
-      <div style="color:#333;font-size:11px;font-family:Arial;text-align:center;max-width:320px;line-height:1.5;">Try: &quot;做一份AI趨勢簡報 5頁&quot; or &quot;Create a startup pitch deck about...&quot;</div>
+      <div style="color:#333;font-size:11px;font-family:Arial;text-align:center;max-width:320px;line-height:1.5;">Try: &quot;Create a 5-slide deck about AI trends&quot; or &quot;Build a startup pitch deck&quot;</div>
     </div>`;
     document.getElementById('slideNav').innerHTML='';
     document.getElementById('slideInfo').textContent='';
@@ -2365,10 +2587,43 @@ async function sendMessage(){
     openSettings(); return;
   }
 
+  // Workspace quick-create: "/doc Title\nContent..." or "/sheet Title\nCSV..."
+  const docMatch=trimText.match(/^\/(doc|文件)\s+(.+)/is);
+  if(docMatch){
+    const lines=docMatch[2].split('\n');
+    const title=lines[0].trim();
+    const body=lines.slice(1).join('\n').trim()||title;
+    const doc=wsCreateDoc(title,body);
+    addMessage(`✓ Created doc "${doc.title}" (${doc.content.blocks.length} blocks). Reference it by name when making slides!`,'system');
+    return;
+  }
+  const sheetMatch=trimText.match(/^\/(sheet|表格|數據)\s+(.+)/is);
+  if(sheetMatch){
+    const lines=sheetMatch[2].split('\n');
+    const title=lines[0].trim();
+    const body=lines.slice(1).join('\n').trim();
+    if(!body){addMessage('Sheet needs data! Format: /sheet Title\\nHeader1,Header2\\nRow1,Row2','system');return;}
+    const sheet=wsCreateSheet(title,body);
+    addMessage(`✓ Created sheet "${sheet.title}" (${sheet.content.columns.length} cols, ${sheet.content.rows.length} rows). Reference it by name!`,'system');
+    return;
+  }
+
   const statusDiv=addMessage('Thinking...','system');
   const sendBtn=document.querySelector('.send-btn');
   sendBtn.disabled=true;
   sendBtn.textContent='...';
+
+  // ── Workspace cross-file reference detection ──
+  const wsRefs=wsDetectReferences(text);
+  let wsContext='';
+  if(wsRefs.length>0){
+    wsContext='\n\n## WORKSPACE REFERENCE DATA\nThe user referenced the following workspace files. Use this data to generate or edit slides:\n\n';
+    wsRefs.forEach(f=>{
+      wsContext+=wsFileToContext(f)+'\n\n';
+    });
+    const refNames=wsRefs.map(f=>`"${f.title}"`).join(', ');
+    addMessage(`📎 Using workspace data: ${refNames}`,'system');
+  }
 
   try{
     // ── PASS 0: Style edit? (lightweight LLM, no deck regeneration) ──
@@ -2399,7 +2654,7 @@ async function sendMessage(){
     if(isDeckWideEdit(text)&&currentDeck){
       statusDiv.textContent='Editing all slides...';
       const deckContent=deckToContentJSON();
-      const editInput=`Current deck content:\n${JSON.stringify(deckContent)}\n\nUser instruction: ${text}`;
+      const editInput=`Current deck content:\n${JSON.stringify(deckContent)}\n\nUser instruction: ${text}${wsContext}`;
       const raw=await callLLM(DECK_EDIT_PROMPT,[{role:'user',content:editInput}],{max_tokens:8192});
       chatHistory.push({role:'assistant',content:`[deck-wide edit: ${text}]`});
 
@@ -2505,7 +2760,7 @@ async function sendMessage(){
           }
           statusDiv.textContent='Editing content...';
           const contentStr=typeof currentContent==='object'?JSON.stringify(currentContent):currentContent;
-          const editInput=`Current content of region "${rId}" on slide ${targetSlide+1} (layout: ${slide.layout}):\n${contentStr}\n\nUser instruction: ${text}`;
+          const editInput=`Current content of region "${rId}" on slide ${targetSlide+1} (layout: ${slide.layout}):\n${contentStr}\n\nUser instruction: ${text}${wsContext}`;
           const raw=await callLLM(CONTENT_EDIT_PROMPT,[{role:'user',content:editInput}],{max_tokens:2048});
           chatHistory.push({role:'assistant',content:`[edited slide ${targetSlide+1} ${rId}]`});
 
@@ -2538,6 +2793,7 @@ async function sendMessage(){
     // ── PASS 1: Router (fast small model) — decide intent ──
     const recentMsgs=chatHistory.slice(-6);
     if(currentDeck)recentMsgs.push({role:'system',content:'[context: user has an existing deck loaded]'});
+    if(wsRefs.length>0)recentMsgs.push({role:'system',content:`[context: user referenced workspace files: ${wsRefs.map(f=>f.title).join(', ')}. This is likely a generate request.]`});
     const routerRaw=await callLLM(ROUTER_PROMPT,recentMsgs,{useRouter:true,temperature:0,max_tokens:32,json:true});
     let intent='chat';
     try{
@@ -2546,7 +2802,7 @@ async function sendMessage(){
     }catch(e){}
 
     if(intent==='generate'){
-      await doGenerate(statusDiv);
+      await doGenerate(statusDiv,wsContext);
     }else{
       // ── PASS 2a: Chat (big model, natural language) ──
       statusDiv.textContent='...';
@@ -2568,15 +2824,17 @@ async function sendMessage(){
 }
 
 // ── Slide generation (reusable) ──
-async function doGenerate(statusDiv){
+async function doGenerate(statusDiv,wsContext){
   statusDiv.textContent='Generating slides...';
   let editContext='';
   if(currentDeck){
     editContext=`\n\n## EDITING MODE — CRITICAL\nThe user ALREADY has this deck. They want to MODIFY it, not regenerate from scratch.\nYou MUST keep ALL existing content, slides, and settings UNCHANGED except for what the user specifically asks to change.\nOutput the COMPLETE deck JSON with only the requested changes applied.\n\n[CURRENT DECK]\n${JSON.stringify(currentDeck)}`;
   }
+  // Inject workspace file data if user referenced any docs/sheets
+  const wsExtra=wsContext||'';
   // Only send last 6 messages to generation model to avoid token overflow
   const genHistory=chatHistory.slice(-6);
-  const raw=await callLLM(GEN_PROMPT+editContext,genHistory,{json:true,max_tokens:8192});
+  const raw=await callLLM(GEN_PROMPT+editContext+wsExtra,genHistory,{json:true,max_tokens:8192});
   chatHistory.push({role:'assistant',content:raw});
 
   const deck=extractJSON(raw);
@@ -3054,47 +3312,81 @@ async function refreshFileList(){
   list.innerHTML='<div class="fn-empty">Loading...</div>';
 
   let files=[];
-  if(fileNavTab==='local'||fileNavTab==='all'){
-    files.push(...getLocalFiles());
+
+  // Workspace docs & sheets
+  if(fileNavTab==='all'||fileNavTab==='docs'||fileNavTab==='sheets'){
+    const wsFiles=wsListFiles();
+    for(const wf of wsFiles){
+      if(fileNavTab==='docs'&&wf.type!=='doc')continue;
+      if(fileNavTab==='sheets'&&wf.type!=='sheet')continue;
+      files.push({
+        id:'ws_'+wf.id,
+        wsId:wf.id,
+        title:wf.title,
+        type:wf.type,
+        source:'workspace',
+        updated:new Date(wf.updated).getTime(),
+        meta: wf.type==='doc'? `${(wf.content.blocks||[]).length} blocks` :
+              wf.type==='sheet'? `${(wf.content.rows||[]).length} rows` : ''
+      });
+    }
   }
+
+  // Local slides
+  if(fileNavTab==='all'||fileNavTab==='slides'){
+    files.push(...getLocalFiles().map(f=>({...f,type:'slides'})));
+  }
+
+  // Cloud files
   if(fileNavTab==='cloud'||fileNavTab==='all'){
     const cloud=await getCloudFiles();
-    files.push(...cloud);
+    files.push(...cloud.map(f=>({...f,type:'slides'})));
   }
 
   // Sort by updated descending
   files.sort((a,b)=>b.updated-a.updated);
 
-  // Also add current unsaved deck if any
-  if(currentDeck&&files.length===0){
-    // no files at all — show current
-  }
-
   if(files.length===0){
-    list.innerHTML='<div class="fn-empty">No saved files yet.<br>Create a deck and save it!</div>';
+    list.innerHTML='<div class="fn-empty">No files yet.<br>Use the buttons below to create docs, sheets, or slides!</div>';
     return;
   }
 
   list.innerHTML=files.map(f=>{
-    const badge=f.source==='cloud'?'<span class="fn-cloud-badge">cloud</span>':'<span class="fn-local-badge">local</span>';
+    const icons={doc:'&#128196;',sheet:'&#128202;',slides:'&#128197;',cloud:'&#9729;'};
+    const icon=f.source==='cloud'?icons.cloud:(icons[f.type]||'&#128196;');
+    const typeBadge=f.source==='workspace'?
+      `<span class="fn-type-badge fn-type-${f.type}">${f.type}</span>`:
+      (f.source==='cloud'?'<span class="fn-cloud-badge">cloud</span>':'<span class="fn-type-badge fn-type-slides">slides</span>');
     const date=new Date(f.updated);
     const timeStr=date.toLocaleDateString()+' '+date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    const slidesInfo=f.slides?` · ${f.slides} slides`:'';
+    const metaInfo=f.meta?` · ${f.meta}`:(f.slides?` · ${f.slides} slides`:'');
+    const deleteId=f.wsId||f.key||f.path||'';
+    const deleteSource=f.source;
     return `<div class="fn-item" onclick="loadFileFromNav('${f.id}')" title="${f.title}">
-      <div class="fn-item-icon">${f.source==='cloud'?'&#9729;':'&#128196;'}</div>
+      <div class="fn-item-icon">${icon}</div>
       <div class="fn-item-info">
-        <div class="fn-item-title">${f.title}${badge}</div>
-        <div class="fn-item-meta">${timeStr}${slidesInfo}</div>
+        <div class="fn-item-title">${f.title}${typeBadge}</div>
+        <div class="fn-item-meta">${timeStr}${metaInfo}</div>
       </div>
       <div class="fn-item-actions">
         ${f.source==='cloud'?`<button class="fn-item-btn" onclick="event.stopPropagation();shareFile('${f.path}')">Share</button>`:''}
-        <button class="fn-item-btn danger" onclick="event.stopPropagation();deleteFileFromNav('${f.id}','${f.source}','${f.key||f.path||''}')">Del</button>
+        <button class="fn-item-btn danger" onclick="event.stopPropagation();deleteFileFromNav('${f.id}','${deleteSource}','${deleteId}')">Del</button>
       </div>
     </div>`;
   }).join('');
 }
 
 function loadFileFromNav(id){
+  if(id.startsWith('ws_')){
+    // Workspace doc/sheet — show preview in chat, notify user it's available for reference
+    const wsFileId=id.replace('ws_','');
+    const file=wsGetFile(wsFileId);
+    if(!file){addMessage('File not found.','system');return;}
+    const preview=wsFileToContext(file).slice(0,300);
+    addMessage(`📎 "${file.title}" (${file.type}) is ready in your workspace. Mention it by name when creating slides!\n\nPreview: ${preview}...`,'system');
+    closeFileNav();
+    return;
+  }
   if(id.startsWith('local_')){
     const key=id.replace('local_','');
     try{
@@ -3167,10 +3459,12 @@ async function saveCurrentToCloud(){
 }
 
 async function deleteFileFromNav(id,source,keyOrPath){
-  const name=id.replace('local_','').replace('cloud_','').replace(/_\d+$/,'').replace(/_/g,' ');
+  const name=id.replace('local_','').replace('cloud_','').replace('ws_','').replace(/_\d+$/,'').replace(/_/g,' ');
   if(!confirm(`Delete "${name}"?`))return;
 
-  if(source==='local'){
+  if(source==='workspace'){
+    wsDeleteFile(keyOrPath);
+  }else if(source==='local'){
     try{
       const saves=JSON.parse(localStorage.getItem('sloth_space_saves')||'{}');
       delete saves[keyOrPath];
@@ -3197,6 +3491,51 @@ async function shareFile(path){
     await navigator.clipboard.writeText(shareUrl);
     addMessage('✓ Share link copied! Valid for 7 days.','system');
   }catch(e){addMessage('Share error: '+e.message,'system');}
+}
+
+// ═══════════════════════════════════════════
+// WORKSPACE — New Doc / Sheet modals
+// ═══════════════════════════════════════════
+let wsModalType='doc'; // 'doc' or 'sheet'
+
+function showWsNewDoc(){
+  wsModalType='doc';
+  document.getElementById('wsModalTitle').textContent='New Document';
+  document.getElementById('wsModalContentLabel').textContent='Content (paste text — each paragraph becomes a block)';
+  document.getElementById('wsModalContent').placeholder='Paste or type content here...\n\nEach paragraph separated by a blank line becomes a block.';
+  document.getElementById('wsModalTitleInput').value='';
+  document.getElementById('wsModalContent').value='';
+  document.getElementById('wsModalOverlay').style.display='flex';
+}
+
+function showWsNewSheet(){
+  wsModalType='sheet';
+  document.getElementById('wsModalTitle').textContent='New Sheet';
+  document.getElementById('wsModalContentLabel').textContent='Data (CSV or tab-separated — first row = headers)';
+  document.getElementById('wsModalContent').placeholder='Name,Q1,Q2,Q3,Q4\nProduct A,100,150,200,250\nProduct B,80,120,160,200';
+  document.getElementById('wsModalTitleInput').value='';
+  document.getElementById('wsModalContent').value='';
+  document.getElementById('wsModalOverlay').style.display='flex';
+}
+
+function closeWsModal(){
+  document.getElementById('wsModalOverlay').style.display='none';
+}
+
+function saveWsModal(){
+  const title=document.getElementById('wsModalTitleInput').value.trim();
+  const content=document.getElementById('wsModalContent').value.trim();
+  if(!content){alert('Please enter some content.');return;}
+
+  if(wsModalType==='doc'){
+    const doc=wsCreateDoc(title||'Untitled Doc',content);
+    addMessage(`✓ Created doc "${doc.title}" — ${doc.content.blocks.length} blocks. Mention it by name when creating slides!`,'system');
+  }else{
+    const sheet=wsCreateSheet(title||'Untitled Sheet',content);
+    addMessage(`✓ Created sheet "${sheet.title}" — ${sheet.content.columns.length} columns, ${sheet.content.rows.length} rows. Reference it by name in your prompts!`,'system');
+  }
+  closeWsModal();
+  refreshFileList();
 }
 
 // On page load, check for ?load= param
@@ -3274,6 +3613,70 @@ initOllamaGuide(); // Render OS-specific Ollama instructions
 initAuth(); // Initialize Supabase auth if configured
 autoLoad(); // Restore previous session from localStorage
 checkShareLink(); // Check for ?load= share link
+
+// ═══════════════════════════════════════════
+// MOBILE: Instagram-style interactions
+// ═══════════════════════════════════════════
+const isMobile=()=>window.innerWidth<=600;
+
+// Mobile chat panel toggle — tap header to expand/collapse
+document.querySelector('.chat-header').addEventListener('click',function(){
+  if(!isMobile())return;
+  document.querySelector('.chat-panel').classList.toggle('mobile-open');
+});
+
+// Auto-open chat panel when AI responds (mobile)
+const origAddMessage=addMessage;
+addMessage=function(text,type){
+  const div=origAddMessage(text,type);
+  if(isMobile()&&(type==='ai'||type==='system')){
+    document.querySelector('.chat-panel').classList.add('mobile-open');
+  }
+  return div;
+};
+
+// Close chat panel when user taps slide area (mobile)
+document.querySelector('.slide-panel').addEventListener('click',function(e){
+  if(!isMobile())return;
+  if(e.target.closest('.region-box'))return; // don't close if selecting region
+  document.querySelector('.chat-panel').classList.remove('mobile-open');
+});
+
+// Swipe left/right on slide to navigate (mobile)
+let touchStartX=0;
+let touchStartY=0;
+const slideCanvas=document.getElementById('slideCanvas');
+slideCanvas.addEventListener('touchstart',function(e){
+  touchStartX=e.touches[0].clientX;
+  touchStartY=e.touches[0].clientY;
+},{passive:true});
+slideCanvas.addEventListener('touchend',function(e){
+  if(!currentDeck)return;
+  const dx=e.changedTouches[0].clientX-touchStartX;
+  const dy=e.changedTouches[0].clientY-touchStartY;
+  // Only handle horizontal swipes (not vertical scroll)
+  if(Math.abs(dx)<50||Math.abs(dy)>Math.abs(dx))return;
+  if(dx<0&&currentSlide<currentDeck.slides.length-1){
+    currentSlide++;renderApp();
+  }else if(dx>0&&currentSlide>0){
+    currentSlide--;renderApp();
+  }
+},{passive:true});
+
+// Auto-expand textarea on mobile when typing (auto-grow)
+const chatInputEl=document.getElementById('chatInput');
+chatInputEl.addEventListener('input',function(){
+  if(!isMobile())return;
+  this.style.height='38px';
+  this.style.height=Math.min(this.scrollHeight,100)+'px';
+});
+chatInputEl.addEventListener('focus',function(){
+  if(isMobile()){
+    // Close chat overlay when focusing input (input is in bottom-panel, not chat-panel)
+    document.querySelector('.chat-panel').classList.remove('mobile-open');
+  }
+});
+
 renderApp();
 </script>
 </body>
