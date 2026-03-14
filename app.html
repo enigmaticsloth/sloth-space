@@ -1874,8 +1874,8 @@ function updateUndoRedoUI(){
   const rb=document.getElementById('redoBtn');
   const uOk=undoStack.length>0;
   const rOk=redoStack.length>0;
-  if(ub){ ub.disabled=!uOk; ub.style.opacity=uOk?'1':'0.35'; ub.style.color=uOk?'#fff':'#555'; ub.style.pointerEvents=uOk?'auto':'none'; }
-  if(rb){ rb.disabled=!rOk; rb.style.opacity=rOk?'1':'0.35'; rb.style.color=rOk?'#fff':'#555'; rb.style.pointerEvents=rOk?'auto':'none'; }
+  if(ub){ ub.style.opacity=uOk?'1':'0.35'; ub.style.color=uOk?'#fff':'#555'; }
+  if(rb){ rb.style.opacity=rOk?'1':'0.35'; rb.style.color=rOk?'#fff':'#555'; }
 }
 // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
 document.addEventListener('keydown',function(e){
@@ -4821,11 +4821,18 @@ function docPushUndo(){
 function docUndo(){
   if(!docUndoStack.length) return;
   docUndoRedoInProgress=true;
+  const currentStr=JSON.stringify(currentDoc);
+  // Skip past any snapshots identical to current state (dedup)
+  let snap=null;
+  while(docUndoStack.length){
+    const candidate=docUndoStack.pop();
+    if(JSON.stringify(candidate)!==currentStr){ snap=candidate; break; }
+  }
+  if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); return; } // nothing different to undo to
   const current=docSnapshotDoc();
   if(current) docRedoStack.push(current);
-  const snap=docUndoStack.pop();
   currentDoc=snap;
-  docEditingBlockId=null; // exit edit mode so renderDocMode won't re-focus and re-push
+  docEditingBlockId=null;
   docUpdateUndoUI();
   renderDocMode();
   docAutoSave();
@@ -4834,9 +4841,15 @@ function docUndo(){
 function docRedo(){
   if(!docRedoStack.length) return;
   docUndoRedoInProgress=true;
+  const currentStr=JSON.stringify(currentDoc);
+  let snap=null;
+  while(docRedoStack.length){
+    const candidate=docRedoStack.pop();
+    if(JSON.stringify(candidate)!==currentStr){ snap=candidate; break; }
+  }
+  if(!snap){ docUndoRedoInProgress=false; docUpdateUndoUI(); return; }
   const current=docSnapshotDoc();
   if(current) docUndoStack.push(current);
-  const snap=docRedoStack.pop();
   currentDoc=snap;
   docEditingBlockId=null;
   docUpdateUndoUI();
@@ -4848,8 +4861,8 @@ function docUpdateUndoUI(){
   // Use unified toolbar buttons — white when enabled, dark gray when disabled
   const ub=document.getElementById('undoBtn');
   const rb=document.getElementById('redoBtn');
-  if(ub){ ub.style.opacity=docUndoStack.length?'1':'0.35'; ub.style.color=docUndoStack.length?'#fff':'#555'; ub.style.pointerEvents=docUndoStack.length?'auto':'none'; }
-  if(rb){ rb.style.opacity=docRedoStack.length?'1':'0.35'; rb.style.color=docRedoStack.length?'#fff':'#555'; rb.style.pointerEvents=docRedoStack.length?'auto':'none'; }
+  if(ub){ ub.style.opacity=docUndoStack.length?'1':'0.35'; ub.style.color=docUndoStack.length?'#fff':'#555'; }
+  if(rb){ rb.style.opacity=docRedoStack.length?'1':'0.35'; rb.style.color=docRedoStack.length?'#fff':'#555'; }
 }
 
 // ── Doc toolbar action functions ──
