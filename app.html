@@ -192,6 +192,29 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .selection-clear { background:transparent; border:none; color:#555; cursor:pointer; font-size:10px; padding:1px 4px; }
 .selection-clear:hover { color:#999; }
 
+/* ─── Contextual AI Menu (appears on region click) ─── */
+.ctx-ai-menu { position:absolute; z-index:200; background:#1a1a1a; border:1px solid #333; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,0.6); min-width:220px; max-width:300px; overflow:hidden; animation:ctx-fade-in 0.15s ease; pointer-events:auto; }
+@keyframes ctx-fade-in { from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:translateY(0);} }
+.ctx-ai-header { display:flex; align-items:center; gap:6px; padding:8px 12px; border-bottom:1px solid #2a2a2a; }
+.ctx-ai-header .ctx-icon { font-size:12px; }
+.ctx-ai-header .ctx-label { font-size:10px; color:#7886A5; font-weight:600; flex:1; }
+.ctx-ai-header .ctx-region-name { font-size:9px; color:#555; }
+.ctx-ai-header .ctx-close { background:none; border:none; color:#555; cursor:pointer; font-size:14px; padding:0 2px; line-height:1; }
+.ctx-ai-header .ctx-close:hover { color:#999; }
+.ctx-ai-actions { padding:4px; }
+.ctx-ai-btn { display:flex; align-items:flex-start; gap:8px; width:100%; padding:8px 10px; background:transparent; border:none; color:#ccc; cursor:pointer; font-size:11px; font-family:Arial; text-align:left; border-radius:6px; line-height:1.4; transition:background 0.1s; }
+.ctx-ai-btn:hover { background:#252530; }
+.ctx-ai-btn .ctx-btn-icon { font-size:13px; flex-shrink:0; margin-top:1px; }
+.ctx-ai-btn .ctx-btn-text { flex:1; }
+.ctx-ai-btn .ctx-btn-hint { font-size:9px; color:#555; display:block; margin-top:2px; }
+.ctx-ai-divider { height:1px; background:#2a2a2a; margin:2px 4px; }
+.ctx-ai-input { display:flex; gap:4px; padding:6px 8px; border-top:1px solid #2a2a2a; }
+.ctx-ai-input input { flex:1; background:#111; border:1px solid #333; border-radius:5px; padding:5px 8px; font-size:11px; color:#e0e0e0; font-family:Arial; }
+.ctx-ai-input input:focus { outline:none; border-color:#7886A5; }
+.ctx-ai-input input::placeholder { color:#444; }
+.ctx-ai-input button { background:#7886A5; color:#fff; border:none; border-radius:5px; padding:5px 10px; font-size:10px; cursor:pointer; font-family:Arial; font-weight:600; white-space:nowrap; }
+.ctx-ai-input button:hover { background:#6775A0; }
+
 /* ─── Settings overlay ─── */
 .settings-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center; }
 .settings-overlay.show { display:flex; }
@@ -600,6 +623,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .chat-chip { padding:7px 10px; font-size:10px; }
   .chat-onboarding-title { font-size:11px; }
   .chat-onboarding { padding:12px 10px; gap:8px; }
+
+  /* --- Contextual AI menu: bottom sheet on mobile --- */
+  .ctx-ai-menu { position:fixed !important; left:0 !important; right:0 !important; bottom:0 !important; top:auto !important; max-width:100% !important; width:100% !important; border-radius:14px 14px 0 0 !important; max-height:60vh; overflow-y:auto; animation:ctx-slide-up 0.2s ease !important; }
+  @keyframes ctx-slide-up { from{transform:translateY(100%);} to{transform:translateY(0);} }
 }
 
 /* Very small phones */
@@ -1085,6 +1112,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   </div>
 </div>
 
+<!-- Contextual AI Menu (positioned dynamically near selected region) -->
+<div class="ctx-ai-menu" id="ctxAiMenu" style="display:none;"></div>
+
 <script>
 // ═══════════════════════════════════════════
 // DATA
@@ -1358,20 +1388,201 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-function selectRegion(slideIdx,regionId,role,label){
+function selectRegion(slideIdx,regionId,role,label,clickEvent){
   selectedRegion={slideIdx,regionId,role,label};
   document.getElementById('selectionBar').style.display='flex';
   document.getElementById('selectionTag').textContent=`Slide ${slideIdx+1} → ${label} (${regionId})`;
   // Re-render to show highlight
   renderApp();
   updateFontSizeIndicator();
+  // Show contextual AI menu near the click
+  if(clickEvent) showCtxAiMenu(slideIdx,regionId,role,label,clickEvent);
 }
 function clearSelection(){
   selectedRegion=null;
   document.getElementById('selectionBar').style.display='none';
+  hideCtxAiMenu();
   updateFontSizeIndicator();
   renderApp();
 }
+
+// ═══════════════════════════════════════════
+// CONTEXTUAL AI MENU — Smart actions on region click
+// ═══════════════════════════════════════════
+
+function getRegionContent(slideIdx,regionId){
+  if(!currentDeck||!currentDeck.slides[slideIdx])return null;
+  return currentDeck.slides[slideIdx].content[regionId]||null;
+}
+
+function getContentPreview(content){
+  if(!content) return '';
+  if(typeof content==='string') return content.slice(0,80);
+  if(typeof content==='object'){
+    if(content.type==='table') return `Table (${content.headers?.length||0} cols × ${content.rows?.length||0} rows)`;
+    if(content.type==='list') return `List (${content.items?.length||0} items)`;
+    if(content.type==='image') return content.alt||'Image';
+  }
+  return JSON.stringify(content).slice(0,60);
+}
+
+function generateCtxSuggestions(role,regionId,content){
+  const suggestions=[];
+  const isText=typeof content==='string';
+  const isTable=typeof content==='object'&&content?.type==='table';
+  const isList=typeof content==='object'&&content?.type==='list';
+  const isImage=typeof content==='object'&&content?.type==='image';
+  const textLen=isText?content.length:0;
+
+  // ── Universal actions ──
+  if(isText&&textLen>0){
+    suggestions.push({icon:'✨',text:'Rewrite to be more concise',hint:'Shorten while keeping key points',action:`Rewrite the ${regionId} region to be more concise`});
+    suggestions.push({icon:'🌐',text:'Translate to English',hint:'Or any language',action:`Translate the ${regionId} region to English`});
+  }
+
+  // ── Role-specific suggestions ──
+  if(role==='title'||role==='heading'){
+    suggestions.push({icon:'💡',text:'Make it more impactful',hint:'Punchy, attention-grabbing',action:`Make the ${regionId} more impactful and attention-grabbing`});
+    suggestions.push({icon:'📐',text:'Make it shorter',hint:'Max 5 words',action:`Shorten the ${regionId} to 5 words or fewer`});
+  }
+
+  if(role==='body'){
+    if(isText&&textLen>100){
+      suggestions.push({icon:'📊',text:'Convert to key data points',hint:'Extract 3-4 bullet stats',action:`Convert the ${regionId} into 3-4 key data points with numbers`});
+      suggestions.push({icon:'📋',text:'Turn into a bullet list',hint:'Structured, scannable',action:`Convert the ${regionId} text into a structured bullet list`});
+    }
+    if(isText&&textLen>0){
+      suggestions.push({icon:'📈',text:'Add concrete numbers',hint:'Statistics, metrics, data',action:`Enhance the ${regionId} by adding concrete numbers, statistics, or metrics`});
+      suggestions.push({icon:'🎯',text:'Make it more persuasive',hint:'Stronger call-to-action',action:`Make the ${regionId} more persuasive with stronger language`});
+    }
+    suggestions.push({icon:'📊',text:'Convert to comparison table',hint:'Side-by-side pros/cons',action:`Convert this slide's content into a data-table layout with a comparison table`});
+  }
+
+  if(role==='subtitle'||role==='caption'){
+    suggestions.push({icon:'✏️',text:'Expand with more detail',hint:'Add context',action:`Expand the ${regionId} with more detail and context`});
+  }
+
+  if(role==='quote'){
+    suggestions.push({icon:'🔄',text:'Find a better quote',hint:'More relevant, impactful',action:`Replace the quote with a more impactful one on the same topic`});
+  }
+
+  if(isTable){
+    suggestions.push({icon:'📈',text:'Add a trends column',hint:'Growth %, YoY change',action:`Add a growth/trends column to the table on this slide`});
+    suggestions.push({icon:'🔢',text:'Sort by highest value',hint:'Reorder rows',action:`Sort the table rows by the main numeric column, highest first`});
+  }
+
+  if(isList){
+    suggestions.push({icon:'✨',text:'Make each point stronger',hint:'More specific, data-driven',action:`Rewrite each bullet point in the ${regionId} to be more specific and data-driven`});
+  }
+
+  // ── Layout change suggestions ──
+  suggestions.push({icon:'🔀',text:'Change this slide\'s layout',hint:'Try a different arrangement',action:`Suggest a better layout for this slide and change it`});
+
+  // ── Danger zone ──
+  suggestions.push({type:'divider'});
+  suggestions.push({icon:'🗑️',text:'Clear this region',hint:'Remove content',action:`__clear__${regionId}`,danger:true});
+
+  return suggestions;
+}
+
+function showCtxAiMenu(slideIdx,regionId,role,label,clickEvent){
+  const menu=document.getElementById('ctxAiMenu');
+  const content=getRegionContent(slideIdx,regionId);
+  const preview=getContentPreview(content);
+  const suggestions=generateCtxSuggestions(role,regionId,content);
+
+  // Build menu HTML
+  let html=`<div class="ctx-ai-header">
+    <span class="ctx-icon">✦</span>
+    <span class="ctx-label">AI Actions</span>
+    <span class="ctx-region-name">${label}</span>
+    <button class="ctx-close" onclick="event.stopPropagation();hideCtxAiMenu()">×</button>
+  </div>`;
+  html+=`<div class="ctx-ai-actions">`;
+  suggestions.forEach((s,i)=>{
+    if(s.type==='divider'){
+      html+=`<div class="ctx-ai-divider"></div>`;
+      return;
+    }
+    const cls=s.danger?'ctx-ai-btn danger':'ctx-ai-btn';
+    const dangerStyle=s.danger?'color:#D55B5B;':'';
+    html+=`<button class="${cls}" style="${dangerStyle}" onclick="event.stopPropagation();execCtxAction('${s.action.replace(/'/g,"\\'")}')">
+      <span class="ctx-btn-icon">${s.icon}</span>
+      <span class="ctx-btn-text">${s.text}<span class="ctx-btn-hint">${s.hint||''}</span></span>
+    </button>`;
+  });
+  html+=`</div>`;
+  // Custom input at bottom
+  html+=`<div class="ctx-ai-input">
+    <input type="text" id="ctxCustomInput" placeholder="Or type your own instruction..." onkeydown="if(event.key==='Enter'){event.stopPropagation();execCtxCustom();}">
+    <button onclick="event.stopPropagation();execCtxCustom()">Go</button>
+  </div>`;
+  menu.innerHTML=html;
+
+  // Position near the click — relative to viewport
+  menu.style.display='block';
+  const menuW=menu.offsetWidth;
+  const menuH=menu.offsetHeight;
+  const vw=window.innerWidth;
+  const vh=window.innerHeight;
+  let x=clickEvent.clientX+8;
+  let y=clickEvent.clientY-20;
+  // Keep within viewport
+  if(x+menuW>vw-10) x=vw-menuW-10;
+  if(x<10) x=10;
+  if(y+menuH>vh-10) y=vh-menuH-10;
+  if(y<10) y=10;
+  menu.style.position='fixed';
+  menu.style.left=x+'px';
+  menu.style.top=y+'px';
+
+  // Focus custom input after a tick
+  setTimeout(()=>{
+    const inp=document.getElementById('ctxCustomInput');
+    if(inp) inp.focus();
+  },100);
+}
+
+function hideCtxAiMenu(){
+  const menu=document.getElementById('ctxAiMenu');
+  if(menu) menu.style.display='none';
+}
+
+function execCtxAction(action){
+  hideCtxAiMenu();
+  // Handle special actions
+  if(action.startsWith('__clear__')){
+    const regionId=action.replace('__clear__','');
+    if(!currentDeck||!currentDeck.slides[currentSlide])return;
+    pushUndo();
+    currentDeck.slides[currentSlide].content[regionId]='';
+    addMessage(`✓ Cleared ${regionId} on slide ${currentSlide+1}`,'system');
+    clearSelection();
+    renderApp();
+    return;
+  }
+  // Normal AI actions: inject into chat input and send
+  const input=document.getElementById('chatInput');
+  input.value=action;
+  sendMessage();
+}
+
+function execCtxCustom(){
+  const inp=document.getElementById('ctxCustomInput');
+  if(!inp||!inp.value.trim())return;
+  hideCtxAiMenu();
+  const input=document.getElementById('chatInput');
+  input.value=inp.value.trim();
+  sendMessage();
+}
+
+// Close ctx menu on click outside
+document.addEventListener('click',function(e){
+  const menu=document.getElementById('ctxAiMenu');
+  if(menu&&menu.style.display!=='none'&&!menu.contains(e.target)){
+    hideCtxAiMenu();
+  }
+});
 
 function updateFontSizeIndicator(){
   const el=document.getElementById('fontSizeIndicator');
@@ -1507,7 +1718,7 @@ function renderSlide(slide,idx,p,total){
     const isSel=selectedRegion&&selectedRegion.slideIdx===idx&&selectedRegion.regionId===r.id;
     const selClass=isSel?'region-box selected':'region-box';
     const roleLabel=r.role.charAt(0).toUpperCase()+r.role.slice(1);
-    html+=`<div class="${selClass}" onclick="event.stopPropagation();selectRegion(${idx},'${r.id}','${r.role}','${roleLabel}')" style="position:absolute;left:${ax}px;top:${ay}px;width:${r.bounds.w}px;height:${r.bounds.h}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
+    html+=`<div class="${selClass}" onclick="event.stopPropagation();selectRegion(${idx},'${r.id}','${r.role}','${roleLabel}',event)" style="position:absolute;left:${ax}px;top:${ay}px;width:${r.bounds.w}px;height:${r.bounds.h}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
     html+=rc(c,r.role,p,r,regionColor,regionFontSize);
     html+='</div>';
   });
