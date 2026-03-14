@@ -229,21 +229,21 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 /* Demo panel */
 .demo-panel { flex:1; display:flex; flex-direction:column; padding:18px; gap:10px; }
 .demo-label { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; text-align:center; margin-bottom:4px; }
-.demo-slide-area { flex:1 1 0; min-height:0; border-radius:10px; overflow:hidden; position:relative; background:#1a1a1a; border:1px solid #333; }
+.demo-slide-area { flex:5 1 0; min-height:0; border-radius:10px; overflow:hidden; position:relative; background:#1a1a1a; border:1px solid #333; }
 .demo-slide-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center; opacity:0; transition:opacity 0.8s ease; }
 .demo-slide-inner.visible { opacity:1; }
 .demo-slide-inner .ds-title { font-size:18px; font-weight:700; margin-bottom:5px; }
 .demo-slide-inner .ds-subtitle { font-size:10px; opacity:0.8; }
 .demo-slide-inner .ds-body { font-size:9px; opacity:0.6; margin-top:6px; line-height:1.5; }
-.demo-chat-area { flex:1 1 0; min-height:0; border-radius:8px; background:#111; border:1px solid #2a2a2a; display:flex; flex-direction:column; overflow:hidden; }
+.demo-chat-area { flex:4 1 0; min-height:0; border-radius:8px; background:#111; border:1px solid #2a2a2a; display:flex; flex-direction:column; overflow:hidden; }
 .demo-messages { flex:1; padding:10px 12px; overflow:hidden; display:flex; flex-direction:column; gap:8px; }
 .demo-msg { font-size:13px; padding:7px 12px; border-radius:8px; max-width:88%; opacity:0; transition:opacity 0.5s ease; line-height:1.5; }
 .demo-msg.visible { opacity:1; }
 .demo-msg.user { background:#7886A5; color:#fff; align-self:flex-end; border-radius:8px 8px 2px 8px; }
 .demo-msg.ai { background:#2a2a2a; color:#ccc; align-self:flex-start; border-radius:8px 8px 8px 2px; }
-.demo-prompt-bar { height:40px; border-top:1px solid #2a2a2a; display:flex; align-items:center; padding:0 14px; gap:6px; }
-.demo-prompt-text { flex:1; font-size:13px; color:#e0e0e0; font-family:Arial; overflow:hidden; white-space:nowrap; }
-.demo-prompt-cursor { display:inline-block; width:2px; height:15px; background:#7886A5; animation:blink-cursor 0.8s step-end infinite; }
+.demo-prompt-bar { height:48px; border-top:1px solid #2a2a2a; display:flex; align-items:center; padding:0 16px; gap:6px; }
+.demo-prompt-text { flex:1; font-size:14px; color:#e0e0e0; font-family:Arial; overflow:hidden; white-space:nowrap; }
+.demo-prompt-cursor { display:inline-block; width:2px; height:16px; background:#7886A5; animation:blink-cursor 0.8s step-end infinite; }
 @keyframes blink-cursor { 0%,100%{opacity:1;} 50%{opacity:0;} }
 .welcome-box::-webkit-scrollbar { width:5px; } .welcome-box::-webkit-scrollbar-thumb { background:#444; border-radius:4px; }
 .welcome-box .wb-logo { font-size:44px; font-weight:700; color:#e0e0e0; margin-bottom:2px; letter-spacing:-1px; }
@@ -801,11 +801,13 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;background:rgba(139,158,139,0.15);border:1px solid rgba(139,158,139,0.3);border-radius:6px;font-size:12px;color:#8B9E8B;">
           <span>Signed in as</span><b id="welcomeAuthName"></b>
         </div>
-        <button onclick="doWelcomeSignOut()" style="margin-top:8px;background:transparent;border:1px solid #444;color:#888;padding:5px 16px;border-radius:5px;font-size:11px;cursor:pointer;font-family:Arial;">Sign Out</button>
       </div>
     </div>
 
     <button class="wb-start-btn" onclick="finishWelcome()">Start Creating</button>
+    <div id="welcomeSignOutRow" style="display:none;text-align:center;margin-top:8px;">
+      <button onclick="doWelcomeSignOut()" style="background:transparent;border:1px solid #444;color:#888;padding:5px 16px;border-radius:5px;font-size:11px;cursor:pointer;font-family:Arial;">Sign Out</button>
+    </div>
     <div class="wb-skip" onclick="skipWelcome()">Skip &mdash; configure later in Settings</div>
     <div class="wb-tos-link" onclick="showTerms()">Terms of Service &amp; Disclaimer</div>
     </div><!-- end wb-left -->
@@ -1078,10 +1080,13 @@ async function syncWorkspaceFromCloud(){
     const cloudFiles=JSON.parse(text);
     if(!Array.isArray(cloudFiles)||cloudFiles.length===0)return;
     // Merge: cloud files + local files, deduplicate by id, prefer newer
+    // But never restore files that were explicitly deleted locally
+    const deletedIds=new Set(JSON.parse(localStorage.getItem('sloth_ws_deleted')||'[]'));
     const localFiles=wsLoad();
     const merged=new Map();
     for(const f of localFiles) merged.set(f.id,f);
     for(const f of cloudFiles){
+      if(deletedIds.has(f.id))continue; // skip deleted files
       const existing=merged.get(f.id);
       if(!existing||new Date(f.updated)>new Date(existing.updated)){
         merged.set(f.id,f);
@@ -1132,6 +1137,11 @@ function wsCreateSheet(title,csvOrText){
 function wsDeleteFile(id){
   const files=wsLoad().filter(f=>f.id!==id);
   wsSave(files);
+  // Track deleted IDs so cloud sync never restores them
+  try{
+    const deleted=JSON.parse(localStorage.getItem('sloth_ws_deleted')||'[]');
+    if(!deleted.includes(id)){ deleted.push(id); localStorage.setItem('sloth_ws_deleted',JSON.stringify(deleted)); }
+  }catch(e){}
   // Force immediate cloud sync so deleted state is persisted before any refresh
   clearTimeout(wsSave._timer);
   syncWorkspaceToCloud();
@@ -1825,9 +1835,9 @@ function saveSettings() {
   const isCloud=CLOUD_PROVIDERS.includes(settingsProvider);
   const newKey=isCloud?document.getElementById('settingsApiKey').value.trim():'';
   const oldKey=llmConfig.apiKey||'';
-  // Show confirmation if switching to cloud provider with a new/different API key
-  if(isCloud && newKey && newKey!==oldKey){
-    showApiCostConfirm(function(){ _commitSettings(); });
+  // Show confirmation if switching to cloud provider with a new/different API key (skip if already accepted)
+  if(isCloud && newKey && newKey!==oldKey && !localStorage.getItem('sloth_api_warning_accepted')){
+    showApiCostConfirm(function(){ localStorage.setItem('sloth_api_warning_accepted','1'); _commitSettings(); });
     return;
   }
   _commitSettings();
@@ -2026,9 +2036,10 @@ function finishWelcome() {
     llmConfig.router = document.getElementById('welcomeCustomRouter').value.trim() || llmConfig.model;
   }
 
-  // For cloud providers, show cost confirmation before saving
-  if(isCloud){
+  // For cloud providers, show cost confirmation before saving (skip if already accepted)
+  if(isCloud && !localStorage.getItem('sloth_api_warning_accepted')){
     showApiCostConfirm(function(){
+      localStorage.setItem('sloth_api_warning_accepted','1');
       _commitWelcomeConfig(defaults, isCloud);
     });
     return;
@@ -2383,6 +2394,8 @@ function setAuthUser(user){
     wStatus.style.display='none';
     wLoggedIn.style.display='block';
     if(wName)wName.textContent=name;
+    const soRow=document.getElementById('welcomeSignOutRow');
+    if(soRow)soRow.style.display='block';
   }
   // Auto-fill welcome name field
   const nameInput=document.getElementById('welcomeDisplayName');
@@ -2502,6 +2515,8 @@ async function doWelcomeSignOut(){
   const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
   if(wStatus)wStatus.style.display='flex';
   if(wLoggedIn)wLoggedIn.style.display='none';
+  const soRow=document.getElementById('welcomeSignOutRow');
+  if(soRow)soRow.style.display='none';
 }
 
 // ═══════════════════════════════════════════
