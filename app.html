@@ -62,9 +62,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .topbar .logo { font-size:28px; font-weight:700; color:var(--text); white-space:nowrap; letter-spacing:-0.5px; }
 .topbar .tagline { font-size:12px; color:#ffffff; white-space:nowrap; margin-left:4px; align-self:flex-end; padding-bottom:4px; }
 .preset-pills, .topbar-center { display:flex; gap:4px; }
-.preset-pills button, #presetPills button { padding:4px 12px; border-radius:4px; cursor:pointer; font-size:10px; font-family:Arial; font-weight:500; transition:opacity 0.15s, transform 0.1s; }
-.preset-pills button:hover, #presetPills button:hover { opacity:0.85; transform:translateY(-1px); }
-.preset-pills button.active, #presetPills button.active { font-weight:700; box-shadow:0 1px 4px rgba(0,0,0,0.3); }
+.preset-pills button, #presetPills button { padding:4px 12px; border-radius:4px; cursor:pointer; font-size:10px; font-family:Arial; font-weight:600; transition:opacity 0.15s; }
+.preset-pills button:hover, #presetPills button:hover { opacity:0.8; }
+.preset-pills button.active, #presetPills button.active { font-weight:700; box-shadow:0 1px 6px rgba(0,0,0,0.4); }
 .topbar-exports { display:flex; align-items:center; gap:2px; }
 .export-btn { background:#E8D5A3; color:#6B5E4A; border:1px solid #E8D5A3; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; margin-left:6px; font-weight:600; }
 .export-btn:hover { background:#DECA8E; border-color:#DECA8E; color:#5A4E3A; }
@@ -347,7 +347,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 /* ─── Doc Canvas ─── */
 .doc-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; }
-.doc-page { max-width:720px; margin:0 auto; min-height:60vh; padding-bottom:40vh; }
+.doc-page { max-width:720px; margin:0 auto; min-height:60vh; padding-bottom:40vh; overflow:hidden; }
 .doc-empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:50vh; text-align:center; }
 
 /* Doc block styles */
@@ -370,9 +370,28 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="list"]::before { content:'•'; position:absolute; left:8px; color:#7886A5; font-weight:700; }
 .doc-block[data-type="numbered"] { font-size:15px; padding-left:24px; counter-increment:doc-ol; }
 .doc-block[data-type="numbered"]::before { content:attr(data-number) '.'; position:absolute; left:4px; color:#7886A5; font-weight:600; font-size:13px; min-width:16px; text-align:right; }
-.doc-block[data-type="image"] { text-align:center; padding:8px; min-height:80px; }
-.doc-block[data-type="image"] img { max-width:100%; border-radius:4px; }
+.doc-block[data-type="image"] { padding:8px; min-height:80px; }
+.doc-block[data-type="image"].float-none { text-align:center; }
+.doc-block[data-type="image"].float-left { float:left; width:45%; margin:0 20px 12px 0; clear:left; }
+.doc-block[data-type="image"].float-right { float:right; width:45%; margin:0 0 12px 20px; clear:right; }
+.doc-block[data-type="image"] img { max-width:100%; border-radius:4px; display:block; }
+.doc-block[data-type="image"] .img-float-bar { display:flex; gap:4px; justify-content:center; margin-top:6px; }
+.doc-block[data-type="image"] .img-float-bar button { font-size:10px; padding:2px 8px; background:#2a2a2a; border:1px solid #444; color:#aaa; border-radius:4px; cursor:pointer; }
+.doc-block[data-type="image"] .img-float-bar button.active { background:#7886A5; color:#fff; border-color:#7886A5; }
+.doc-figure { margin:0 0 8px 0; padding:0; }
+.doc-figure .doc-figure-caption { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:4px; padding:2px 8px; min-height:18px; outline:none; }
+.doc-figure .doc-figure-caption:empty::before { content:'Add caption...'; color:#555; }
 .doc-block[data-type="caption"] { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:-2px; margin-bottom:12px; }
+.doc-clear-float { clear:both; height:0; margin:0; padding:0; }
+/* Table block */
+.doc-block[data-type="table"] { padding:4px; overflow-x:auto; }
+.doc-block[data-type="table"] table { width:100%; border-collapse:collapse; font-size:13px; }
+.doc-block[data-type="table"] th, .doc-block[data-type="table"] td { border:1px solid #444; padding:6px 10px; text-align:left; min-width:60px; }
+.doc-block[data-type="table"] th { background:#2a2a2a; color:#ccc; font-weight:600; font-size:12px; }
+.doc-block[data-type="table"] td { background:transparent; color:#ddd; }
+.doc-block[data-type="table"] td:focus { outline:1px solid #7886A5; background:rgba(120,134,165,0.1); }
+.doc-block[data-type="table"] .table-add-row { display:block; width:100%; margin-top:4px; padding:3px; font-size:10px; color:#666; background:transparent; border:1px dashed #444; border-radius:4px; cursor:pointer; text-align:center; }
+.doc-block[data-type="table"] .table-add-row:hover { color:#aaa; border-color:#666; }
 
 /* Drag handle */
 .doc-block-handle { position:absolute; left:-28px; top:50%; transform:translateY(-50%); width:20px; height:20px; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; cursor:grab; color:#555; border-radius:3px; }
@@ -424,8 +443,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .insert-group { border-right:1px solid var(--border) !important; padding-right:6px !important; }
 .insert-menu { position:fixed; background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:4px 0; z-index:9999; box-shadow:0 6px 24px rgba(0,0,0,0.6); min-width:200px; max-height:320px; overflow-y:auto; }
 .insert-menu-title { font-size:9px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:4px 12px 2px; }
-.insert-menu-item { padding:7px 12px; font-size:11px; color:#ccc; cursor:pointer; transition:background 0.1s; white-space:nowrap; }
+.insert-menu-item { padding:7px 12px; font-size:11px; color:#ccc; cursor:pointer; transition:background 0.1s; white-space:nowrap; display:flex; align-items:center; gap:8px; }
 .insert-menu-item:hover { background:#2a2a2a; color:#fff; }
+.insert-menu-item svg { flex-shrink:0; vertical-align:middle; }
 /* Doc block inline AI action bar */
 .doc-block-actions { display:flex; gap:2px; padding:4px 8px; margin:-4px 0 4px; animation:ctx-fade-in 0.12s ease; }
 .doc-block-actions button { background:#1e1e1e; border:1px solid #333; color:#aaa; font-size:10px; padding:4px 10px; border-radius:5px; cursor:pointer; transition:all 0.1s; white-space:nowrap; }
@@ -1426,18 +1446,21 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleInsertedFiles(this.files)">
       <div class="insert-menu" id="insertMenu" style="display:none;">
         <div class="insert-menu-title">Insert</div>
-        <div class="insert-menu-item" onclick="triggerLocalImageInsert()">🖼 Image (local file)</div>
-        <div class="insert-menu-item" onclick="triggerUrlImageInsert()">🔗 Image (URL)</div>
-        <div class="insert-menu-item tb-doc-only" onclick="docInsertDivider();hideInsertMenu()">— Divider</div>
-        <div class="insert-menu-item tb-doc-only" onclick="docInsertTablePrompt();hideInsertMenu()">⊞ Table (AI)</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: content]');hideInsertMenu()">📄 Layout: Content</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: two-column]');hideInsertMenu()">📑 Layout: Two Column</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-top]');hideInsertMenu()">🖼 Layout: Image Top</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-left]');hideInsertMenu()">◧ Layout: Image Left</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-right]');hideInsertMenu()">◨ Layout: Image Right</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: quote]');hideInsertMenu()">❝ Layout: Quote</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: data-table]');hideInsertMenu()">📊 Layout: Data Table</div>
+        <div class="insert-menu-item" onclick="triggerLocalImageInsert()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Image (file)</div>
+        <div class="insert-menu-item" onclick="triggerUrlImageInsert()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Image (URL)</div>
+        <div class="insert-menu-item tb-doc-only" onclick="docInsertTablePrompt();hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Table</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: content]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg> Content</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: two-column]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg> Two Column</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-top]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="10" cy="7.5" r="1.5"/></svg> Image Top</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-left]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><rect x="5" y="6" width="5" height="5" rx="1"/></svg> Image Left</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-right]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><rect x="14" y="6" width="5" height="5" rx="1"/></svg> Image Right</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: quote]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.76-2.02-2-2H6c-1.25 0-2 .75-2 2v6c0 1 .75 2 2 2h1c-.17 2.14-1.5 3.6-4 4z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.76-2.02-2-2h-2c-1.25 0-2 .75-2 2v6c0 1 .75 2 2 2h1c-.17 2.14-1.5 3.6-4 4z"/></svg> Quote</div>
+        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: data-table]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg> Data Table</div>
       </div>
+    </div>
+    <!-- Divider button (doc-only) -->
+    <div class="dt-group tb-doc-only" style="display:none;">
+      <button class="dt-btn" onclick="docInsertDivider()" title="Insert divider"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="3" y1="18" x2="9" y2="18"/></svg></button>
     </div>
     <!-- Undo/Redo -->
     <div class="undo-redo-group">
@@ -2908,14 +2931,18 @@ function renderApp(){
     deckNameEl.value=currentDeck?.title||'';
   }
 
+  // Vivid preset pill colors
+  const PILL_COLORS={
+    'clean-white':{bg:'#FFFFFF',fg:'#111',bd:'#ccc',aBg:'#111',aFg:'#fff'},
+    'clean-gray':{bg:'#D0D0D0',fg:'#222',bd:'#aaa',aBg:'#666',aFg:'#fff'},
+    'clean-dark':{bg:'#222',fg:'#eee',bd:'#555',aBg:'#000',aFg:'#fff'},
+    'monet':{bg:'#B8C4D8',fg:'#2C2C3A',bd:'#7886A5',aBg:'#7886A5',aFg:'#fff'},
+    'seurat':{bg:'#E8C89A',fg:'#2A2A1E',bd:'#C67A3C',aBg:'#C67A3C',aFg:'#fff'}
+  };
   document.getElementById('presetPills').innerHTML=Object.values(PRESETS).map(pr=>{
-    const c=pr.colors;
+    const p=PILL_COLORS[pr.id]||{bg:'#333',fg:'#ccc',bd:'#555',aBg:'#666',aFg:'#fff'};
     const isActive=pr.id===currentPreset;
-    // Each pill shows its theme color: bg=preset background, text=preset primary, border=accent
-    const bg=isActive?c.accent:c.background;
-    const fg=isActive?c.on_accent:c.primary;
-    const border=isActive?c.accent:c.border;
-    return `<button class="${isActive?'active':''}" onclick="setPreset('${pr.id}')" style="background:${bg};color:${fg};border:1px solid ${border};">${pr.name}</button>`;
+    return `<button class="${isActive?'active':''}" onclick="setPreset('${pr.id}')" style="background:${isActive?p.aBg:p.bg};color:${isActive?p.aFg:p.fg};border:1.5px solid ${isActive?p.aBg:p.bd};">${pr.name}</button>`;
   }).join('');
 
   // Toolbar visibility is ONLY controlled by updateToolbarForMode().
@@ -4378,7 +4405,7 @@ function triggerUrlImageInsert(){
     const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
     docPushUndo();
     const blk=docInsertBlock(afterId,'image','');
-    blk.meta={src:url.trim(), alt:''};
+    blk.meta={src:url.trim(), alt:'', float:'none', caption:''};
     currentDoc.updated=new Date().toISOString();
     renderDocMode();
   } else {
@@ -4396,7 +4423,7 @@ function handleInsertedFiles(files){
         const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
         docPushUndo();
         const blk=docInsertBlock(afterId,'image','');
-        blk.meta={src:e.target.result, alt:file.name};
+        blk.meta={src:e.target.result, alt:file.name, float:'none', caption:''};
         currentDoc.updated=new Date().toISOString();
         renderDocMode();
       };
@@ -4500,13 +4527,90 @@ function docInsertImageBlock(){
   triggerLocalImageInsert();
 }
 function docInsertTablePrompt(){
-  // Use AI to create a table (as a code block placeholder or future table block)
-  const input=document.getElementById('chatInput');
-  if(input){
-    input.value='Insert a table here with columns: ';
-    input.focus();
+  const cols=prompt('Number of columns:','3');
+  const rows=prompt('Number of rows (excluding header):','3');
+  if(!cols||!rows) return;
+  const c=parseInt(cols)||3, r=parseInt(rows)||3;
+  const afterId=docEditingBlockId||docSelectedBlockId||currentDoc?.blocks[currentDoc.blocks.length-1]?.id;
+  docPushUndo();
+  // Build markdown-style table as a code block for now
+  let header='| '+Array.from({length:c},(_,i)=>'Column '+(i+1)).join(' | ')+' |';
+  let sep='| '+Array.from({length:c},()=>'---').join(' | ')+' |';
+  let body=Array.from({length:r},()=>'| '+Array.from({length:c},()=>'   ').join(' | ')+' |').join('\n');
+  const tableText=header+'\n'+sep+'\n'+body;
+  // Insert as a table block type
+  const blk=docInsertBlock(afterId,'table','');
+  blk.meta={cols:c, rows:r, cells:[]};
+  // Initialize cells: row 0 = header
+  for(let ri=0;ri<=r;ri++){
+    const row=[];
+    for(let ci=0;ci<c;ci++){
+      row.push(ri===0?'Column '+(ci+1):'');
+    }
+    blk.meta.cells.push(row);
   }
-  addMessage('Type your table description in chat and AI will generate it.','system');
+  currentDoc.updated=new Date().toISOString();
+  renderDocMode();
+}
+
+// Image float control
+function docSetImageFloat(blockId, float){
+  const block=docGetBlock(blockId);
+  if(!block||block.type!=='image') return;
+  docPushUndo();
+  if(!block.meta) block.meta={};
+  block.meta.float=float;
+  currentDoc.updated=new Date().toISOString();
+  renderDocMode();
+}
+
+// Save figure caption
+function docSaveFigureCaption(blockId, text){
+  const block=docGetBlock(blockId);
+  if(!block||block.type!=='image') return;
+  if(!block.meta) block.meta={};
+  block.meta.caption=text.trim();
+  currentDoc.updated=new Date().toISOString();
+}
+
+// Table cell editing
+function docSaveTableCell(blockId, row, col, text){
+  const block=docGetBlock(blockId);
+  if(!block||block.type!=='table'||!block.meta?.cells) return;
+  if(block.meta.cells[row]) block.meta.cells[row][col]=text;
+  currentDoc.updated=new Date().toISOString();
+}
+function docTableKeydown(event, blockId, row, col){
+  if(event.key==='Tab'){
+    event.preventDefault();
+    // Move to next cell
+    const block=docGetBlock(blockId);
+    if(!block?.meta?.cells) return;
+    const maxRow=block.meta.cells.length-1;
+    const maxCol=(block.meta.cells[0]?.length||1)-1;
+    let nr=row, nc=col+1;
+    if(nc>maxCol){ nc=0; nr++; }
+    if(nr>maxRow) return;
+    // Focus the target cell
+    const tableEl=document.querySelector(`[data-block-id="${blockId}"] table`);
+    if(tableEl){
+      const rows=tableEl.querySelectorAll('tr');
+      if(rows[nr]){
+        const cells=rows[nr].querySelectorAll('th,td');
+        if(cells[nc]) cells[nc].focus();
+      }
+    }
+  }
+}
+function docTableAddRow(blockId){
+  const block=docGetBlock(blockId);
+  if(!block||block.type!=='table'||!block.meta?.cells) return;
+  docPushUndo();
+  const cols=block.meta.cols||block.meta.cells[0]?.length||3;
+  block.meta.cells.push(Array(cols).fill(''));
+  block.meta.rows=(block.meta.rows||block.meta.cells.length-1)+1;
+  currentDoc.updated=new Date().toISOString();
+  renderDocMode();
 }
 
 // Update block type dropdown when a block is selected/focused
@@ -4538,7 +4642,7 @@ function docShowContextMenu(blockId, x, y){
   menu.className='doc-ctx-menu';
 
   // Build menu based on block type
-  const isText=!['divider','image'].includes(block.type);
+  const isText=!['divider','image','table'].includes(block.type);
   menu.innerHTML=`
     <div class="doc-ctx-section">Direct</div>
     ${isText?`
@@ -4685,7 +4789,7 @@ function enterDocMode(){
 // ═══════════════════════════════════════════
 // BLOCK SCHEMA — Unified block type system
 // ═══════════════════════════════════════════
-// Block types: paragraph, heading1, heading2, heading3, quote, code, list, numbered, image, divider, caption
+// Block types: paragraph, heading1, heading2, heading3, quote, code, list, numbered, image, divider, caption, table
 // Each block: { id, type, content (ProseMirror-style runs OR plain text), meta:{} }
 // ProseMirror runs: [{text:"hello ", marks:[]}, {text:"world", marks:[{type:"bold"}]}]
 
@@ -4830,13 +4934,48 @@ function renderDocMode(){
       </div>`;
     }
 
-    // Image block
+    // Image block with float + figure legend
     if(block.type==='image'){
       const src=block.meta?.src||'';
       const alt=block.meta?.alt||'';
-      return `<div class="doc-block${selected}" data-type="image" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
+      const float=block.meta?.float||'none';
+      const caption=block.meta?.caption||'';
+      const floatClass='float-'+float;
+      const btnL=float==='left'?' active':'';
+      const btnC=float==='none'?' active':'';
+      const btnR=float==='right'?' active':'';
+      return `<figure class="doc-figure"><div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
         <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
         ${src?`<img src="${src}" alt="${escapeHtml(alt)}" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
+        ${src?`<div class="img-float-bar" contenteditable="false">
+          <button class="${btnL}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','left')" title="Float left">◧</button>
+          <button class="${btnC}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','none')" title="Center">▣</button>
+          <button class="${btnR}" onclick="event.stopPropagation();docSetImageFloat('${block.id}','right')" title="Float right">◨</button>
+        </div>`:''}
+        <div class="doc-figure-caption" contenteditable="true" data-caption-for="${block.id}"
+          onblur="docSaveFigureCaption('${block.id}',this.textContent)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(caption)}</div>
+      </div>${float!=='none'?'':'<div class="doc-clear-float"></div>'}</figure>`;
+    }
+
+    // Table block
+    if(block.type==='table'){
+      const cells=block.meta?.cells||[];
+      const cols=block.meta?.cols||3;
+      let tableHtml='<table>';
+      cells.forEach((row,ri)=>{
+        tableHtml+='<tr>';
+        row.forEach((cell,ci)=>{
+          const tag=ri===0?'th':'td';
+          tableHtml+=`<${tag} contenteditable="true" onblur="docSaveTableCell('${block.id}',${ri},${ci},this.textContent)" onkeydown="docTableKeydown(event,'${block.id}',${ri},${ci})">${escapeHtml(cell)}</${tag}>`;
+        });
+        tableHtml+='</tr>';
+      });
+      tableHtml+='</table>';
+      tableHtml+=`<button class="table-add-row" onclick="docTableAddRow('${block.id}')">+ Add row</button>`;
+      return `<div class="doc-block${selected}" data-type="table" data-block-id="${block.id}" onclick="docSelectBlock('${block.id}',event)">
+        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
+        ${tableHtml}
       </div>`;
     }
 
