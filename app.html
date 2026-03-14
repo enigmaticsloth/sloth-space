@@ -8845,12 +8845,12 @@ renderApp();
 // ── Save doc on page unload/tab close ──
 window.addEventListener('beforeunload',function(){
   if(currentMode==='doc'&&currentDoc){
-    // Flush editing state and push final undo snapshot
+    // Flush editing state to model
     if(docEditingBlockId){
       const el=document.querySelector(`[data-block-id="${docEditingBlockId}"]`);
       if(el){ const b=docGetBlock(docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
     }
-    docPushUndo();
+    // Save stacks as-is (don't docPushUndo — it clears redoStack)
     docSaveUndoStacks();
     docSaveNow();
   }
