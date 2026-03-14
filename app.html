@@ -219,19 +219,25 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 /* ─── Welcome screen (Monet palette) ─── */
 .welcome-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:600; display:flex; align-items:center; justify-content:center;
-  background:linear-gradient(135deg, #0e0e0e 0%, #1a1520 15%, #1e2a3a 30%, #2a1e30 50%, #1a2a28 70%, #1e1a20 85%, #0e0e0e 100%);
+  background:linear-gradient(135deg, #0e0e0e 0%, #2a1f3a 15%, #2a4060 30%, #4a2a50 50%, #2a4a3a 70%, #3a2a40 85%, #0e0e0e 100%);
   background-size:400% 400%; animation:monet-shift 12s ease infinite; }
 @keyframes monet-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
 .welcome-overlay.hidden { display:none; }
 .welcome-box { text-align:center; width:96%; max-width:1100px; max-height:92vh; overflow-y:auto; padding:0; background:rgba(22,22,22,0.88); backdrop-filter:blur(16px); border:1px solid #2a2a2a; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,0.5); display:flex; }
 .wb-left { flex:1; min-width:0; padding:28px 32px; overflow-y:auto; }
-.wb-right { width:420px; flex-shrink:0; border-left:1px solid #2a2a2a; border-radius:0 16px 16px 0; overflow:hidden; display:flex; flex-direction:column; background:rgba(16,16,16,0.6); }
+.wb-right { width:440px; flex-shrink:0; border-left:1px solid #2a2a2a; border-radius:0 16px 16px 0; overflow:hidden; display:flex; flex-direction:column; background:rgba(16,16,16,0.6); position:relative; }
+.wb-right-config { position:absolute; inset:0; background:rgba(16,16,16,0.95); padding:22px 20px; overflow-y:auto; display:none; flex-direction:column; z-index:2; }
+.wb-right-config.active { display:flex; }
+.wb-right-config .wrc-title { font-size:13px; color:#e0e0e0; font-weight:600; margin-bottom:14px; text-align:center; }
+.wb-right-config .wrc-done-btn { width:100%; padding:10px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:Arial; margin-top:12px; transition:transform 0.15s; }
+.wb-right-config .wrc-done-btn:hover { transform:translateY(-1px); }
 /* Demo panel */
 .demo-panel { flex:1; display:flex; flex-direction:column; padding:18px; gap:10px; }
 .demo-label { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; text-align:center; margin-bottom:4px; }
 .demo-slide-area { flex:5 1 0; min-height:0; border-radius:10px; overflow:hidden; position:relative; background:#1a1a1a; border:1px solid #333; }
 .demo-slide-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px; text-align:center; opacity:0; transition:opacity 0.8s ease; }
 .demo-slide-inner.visible { opacity:1; }
+.demo-slide-inner .ds-icon { margin-bottom:8px; opacity:0.85; }
 .demo-slide-inner .ds-title { font-size:18px; font-weight:700; margin-bottom:5px; }
 .demo-slide-inner .ds-subtitle { font-size:10px; opacity:0.8; }
 .demo-slide-inner .ds-body { font-size:9px; opacity:0.6; margin-top:6px; line-height:1.5; }
@@ -393,6 +399,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .deck-action-btn { padding:3px 7px; font-size:9px; }
   .welcome-box { flex-direction:column; max-width:740px; }
   .wb-right { display:none; }
+  /* On tablet, show config panel as modal overlay when active */
+  .wb-right-config.active { display:flex; position:fixed; top:5vh; left:5vw; right:5vw; bottom:5vh; border-radius:14px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); }
 }
 
 /* ═══════════════════════════════════════════════════ */
@@ -545,6 +553,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .welcome-box { width:96%; padding:0; flex-direction:column; }
   .wb-left { padding:20px 16px; }
   .wb-right { display:none; }
+  .wb-right-config.active { display:flex; position:fixed; top:3vh; left:3vw; right:3vw; bottom:3vh; border-radius:12px; z-index:700; box-shadow:0 12px 40px rgba(0,0,0,0.7); }
   .welcome-box .wb-logo { font-size:32px; }
   .wb-provider-row { flex-direction:column; gap:8px; }
   .wb-products { gap:12px; }
@@ -725,64 +734,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       Connect your LLM to get started
     </button>
 
-    <div id="welcomeProviderPanel" style="display:none;">
-      <div class="wb-provider-grid" id="welcomeProviderGrid"></div>
-
-      <!-- API key fields (shown for cloud providers) -->
-      <div id="welcomeKeyFields" style="display:none;">
-        <div class="wb-input-group">
-          <label id="welcomeKeyLabel">API Key</label>
-          <input type="password" id="welcomeApiKey" placeholder="">
-        </div>
-        <div class="api-cost-warning">
-          <div class="acw-icon">&#9888;</div>
-          <div class="acw-text">
-            <b>API calls cost real money.</b> Each slide edit / generation consumes tokens from your account.
-            We strongly recommend setting a <b>monthly spending cap</b> on your provider's dashboard before using Sloth Space.
-            We are not responsible for any charges incurred.
-          </div>
-        </div>
-      </div>
-
-      <!-- Ollama fields -->
-      <div id="welcomeOllamaFields" style="display:none;">
-        <div class="ollama-guide" id="ollamaGuide">
-          <!-- Content filled by initOllamaGuide() based on OS -->
-        </div>
-        <div class="wb-inline-row" style="margin-top:10px;">
-          <div class="wb-input-group">
-            <label>URL</label>
-            <input type="text" id="welcomeOllamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434" style="margin-bottom:0;">
-          </div>
-          <div class="wb-input-group">
-            <label>Model</label>
-            <input type="text" id="welcomeOllamaModel" placeholder="llama3.1:8b" value="llama3.1:8b" style="margin-bottom:0;">
-          </div>
-        </div>
-      </div>
-
-      <!-- Custom fields -->
-      <div id="welcomeCustomFields" style="display:none;">
-        <div class="wb-input-group">
-          <label>API URL</label>
-          <input type="text" id="welcomeCustomUrl" placeholder="https://api.example.com/v1/chat/completions">
-        </div>
-        <div class="wb-input-group">
-          <label>API Key</label>
-          <input type="password" id="welcomeCustomKey" placeholder="your-api-key">
-        </div>
-        <div class="wb-inline-row">
-          <div class="wb-input-group">
-            <label>Model</label>
-            <input type="text" id="welcomeCustomModel" placeholder="model-name">
-          </div>
-          <div class="wb-input-group">
-            <label>Router Model</label>
-            <input type="text" id="welcomeCustomRouter" placeholder="small-model">
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Provider config panel moved to wb-right -->
 
     <div class="wb-input-group" style="margin-top:10px;">
       <label>Your Name</label>
@@ -817,6 +769,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         <div class="demo-label">Live Preview</div>
         <div class="demo-slide-area" id="demoSlideArea">
           <div class="demo-slide-inner" id="demoSlideInner">
+            <div class="ds-icon" id="demoSlideIcon"></div>
             <div class="ds-title" id="demoSlideTitle"></div>
             <div class="ds-subtitle" id="demoSlideSubtitle"></div>
             <div class="ds-body" id="demoSlideBody"></div>
@@ -829,6 +782,63 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
             <span class="demo-prompt-cursor" id="demoCursor"></span>
           </div>
         </div>
+      </div>
+      <!-- Config panel (overlays demo when active) -->
+      <div class="wb-right-config" id="wbRightConfig">
+        <div class="wrc-title">Choose your AI provider</div>
+        <div class="wb-provider-grid" id="welcomeProviderGrid"></div>
+
+        <div id="welcomeKeyFields" style="display:none;">
+          <div class="wb-input-group">
+            <label id="welcomeKeyLabel">API Key</label>
+            <input type="password" id="welcomeApiKey" placeholder="">
+          </div>
+          <div class="api-cost-warning">
+            <div class="acw-icon">&#9888;</div>
+            <div class="acw-text">
+              <b>API calls cost real money.</b> Each slide edit / generation consumes tokens from your account.
+              We strongly recommend setting a <b>monthly spending cap</b> on your provider's dashboard before using Sloth Space.
+              We are not responsible for any charges incurred.
+            </div>
+          </div>
+        </div>
+
+        <div id="welcomeOllamaFields" style="display:none;">
+          <div class="ollama-guide" id="ollamaGuide"></div>
+          <div class="wb-inline-row" style="margin-top:10px;">
+            <div class="wb-input-group">
+              <label>URL</label>
+              <input type="text" id="welcomeOllamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434" style="margin-bottom:0;">
+            </div>
+            <div class="wb-input-group">
+              <label>Model</label>
+              <input type="text" id="welcomeOllamaModel" placeholder="llama3.1:8b" value="llama3.1:8b" style="margin-bottom:0;">
+            </div>
+          </div>
+        </div>
+
+        <div id="welcomeCustomFields" style="display:none;">
+          <div class="wb-input-group">
+            <label>API URL</label>
+            <input type="text" id="welcomeCustomUrl" placeholder="https://api.example.com/v1/chat/completions">
+          </div>
+          <div class="wb-input-group">
+            <label>API Key</label>
+            <input type="password" id="welcomeCustomKey" placeholder="your-api-key">
+          </div>
+          <div class="wb-inline-row">
+            <div class="wb-input-group">
+              <label>Model</label>
+              <input type="text" id="welcomeCustomModel" placeholder="model-name">
+            </div>
+            <div class="wb-input-group">
+              <label>Router Model</label>
+              <input type="text" id="welcomeCustomRouter" placeholder="small-model">
+            </div>
+          </div>
+        </div>
+
+        <button class="wrc-done-btn" onclick="confirmWelcomeProvider()">Confirm</button>
       </div>
     </div><!-- end wb-right -->
   </div>
@@ -1932,11 +1942,13 @@ let welcomeProvider = 'groq';
 const CLOUD_PROVIDERS=['groq','openai','claude','grok']; // providers that need API key
 
 function toggleWelcomeProviders(){
-  const panel=document.getElementById('welcomeProviderPanel');
+  const configPanel=document.getElementById('wbRightConfig');
   const btn=document.getElementById('wbConnectBtn');
-  if(panel.style.display==='none'){
-    panel.style.display='';
-    btn.textContent='Choose your AI provider:';
+  const isOpen=configPanel.classList.contains('active');
+  if(!isOpen){
+    configPanel.classList.add('active');
+    btn.textContent='Configuring...';
+    btn.style.opacity='0.6';
     // Build provider grid dynamically
     const grid=document.getElementById('welcomeProviderGrid');
     grid.innerHTML=Object.entries(LLM_DEFAULTS).map(([key,def])=>
@@ -1947,9 +1959,51 @@ function toggleWelcomeProviders(){
       </div>`
     ).join('');
   }else{
-    panel.style.display='none';
+    configPanel.classList.remove('active');
     btn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4m-7-11H1m22 0h-4m-2.3-6.7-2.8 2.8m-5.8 5.8-2.8 2.8m0-11.4 2.8 2.8m5.8 5.8 2.8 2.8"/><circle cx="12" cy="12" r="3"/></svg> Connect your LLM to get started';
+    btn.style.opacity='';
   }
+}
+function confirmWelcomeProvider(){
+  // Validate the selected provider fields
+  const isCloud=CLOUD_PROVIDERS.includes(welcomeProvider);
+  if(isCloud){
+    const key=document.getElementById('welcomeApiKey').value.trim();
+    if(!key){
+      const input=document.getElementById('welcomeApiKey');
+      const def=LLM_DEFAULTS[welcomeProvider];
+      input.style.border='2px solid #e74c3c';
+      input.placeholder=`API Key required — get at ${def.keyUrl}`;
+      input.focus();
+      input.addEventListener('input',()=>{input.style.border='';},{once:true});
+      return;
+    }
+  }else if(welcomeProvider==='ollama'){
+    const statusEl=document.getElementById('ollamaDetectStatus');
+    if(!statusEl||!statusEl.classList.contains('ok')){
+      detectOllama();
+      return;
+    }
+  }else if(welcomeProvider==='custom'){
+    const url=document.getElementById('welcomeCustomUrl').value.trim();
+    if(!url){
+      document.getElementById('welcomeCustomUrl').style.border='2px solid #e74c3c';
+      document.getElementById('welcomeCustomUrl').focus();
+      return;
+    }
+  }
+  // Close config panel, update button to Connected
+  const configPanel=document.getElementById('wbRightConfig');
+  configPanel.classList.remove('active');
+  const btn=document.getElementById('wbConnectBtn');
+  const def=LLM_DEFAULTS[welcomeProvider]||{};
+  btn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${def.color||'#8B9E8B'};margin-right:6px;"></span> Connected to ${def.label||welcomeProvider}`;
+  btn.style.opacity='';
+  btn.style.color='#fff';
+  btn.style.borderColor=def.color||'#8B9E8B';
+  btn.classList.add('connected');
+  // Mark that provider panel was "opened" so finishWelcome won't re-prompt
+  btn._providerConfirmed=true;
 }
 
 function setWelcomeProvider(p) {
@@ -1973,47 +2027,17 @@ function setWelcomeProvider(p) {
 }
 
 function finishWelcome() {
-  // If provider panel was never opened, prompt user to connect LLM first
-  const panel=document.getElementById('welcomeProviderPanel');
-  if(panel.style.display==='none'){
-    // Flash the connect button to draw attention
-    const btn=document.getElementById('wbConnectBtn');
+  // If provider was never confirmed, prompt user to connect LLM first
+  const btn=document.getElementById('wbConnectBtn');
+  if(!btn._providerConfirmed && !isConfigured()){
     btn.style.animation='none';
-    btn.offsetHeight; // force reflow
+    btn.offsetHeight;
     btn.style.animation='pulse-warn 0.5s ease 3';
-    toggleWelcomeProviders(); // auto-open the panel
+    toggleWelcomeProviders();
     return;
   }
-  // Validate based on provider type
+  // If already configured (returning user), read values from current config
   const isCloud=CLOUD_PROVIDERS.includes(welcomeProvider);
-  if(isCloud){
-    const key = document.getElementById('welcomeApiKey').value.trim();
-    if (!key) {
-      const input = document.getElementById('welcomeApiKey');
-      const def=LLM_DEFAULTS[welcomeProvider];
-      input.style.border = '2px solid #e74c3c';
-      input.placeholder = `API Key required — get one at ${def.keyUrl}`;
-      input.focus();
-      input.addEventListener('input', () => { input.style.border = ''; }, { once: true });
-      return;
-    }
-  } else if (welcomeProvider === 'ollama') {
-    const statusEl = document.getElementById('ollamaDetectStatus');
-    if (!statusEl || !statusEl.classList.contains('ok')) {
-      const guide = document.getElementById('ollamaGuide');
-      if (guide) guide.style.border = '2px solid #e74c3c';
-      setTimeout(() => { if (guide) guide.style.border = ''; }, 3000);
-      detectOllama();
-      return;
-    }
-  } else if (welcomeProvider === 'custom') {
-    const url=document.getElementById('welcomeCustomUrl').value.trim();
-    if(!url){
-      document.getElementById('welcomeCustomUrl').style.border='2px solid #e74c3c';
-      document.getElementById('welcomeCustomUrl').focus();
-      return;
-    }
-  }
 
   const defaults = LLM_DEFAULTS[welcomeProvider];
   llmConfig.provider = welcomeProvider;
@@ -2461,12 +2485,13 @@ document.addEventListener('click',function(e){
 function showWelcome(){
   const overlay=document.getElementById('welcomeOverlay');
   overlay.classList.remove('hidden');
-  // If already configured, pre-fill welcome page so user doesn't think settings are lost
+  // Make sure config panel is hidden (show demo)
+  const configPanel=document.getElementById('wbRightConfig');
+  if(configPanel)configPanel.classList.remove('active');
+  // If already configured, pre-fill and show Connected state
   if(isConfigured()){
-    const panel=document.getElementById('welcomeProviderPanel');
-    panel.style.display='';
     welcomeProvider=llmConfig.provider;
-    // Build provider grid & select the active one
+    // Pre-fill the config panel fields (in case user clicks to re-configure)
     const grid=document.getElementById('welcomeProviderGrid');
     grid.innerHTML=Object.entries(LLM_DEFAULTS).map(([key,def])=>
       `<div class="wb-pgrid-item${key===welcomeProvider?' active':''}" data-provider="${key}" onclick="setWelcomeProvider('${key}')">
@@ -2475,9 +2500,8 @@ function showWelcome(){
         <div class="wpg-desc">${def.desc}</div>
       </div>`
     ).join('');
-    // Show the right input fields for current provider
     setWelcomeProvider(welcomeProvider);
-    // Now fill in the saved values (setWelcomeProvider clears them, so we fill after)
+    // Fill saved values after setWelcomeProvider clears them
     const isCloud=CLOUD_PROVIDERS.includes(llmConfig.provider);
     if(isCloud){
       document.getElementById('welcomeApiKey').value=llmConfig.apiKey||'';
@@ -2491,11 +2515,13 @@ function showWelcome(){
       document.getElementById('welcomeCustomRouter').value=llmConfig.router||'';
     }
     document.getElementById('welcomeDisplayName').value=llmConfig.displayName||'';
-    // Update connect button to show configured state
+    // Show Connected on button
     const btn=document.getElementById('wbConnectBtn');
     const def=LLM_DEFAULTS[llmConfig.provider]||{};
     btn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${def.color||'#8B9E8B'};margin-right:6px;"></span> Connected to ${def.label||llmConfig.provider}`;
     btn.style.color='#fff'; btn.style.borderColor=def.color||'#8B9E8B';
+    btn.classList.add('connected');
+    btn._providerConfirmed=true;
   }
 }
 
@@ -4026,9 +4052,26 @@ async function deleteFileFromNav(id,source,keyOrPath){
       chatHistory=[];
       selectedRegion=null;
       document.getElementById('deckNameInput').value='';
+      // Clear autoSave storage so it doesn't restore on refresh
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_HISTORY_KEY);
       renderApp();
       addMessage('Deck deleted. Starting fresh.','system');
     }
+  }
+  // For local source, also clear autoSave if the saveKey matches
+  if(source==='local'){
+    try{
+      const saved=localStorage.getItem(STORAGE_KEY);
+      if(saved){
+        const data=JSON.parse(saved);
+        const savedTitle=(data.deck?.title||'').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
+        if(savedTitle===keyOrPath){
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(STORAGE_HISTORY_KEY);
+        }
+      }
+    }catch(e){}
   }
   refreshFileList();
 }
@@ -4363,6 +4406,7 @@ renderApp();
       aiReply:'Got it! Generating a 6-slide deck with Monet palette \u2014 cover, features, demo, architecture, roadmap, and closing...',
       slide:{
         bg:'linear-gradient(135deg,#E8DDD0,#D8CEBE)',
+        icon:'<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2.5" stroke="#4A5D7A" stroke-width="1.5"/><path d="M8 21h8M12 17v4" stroke="#4A5D7A" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="10" r="3" fill="#7886A5" opacity="0.4"/><path d="M9 10l2 2 4-4" stroke="#4A5D7A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         title:'Sloth Space',titleColor:'#4A5D7A',
         subtitle:'AI-Native Presentations, Reimagined',subtitleColor:'#7886A5',
         body:'Just describe what you need.\nSloth turns your words into beautiful slides \u2014 instantly.',bodyColor:'#6B7B6B'
@@ -4373,6 +4417,7 @@ renderApp();
       aiReply:'Creating an investor deck with TAM/SAM/SOM breakdown, competitive landscape, revenue projections, and team slides...',
       slide:{
         bg:'linear-gradient(135deg,#7886A5,#9BA8C4)',
+        icon:'<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="3" y="12" width="4" height="8" rx="1" fill="rgba(255,255,255,0.5)"/><rect x="10" y="8" width="4" height="12" rx="1" fill="rgba(255,255,255,0.6)"/><rect x="17" y="4" width="4" height="16" rx="1" fill="rgba(255,255,255,0.8)"/><path d="M3 4l7 4 5-2 6 1" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="3" cy="4" r="1.5" fill="#fff"/><circle cx="10" cy="8" r="1.5" fill="#fff"/><circle cx="15" cy="6" r="1.5" fill="#fff"/><circle cx="21" cy="7" r="1.5" fill="#fff"/></svg>',
         title:'Series A Funding',titleColor:'#fff',
         subtitle:'NovaMind \u2014 Redefining Personalized Learning',subtitleColor:'rgba(255,255,255,0.85)',
         body:'$4.2B TAM \u2022 3x YoY Growth \u2022 12K Active Users\n85% Retention \u2022 $1.8M ARR',bodyColor:'rgba(255,255,255,0.6)'
@@ -4383,6 +4428,7 @@ renderApp();
       aiReply:'Building a launch deck with Seurat-inspired accents \u2014 hero slide, key features, pricing tiers, and call to action...',
       slide:{
         bg:'linear-gradient(135deg,#2D4A3E,#3A5A4E)',
+        icon:'<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#E8C56D" opacity="0.3" stroke="#E8C56D" stroke-width="1.5" stroke-linejoin="round"/></svg>',
         title:'Introducing Arc',titleColor:'#E8C56D',
         subtitle:'The Smartest Way to Manage Your Workflow',subtitleColor:'#A8D5A2',
         body:'Automate \u2022 Collaborate \u2022 Ship Faster\nFrom idea to production in half the time.',bodyColor:'rgba(255,255,255,0.5)'
@@ -4393,6 +4439,7 @@ renderApp();
       aiReply:'Generating Q4 review \u2014 executive summary, revenue dashboard, customer metrics, OKR scorecard, and next quarter outlook...',
       slide:{
         bg:'linear-gradient(135deg,#3A2E4A,#5A4E6A)',
+        icon:'<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="#E8D5A3" stroke-width="1.5"/><path d="M8 12h8M8 8h5M8 16h6" stroke="#E8D5A3" stroke-width="1.2" stroke-linecap="round"/><circle cx="18" cy="6" r="3.5" fill="#5A4E6A" stroke="#A8D5A2" stroke-width="1.2"/><path d="M17 6l1 1 2-2" stroke="#A8D5A2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         title:'Q4 Business Review',titleColor:'#E8D5A3',
         subtitle:'FY2026 \u2014 Exceeding Every Benchmark',subtitleColor:'rgba(232,213,163,0.7)',
         body:'Revenue +23% \u2022 NPS 78 \u2022 Churn < 2%\nNew Markets: APAC, LATAM \u2022 Team +40%',bodyColor:'rgba(255,255,255,0.5)'
@@ -4456,6 +4503,8 @@ renderApp();
     }
     function showSlide(){
       slideArea.style.background=demo.slide.bg;
+      const iconEl=document.getElementById('demoSlideIcon');
+      if(iconEl) iconEl.innerHTML=demo.slide.icon||'';
       titleEl.textContent=demo.slide.title;
       titleEl.style.color=demo.slide.titleColor;
       subEl.textContent=demo.slide.subtitle;
