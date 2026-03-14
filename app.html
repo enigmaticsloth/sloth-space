@@ -107,11 +107,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 
 /* Toolbar */
 .toolbar { display:flex; gap:1px; padding:0 10px; flex-shrink:0; }
-.tool-btn { flex:0; background:transparent; color:#999; border:none; padding:5px 14px; cursor:pointer; font-size:11px; font-family:Arial; position:relative; border-top:1px solid var(--border); white-space:nowrap; }
-.tool-btn:hover { color:#aaa; background:var(--surface2); }
-.tool-btn.active-btn { color:#ccc; background:var(--surface2); }
+.tool-btn { flex:0; background:transparent; color:#ddd; border:none; padding:5px 14px; cursor:pointer; font-size:11px; font-family:Arial; position:relative; border-top:1px solid var(--border); white-space:nowrap; }
+.tool-btn:hover { color:#fff; background:var(--surface2); }
+.tool-btn.active-btn { color:#fff; background:var(--surface2); }
 .toolbar-spacer { flex:1; border-top:1px solid var(--border); }
-.font-size-indicator { display:inline-flex; align-items:center; justify-content:center; min-width:36px; padding:3px 6px; font-size:10px; font-family:'Courier New',monospace; color:#666; border-top:1px solid var(--border); border-right:1px solid var(--border); letter-spacing:-0.5px; user-select:none; }
+.font-size-indicator { display:inline-flex; align-items:center; justify-content:center; min-width:36px; padding:3px 6px; font-size:10px; font-family:'Courier New',monospace; color:#ccc; border-top:1px solid var(--border); border-right:1px solid var(--border); letter-spacing:-0.5px; user-select:none; }
 .font-size-indicator.has-selection { color:#7886A5; }
 .undo-redo-group { display:flex; gap:1px; }
 .undo-redo-btn { background:transparent; color:#555; border:none; padding:5px 10px; cursor:pointer; font-size:14px; border-top:1px solid var(--border); transition:color 0.15s; }
@@ -189,10 +189,10 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .region-box.selected { outline:2px solid #5B9BD5; outline-offset:2px; box-shadow:0 0 8px rgba(91,155,213,0.4); }
 .region-box.selected.fc-move-mode { cursor:move; }
 /* Inline text editing */
-.region-box.inline-editing { outline:2px solid #4CAF50!important; outline-offset:2px!important; box-shadow:0 0 10px rgba(76,175,80,0.3)!important; cursor:text!important; }
-.region-box.inline-editing [contenteditable=true] { outline:none; cursor:text; caret-color:#4CAF50; min-height:1em; }
-.region-box.inline-editing [contenteditable=true]:focus { background:rgba(76,175,80,0.05); border-radius:2px; }
-.region-box.inline-editing td[contenteditable=true]:focus, .region-box.inline-editing th[contenteditable=true]:focus { background:rgba(76,175,80,0.12)!important; }
+.region-box.inline-editing { outline:2px solid #7EC8E3!important; outline-offset:2px!important; box-shadow:0 0 10px rgba(126,200,227,0.3)!important; cursor:text!important; }
+.region-box.inline-editing [contenteditable=true] { outline:none; cursor:text; caret-color:#7EC8E3; min-height:1em; }
+.region-box.inline-editing [contenteditable=true]:focus { background:rgba(126,200,227,0.06); border-radius:2px; }
+.region-box.inline-editing td[contenteditable=true]:focus, .region-box.inline-editing th[contenteditable=true]:focus { background:rgba(126,200,227,0.12)!important; }
 /* Free-form Canvas resize handles — subtle until hover */
 .fc-handle { position:absolute; width:8px; height:8px; background:#5B9BD5; border:1.5px solid #fff; border-radius:2px; z-index:10; pointer-events:auto; opacity:0.3; transition:opacity 0.15s; }
 .region-box.selected:hover .fc-handle, .fc-move-mode .fc-handle { opacity:1; }
@@ -1137,7 +1137,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 <!-- Contextual AI Menu (positioned dynamically near selected region) -->
 <div class="ctx-ai-menu" id="ctxAiMenu" style="display:none;"></div>
 <div class="text-sel-tooltip" id="textSelTooltip" style="display:none;">
-  <button onclick="copySelectionToChat()">✦ Ask AI about this</button>
+  <button onclick="editFromSelection()">✏️ Edit</button>
+  <button onclick="copySelectionToChat()">✦ Ask AI</button>
   <button onclick="copySelectionToClipboard()">📋 Copy</button>
 </div>
 
@@ -1506,27 +1507,56 @@ function initFreeformCanvas(){
     return slideEl.offsetWidth/p.slide.width;
   }
 
-  // ── MOUSE: drag only for resize handles OR when in explicit move mode ──
+  // ── MOUSE: resize handles always; move only in explicit move mode ──
   canvas.addEventListener('mousedown',function(e){
     if(!currentDeck||!selectedRegion||isInlineEditing())return;
     const handle=e.target.closest('.fc-handle');
-    // Move: ONLY when fcMoveMode is active
-    const regionEl=fcMoveMode?e.target.closest('.region-box.selected'):null;
-    if(!handle&&!regionEl)return;
 
-    const scale=getSlideScale();
-    if(!scale)return;
-    const slideIdx=selectedRegion.slideIdx;
-    const regionId=selectedRegion.regionId;
-    const origBounds=getRegionBounds(slideIdx,regionId);
-    if(!origBounds)return;
+    // In move mode: click ANYWHERE on the slide to place, or drag the region
+    if(fcMoveMode&&!handle){
+      const slideEl=canvas.querySelector('[style*="position:relative"]');
+      if(!slideEl)return;
+      const scale=getSlideScale();
+      if(!scale)return;
+      const slideIdx=selectedRegion.slideIdx;
+      const regionId=selectedRegion.regionId;
+      const origBounds=getRegionBounds(slideIdx,regionId);
+      if(!origBounds)return;
 
-    e.preventDefault();e.stopPropagation();
-    document.body.classList.add('fc-dragging');
+      // Check if click is inside the slide area
+      const slideRect=slideEl.getBoundingClientRect();
+      if(e.clientX>=slideRect.left&&e.clientX<=slideRect.right&&e.clientY>=slideRect.top&&e.clientY<=slideRect.bottom){
+        e.preventDefault();e.stopPropagation();
+        // Calculate where on the slide the user clicked → place region center there
+        const clickSlideX=(e.clientX-slideRect.left)/scale;
+        const clickSlideY=(e.clientY-slideRect.top)/scale;
+        const p=PRESETS[currentPreset];
+        const mx=p.spacing.margin.left, my=p.spacing.margin.top;
+        // New bounds: center the region on the click point
+        const newX=clickSlideX-mx-origBounds.w/2;
+        const newY=clickSlideY-my-origBounds.h/2;
+        pushUndo();
+        setRegionBounds(slideIdx,regionId,{x:Math.round(newX),y:Math.round(newY),w:origBounds.w,h:origBounds.h});
+        exitMoveMode();
+        addMessage('✓ Region placed.','system');
+        autoSave();
+        renderApp();
+        return;
+      }
+      return;
+    }
+
+    // Resize handle drag
     if(handle){
+      const scale=getSlideScale();
+      if(!scale)return;
+      const slideIdx=selectedRegion.slideIdx;
+      const regionId=selectedRegion.regionId;
+      const origBounds=getRegionBounds(slideIdx,regionId);
+      if(!origBounds)return;
+      e.preventDefault();e.stopPropagation();
+      document.body.classList.add('fc-dragging');
       fcDrag={type:'resize',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,dir:handle.dataset.dir,scale};
-    }else{
-      fcDrag={type:'move',regionId,slideIdx,startX:e.clientX,startY:e.clientY,origBounds,scale};
     }
   });
 
@@ -1536,19 +1566,15 @@ function initFreeformCanvas(){
     const dx=(e.clientX-fcDrag.startX)/fcDrag.scale;
     const dy=(e.clientY-fcDrag.startY)/fcDrag.scale;
     const ob=fcDrag.origBounds;
-    if(fcDrag.type==='move'){
-      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:ob.x+dx,y:ob.y+dy,w:ob.w,h:ob.h});
-      renderApp();
-    }else if(fcDrag.type==='resize'){
-      let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
-      const d=fcDrag.dir;
-      if(d.includes('e'))nw=Math.max(60,ob.w+dx);
-      if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
-      if(d.includes('s'))nh=Math.max(30,ob.h+dy);
-      if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
-      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
-      renderApp();
-    }
+    // Only resize via drag (move is now click-to-place)
+    let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
+    const d=fcDrag.dir;
+    if(d.includes('e'))nw=Math.max(60,ob.w+dx);
+    if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
+    if(d.includes('s'))nh=Math.max(30,ob.h+dy);
+    if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
+    setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
+    renderApp();
   });
 
   document.addEventListener('mouseup',function(e){
@@ -1558,37 +1584,54 @@ function initFreeformCanvas(){
       pushUndo(); autoSave();
       fcJustDragged=true; setTimeout(()=>{fcJustDragged=false;},100);
     }
-    const wasMoveMode=fcDrag.type==='move';
     fcDrag=null;
     document.body.classList.remove('fc-dragging');
-    // Auto-exit move mode after a successful move-and-place
-    if(wasMoveMode&&moved&&fcMoveMode){
-      exitMoveMode();
-      addMessage('✓ Region placed.','system');
-    }
   });
 
-  // ── TOUCH: same logic — resize handles always, move only in move mode ──
+  // ── TOUCH: resize handles + click-to-place in move mode ──
   canvas.addEventListener('touchstart',function(e){
     if(!currentDeck||!selectedRegion||isInlineEditing())return;
     const t=e.touches[0];
     const el=document.elementFromPoint(t.clientX,t.clientY);
     const handle=el?.closest('.fc-handle');
-    const regionEl=fcMoveMode?el?.closest('.region-box.selected'):null;
-    if(!handle&&!regionEl)return;
 
-    const scale=getSlideScale();
-    if(!scale)return;
-    const slideIdx=selectedRegion.slideIdx;
-    const regionId=selectedRegion.regionId;
-    const origBounds=getRegionBounds(slideIdx,regionId);
-    if(!origBounds)return;
+    // Move mode: tap anywhere on slide to place
+    if(fcMoveMode&&!handle){
+      const slideEl=canvas.querySelector('[style*="position:relative"]');
+      if(!slideEl)return;
+      const scale=getSlideScale();
+      if(!scale)return;
+      const slideRect=slideEl.getBoundingClientRect();
+      if(t.clientX>=slideRect.left&&t.clientX<=slideRect.right&&t.clientY>=slideRect.top&&t.clientY<=slideRect.bottom){
+        e.preventDefault();
+        const slideIdx=selectedRegion.slideIdx;
+        const regionId=selectedRegion.regionId;
+        const origBounds=getRegionBounds(slideIdx,regionId);
+        if(!origBounds)return;
+        const p=PRESETS[currentPreset];
+        const mx=p.spacing.margin.left, my=p.spacing.margin.top;
+        const newX=(t.clientX-slideRect.left)/scale-mx-origBounds.w/2;
+        const newY=(t.clientY-slideRect.top)/scale-my-origBounds.h/2;
+        pushUndo();
+        setRegionBounds(slideIdx,regionId,{x:Math.round(newX),y:Math.round(newY),w:origBounds.w,h:origBounds.h});
+        exitMoveMode();
+        addMessage('✓ Region placed.','system');
+        autoSave();
+        renderApp();
+      }
+      return;
+    }
 
-    e.preventDefault();
+    // Resize handle drag
     if(handle){
+      const scale=getSlideScale();
+      if(!scale)return;
+      const slideIdx=selectedRegion.slideIdx;
+      const regionId=selectedRegion.regionId;
+      const origBounds=getRegionBounds(slideIdx,regionId);
+      if(!origBounds)return;
+      e.preventDefault();
       fcDrag={type:'resize',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,dir:handle.dataset.dir,scale};
-    }else{
-      fcDrag={type:'move',regionId,slideIdx,startX:t.clientX,startY:t.clientY,origBounds,scale};
     }
   },{passive:false});
 
@@ -1599,47 +1642,37 @@ function initFreeformCanvas(){
     const dx=(t.clientX-fcDrag.startX)/fcDrag.scale;
     const dy=(t.clientY-fcDrag.startY)/fcDrag.scale;
     const ob=fcDrag.origBounds;
-    if(fcDrag.type==='move'){
-      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:ob.x+dx,y:ob.y+dy,w:ob.w,h:ob.h});
-      renderApp();
-    }else if(fcDrag.type==='resize'){
-      let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
-      const d=fcDrag.dir;
-      if(d.includes('e'))nw=Math.max(60,ob.w+dx);
-      if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
-      if(d.includes('s'))nh=Math.max(30,ob.h+dy);
-      if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
-      setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
-      renderApp();
-    }
+    let nx=ob.x,ny=ob.y,nw=ob.w,nh=ob.h;
+    const d=fcDrag.dir;
+    if(d.includes('e'))nw=Math.max(60,ob.w+dx);
+    if(d.includes('w')){nw=Math.max(60,ob.w-dx);nx=ob.x+dx;}
+    if(d.includes('s'))nh=Math.max(30,ob.h+dy);
+    if(d.includes('n')){nh=Math.max(30,ob.h-dy);ny=ob.y+dy;}
+    setRegionBounds(fcDrag.slideIdx,fcDrag.regionId,{x:nx,y:ny,w:nw,h:nh});
+    renderApp();
   },{passive:false});
 
   document.addEventListener('touchend',function(e){
     if(!fcDrag)return;
     pushUndo(); autoSave();
-    const wasMoveMode=fcDrag.type==='move';
     fcDrag=null;
-    if(wasMoveMode&&fcMoveMode){
-      exitMoveMode();
-      addMessage('✓ Region placed.','system');
-    }
   });
 }
 
 let fcMoveMode=false; // visual move mode indicator
+let fcMovePickedUp=false; // true once user starts dragging in move mode
 
 function enterMoveMode(){
   fcMoveMode=true;
-  // Add visual indicator to the selected region
+  fcMovePickedUp=false;
   const selEl=document.querySelector('.region-box.selected');
-  if(selEl){
-    selEl.classList.add('fc-move-mode');
-  }
-  addMessage('✥ Move mode: drag the selected region to reposition it. Click elsewhere to exit.','system');
+  if(selEl) selEl.classList.add('fc-move-mode');
+  addMessage('✥ Move mode: drag to reposition, or click where you want to place it.','system');
 }
 
 function exitMoveMode(){
   fcMoveMode=false;
+  fcMovePickedUp=false;
   document.querySelectorAll('.fc-move-mode').forEach(el=>el.classList.remove('fc-move-mode'));
 }
 
@@ -1673,6 +1706,29 @@ function showTextSelTooltip(){
 function hideTextSelTooltip(){
   const tooltip=document.getElementById('textSelTooltip');
   if(tooltip) tooltip.style.display='none';
+}
+
+function editFromSelection(){
+  hideTextSelTooltip();
+  // Find the region element containing the selection
+  const sel=window.getSelection();
+  const anchor=sel?.anchorNode;
+  const regionEl=anchor?.parentElement?.closest?.('.region-box')||anchor?.closest?.('.region-box');
+  if(!regionEl)return;
+  const regionId=regionEl.dataset.region;
+  const slideIdx=parseInt(regionEl.dataset.slide);
+  if(regionId===undefined||isNaN(slideIdx))return;
+  sel.removeAllRanges();
+  // Select the region first, then enter inline edit
+  const L=LAYOUTS[currentDeck.slides[slideIdx].layout];
+  const r=L?.regions.find(r=>r.id===regionId);
+  if(r){
+    const roleLabel=r.role.charAt(0).toUpperCase()+r.role.slice(1);
+    selectedRegion={slideIdx,regionId,role:r.role,label:roleLabel};
+    document.getElementById('selectionBar').style.display='flex';
+    document.getElementById('selectionTag').textContent=`Slide ${slideIdx+1} → ${roleLabel} (${regionId})`;
+  }
+  enterInlineEdit(slideIdx,regionId);
 }
 
 function copySelectionToChat(){
@@ -1757,7 +1813,7 @@ function generateCtxSuggestions(role,regionId,content){
       suggestions.push({icon:'📍',text:'Reset position',hint:'Back to default layout',action:`__reset_bounds__${regionId}`});
     }
   }
-  suggestions.push({icon:'🔀',text:'Change layout',hint:'Try a different arrangement',action:`Suggest a better layout for this slide and change it`});
+  suggestions.push({icon:'🔀',text:'Change layout',hint:'Different arrangement',action:`Change this slide to a different layout`});
 
   // ════════ AI SUGGESTIONS (below divider) ════════
   suggestions.push({type:'divider'});
@@ -2366,14 +2422,43 @@ function goSlide(i){
   slideAnimDir=0;
 }
 function setPreset(id){
+  const prevPreset=currentPreset;
   currentPreset=id;
-  // If no deck loaded, generate a sample template deck for this preset
   if(!currentDeck){
+    // No deck yet → create template
     currentDeck=generateTemplateDeck(id);
     currentSlide=0;
     chatHistory=[];
     addMessage(`✓ Created ${PRESETS[id].name} template deck`,'system');
+  }else if(currentDeck._isTemplate){
+    // Still on a template deck (user hasn't generated real content) → regenerate template
+    currentDeck=generateTemplateDeck(id);
+    currentSlide=0;
+    addMessage(`✓ Switched to ${PRESETS[id].name} template`,'system');
+  }else{
+    // Real deck with content → clear per-slide style_overrides from old preset
+    // Apply the new preset's style bank if available
+    const newTemplate=generateTemplateDeck(id);
+    if(newTemplate._styleBank){
+      currentDeck._styleBank=newTemplate._styleBank;
+      // Re-apply style bank to existing slides based on their layout
+      currentDeck.slides.forEach(s=>{
+        const bank=newTemplate._styleBank;
+        if(bank[s.layout]){
+          s.style_overrides={...bank[s.layout]};
+        }else if(s.layout==='content'&&bank.content){
+          s.style_overrides={...bank.content[0]};
+        }else{
+          s.style_overrides={};
+        }
+      });
+    }else{
+      // Clean presets (white/gray/dark): clear all style overrides
+      currentDeck.slides.forEach(s=>{ s.style_overrides={}; });
+    }
+    addMessage(`✓ Applied ${PRESETS[id].name} preset to all slides`,'system');
   }
+  currentDeck.preset=id;
   renderApp();
 }
 
@@ -2401,15 +2486,15 @@ function generateTemplateDeck(presetId){
     deck.slides=[{layout:'title',content:{title:'Impressions of Light',subtitle:'Describe your topic — Sloth will paint your slides',tagline:'Monet preset · warm impressionist palette',date:new Date().toLocaleDateString()},style_overrides:deck._styleBank.title}];
   }else if(presetId==='seurat'){
     deck._styleBank={
-      title:{background:'#2A2A1E',heading_color:'#E8D8BD',regions:{subtitle:{color:'#C67A3C'},tagline:{color:'#8B9E6B'}}},
+      title:{background:'#FDF8EF',heading_color:'#C67A3C',regions:{subtitle:{color:'#4A7C6F'},tagline:{color:'#D4564A'},date:{color:'#8B9E6B'}}},
       content:[
-        {background:'#C67A3C',heading_color:'#FDF8EF',regions:{body:{color:'#FEF5E8'}}},
-        {background:'#D4564A',heading_color:'#FDF8EF',regions:{body:{color:'#FEF0EC'}}}
+        {background:'#FEF5E8',heading_color:'#C67A3C',regions:{body:{color:'#3D3D2E'}}},
+        {background:'#F0EDE6',heading_color:'#D4564A',regions:{body:{color:'#3D3D2E'}}}
       ],
-      'two-column':{background:'#FDF8EF',heading_color:'#2A2A1E',regions:{left:{color:'#6B4D30'},right:{color:'#3B6E8E'},left_label:{color:'#C67A3C'},right_label:{color:'#5B8FA8'}}},
-      quote:{background:'#4A7C6F',heading_color:'#FDF8EF',regions:{quote:{color:'#F0E8D8'},author:{color:'#E8D8BD'}}},
-      'data-table':{background:'#F0E8D8',heading_color:'#2A2A1E',regions:{description:{color:'#6B6B58'}}},
-      closing:{background:'#2A2A1E',heading_color:'#E8D8BD',regions:{subtitle:{color:'#C67A3C'}}}
+      'two-column':{background:'#FDF8EF',heading_color:'#C67A3C',regions:{left:{color:'#4A7C6F'},right:{color:'#D4564A'},left_label:{color:'#C67A3C'},right_label:{color:'#5B8FA8'}}},
+      quote:{background:'#E8F0ED',heading_color:'#4A7C6F',regions:{quote:{color:'#2A2A1E'},author:{color:'#C67A3C'}}},
+      'data-table':{background:'#FDF8EF',heading_color:'#C67A3C',regions:{description:{color:'#6B6B58'}}},
+      closing:{background:'#F0E8D8',heading_color:'#C67A3C',regions:{subtitle:{color:'#4A7C6F'}}}
     };
     deck.slides=[{layout:'title',content:{title:'Points of Brilliance',subtitle:'Describe your topic — Sloth will compose your slides',tagline:'Seurat preset · vivid pointillist palette',date:new Date().toLocaleDateString()},style_overrides:deck._styleBank.title}];
   }else{
