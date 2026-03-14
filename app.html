@@ -5505,7 +5505,9 @@ let docDragInsertIdx=-1; // current visual insert index among non-source blocks
 let docDragOffsetY=0;
 let docDragStartY=null;
 let docDragActivated=false;
+let docDragDropped=false; // flag to prevent dragEnd double-firing after successful drop
 const DOC_DRAG_DEAD_ZONE=12;
+const DOC_DRAG_HYSTERESIS=12; // px hysteresis zone around block midpoints
 
 function docDragStart(event, blockId){
   // Don't start block drag if user is interacting with editable content inside the block
@@ -5574,14 +5576,21 @@ function docDragOver(event){
   const blocks=[...page.querySelectorAll('.doc-block:not(.drag-source)')];
   if(!blocks.length) return;
 
-  // Determine insert index: find the gap the cursor is closest to
-  // Gaps are: before block 0, between block 0 & 1, ... , after last block
+  // Determine insert index with hysteresis to prevent flicker at boundaries
   const srcIdx=currentDoc.blocks.findIndex(b=>b.id===docDragBlockId);
+  const hy=DOC_DRAG_HYSTERESIS;
   let insertIdx=blocks.length; // default: after last
   for(let i=0;i<blocks.length;i++){
     const rect=blocks[i].getBoundingClientRect();
     const midY=rect.top+rect.height/2;
-    if(event.clientY<midY){ insertIdx=i; break; }
+    // If we already have an insertIdx, require cursor to move past midpoint + hysteresis to change
+    if(docDragInsertIdx>=0){
+      if(i===docDragInsertIdx && event.clientY<midY+hy){ insertIdx=i; break; }
+      if(i===docDragInsertIdx-1 && event.clientY<midY-hy){ insertIdx=i; break; }
+      if(i!==docDragInsertIdx && i!==docDragInsertIdx-1 && event.clientY<midY){ insertIdx=i; break; }
+    } else {
+      if(event.clientY<midY){ insertIdx=i; break; }
+    }
   }
 
   if(insertIdx===docDragInsertIdx) return; // no change
@@ -5619,7 +5628,9 @@ function docDragLeave(event){
 }
 
 function docDragEnd(event){
-  // Clean up if drop didn't happen (e.g. cancelled)
+  // Skip if not a block drag (e.g. text selection in contenteditable) or if docDrop already handled it
+  if(!docDragBlockId||docDragDropped){ docDragDropped=false; return; }
+  // Drag was cancelled (Escape, dropped outside, etc.) — restore original state
   docDragCleanup();
   renderDocMode();
 }
@@ -5661,6 +5672,8 @@ function docDrop(event){
   if(insertAt>currentDoc.blocks.length) insertAt=currentDoc.blocks.length;
   currentDoc.blocks.splice(insertAt,0,moved);
   currentDoc.updated=new Date().toISOString();
+
+  docDragDropped=true; // prevent docDragEnd from double-firing
 
   // Animate ghost to final position then re-render
   if(docDragGhost){
