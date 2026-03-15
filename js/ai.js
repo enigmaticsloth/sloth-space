@@ -568,7 +568,7 @@ export function initChatTabs(){
 
 // Save all tabs to localStorage (called after every message / tab switch)
 let _cloudSyncTimer=null;
-function saveChatTabs(){
+export function saveChatTabs(){
   // Snapshot current tab before saving
   _snapshotActiveTab();
   try{

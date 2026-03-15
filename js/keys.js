@@ -264,18 +264,24 @@ export function initKeys(){
     }
   });
 
-  // ── Save doc on page unload/tab close ──
+  // ── Save on page unload/tab close ──
   window.addEventListener('beforeunload',function(){
     if(S.currentMode==='doc'&&S.currentDoc){
       window.docFlushEditing();
       window.docSaveUndoStacks();
       window.docSaveNow();
     }
+    if(S.currentMode==='slide'&&S.currentDeck){
+      window.autoSave();
+    }
+    // Always save chat tabs on unload
+    if(window.saveChatTabs) window.saveChatTabs();
   });
 
   window.addEventListener('visibilitychange',function(){
-    if(document.hidden&&S.currentMode==='doc'&&S.currentDoc){
-      window.docSaveNow();
+    if(document.hidden){
+      if(S.currentMode==='doc'&&S.currentDoc) window.docSaveNow();
+      if(S.currentMode==='slide'&&S.currentDeck) window.autoSave();
     }
   });
 }

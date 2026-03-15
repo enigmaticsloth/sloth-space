@@ -1523,13 +1523,29 @@ export const wsItemLoaders = {
     return true;
   },
   slides(item) {
-    // TODO: load slide deck from workspace item
-    // slideLoadFromWorkspace(item);
+    if (!item.content || !item.content.slides || !item.content.slides.length) {
+      window.addMessage('This slide deck has no content.', 'system');
+      return false;
+    }
+    S.currentDeck = item.content;
+    S.currentPreset = item.content.preset || 'clean-white';
+    S.currentSlide = 0;
+    S.selectedRegion = null;
+    S.undoStack = [];
+    S.redoStack = [];
+    window.addMessage(`✓ Opened: "${item.title || 'Untitled'}" (${item.content.slides.length} slides)`, 'system');
+    window.autoSave(); // persist to localStorage too
     return true;
   },
+  slide(item) {
+    // alias — some items stored with type:'slide' instead of 'slides'
+    return wsItemLoaders.slides(item);
+  },
   sheet(item) {
-    // TODO: load sheet from workspace item
-    return true;
+    // Sheet: just enter workspace with the sheet selected
+    // TODO: full sheet editor
+    window.addMessage(`Sheet "${item.title}" — sheet editor coming soon!`, 'system');
+    return false;
   },
   image(item) {
     // Open image viewer overlay
