@@ -918,6 +918,10 @@ function modeRedo(){
 function modeExecCmd(cmd){
   if(S.currentMode==='doc'){
     window.docExecCmd(cmd);
+  } else if(S.currentMode==='sheet'&&S.sheet.editingCell){
+    // Sheet cell editing: apply formatting via execCommand on contentEditable cell
+    const cellEl=document.querySelector(`.sh-cell[data-row-id="${S.sheet.editingCell.rowId}"][data-col-id="${S.sheet.editingCell.colId}"]`);
+    if(cellEl){ cellEl.focus(); document.execCommand(cmd); }
   } else if(window.isInlineEditing()){
     // Slide inline edit: apply formatting directly via execCommand
     document.execCommand(cmd);

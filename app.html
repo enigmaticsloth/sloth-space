@@ -966,6 +966,46 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   .deck-action-btn.primary { font-size:8px; padding:2px 6px; }
   .input-area textarea { height:20vh; min-height:60px; }
 }
+
+/* ── Sheet: Frozen row/col sticky ── */
+.sh-grid .sh-cell.sh-frozen-row { position:sticky; top:32px; z-index:3; background:#1a1e2a; border-bottom:2px solid #4A6FA5; }
+.sh-grid .sh-cell.sh-frozen-col { position:sticky; left:40px; z-index:3; background:#1a1e2a; border-right:2px solid #4A6FA5; }
+.sh-grid .sh-cell.sh-frozen-row.sh-frozen-col { z-index:4; }
+.sh-grid .sh-row-header.sh-frozen-row-hdr { position:sticky; top:32px; z-index:4; background:#1a1a1a; border-bottom:2px solid #4A6FA5; }
+.sh-grid .sh-col-header.sh-frozen-col-hdr { position:sticky; left:40px; z-index:4; background:#1a1a1a; border-right:2px solid #4A6FA5; }
+.sh-grid .sh-corner.sh-frozen-corner { position:sticky; top:0; left:0; z-index:5; }
+
+/* ── Sheet: Cell Background Picker ── */
+.sh-bg-picker {
+  position:fixed; z-index:800;
+  background:#1e1e1e; border:1px solid #333; border-radius:8px;
+  padding:8px; box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  width:200px; grid-template-columns:repeat(4, 1fr); gap:4px;
+  display:none;
+}
+.sh-bg-picker[style*="display: block"], .sh-bg-picker[style*="display:block"] { display:grid !important; }
+.sh-bg-swatch {
+  width:100%; aspect-ratio:1; border-radius:4px; cursor:pointer;
+  border:1.5px solid transparent; transition:border-color 0.15s, transform 0.1s;
+}
+.sh-bg-swatch:hover { border-color:#7886A5; transform:scale(1.15); z-index:1; }
+
+/* ── Sheet: Header Context Menu ── */
+.sh-header-menu {
+  display:none; position:fixed; z-index:900;
+  background:#1e1e1e; border:1px solid #333; border-radius:8px;
+  padding:4px 0; min-width:180px; box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  font-family:Arial,sans-serif;
+}
+.sh-hm-item {
+  padding:7px 14px; font-size:12px; color:#ddd; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  transition:background 0.12s;
+}
+.sh-hm-item:hover { background:rgba(120,134,165,0.15); }
+.sh-hm-item.disabled { color:#555; cursor:default; pointer-events:none; }
+.sh-hm-info { font-size:10px; color:#666; font-family:monospace; }
+.sh-hm-divider { height:1px; background:#2a2a2a; margin:3px 0; }
 </style>
 </head>
 <body>
@@ -1499,6 +1539,13 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     <div class="undo-redo-group">
       <button class="undo-redo-btn" id="undoBtn" onclick="modeUndo()" title="Undo (Ctrl+Z)">&#8630;</button>
       <button class="undo-redo-btn" id="redoBtn" onclick="modeRedo()" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
+    </div>
+    <!-- Sheet-only: Function picker + Cell BG color -->
+    <div class="dt-group tb-sheet-only" style="display:none;">
+      <button class="dt-btn" id="shFuncBtn" onclick="shToggleFuncPickerToolbar()" title="Insert function" style="font-style:italic;font-weight:700;font-family:serif;font-size:13px;">ƒx</button>
+      <button class="dt-btn" id="shBgColorBtn" onclick="shToggleBgPicker()" title="Cell background color" style="position:relative;">
+        <span style="font-size:11px;font-weight:700;">A</span><span style="display:block;width:14px;height:3px;background:linear-gradient(90deg,#4A6FA5,#D9945A,#5A8A5A);border-radius:1px;margin:0 auto;"></span>
+      </button>
     </div>
     <!-- Doc-only: Block type -->
     <div class="dt-group tb-doc-only" style="display:none;">
@@ -4496,6 +4543,9 @@ function updateToolbarForMode(mode){
   });
   toolbar.querySelectorAll('.tb-doc-only').forEach(el=>{
     el.style.display=(mode==='doc')?'':'none';
+  });
+  toolbar.querySelectorAll('.tb-sheet-only').forEach(el=>{
+    el.style.display=(mode==='sheet')?'':'none';
   });
   // Update undo/redo button state for current mode
   modeUpdateUndoUI();

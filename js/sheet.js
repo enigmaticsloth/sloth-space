@@ -11,6 +11,11 @@ const MAX_COL_WIDTH = 280;
 const DEFAULT_ROWS = 10;
 const DEFAULT_COLS = 8;
 
+// ── Formula Reference Mode ──
+// When active, clicking cells inserts references into the formula being edited
+let _formulaRefMode = false;  // true when user is building a formula and can click cells for refs
+let _formulaRefAnchor = null; // { rowIdx, colIdx } — for drag-to-build range refs
+
 // ── ID Generator ──
 let _shIdCounter = 0;
 function shId(prefix) {
@@ -93,13 +98,16 @@ export function renderSheetMode() {
 
   let html = '';
 
-  // Corner cell
-  html += `<div class="sh-corner"></div>`;
+  // Corner cell (sticky if frozen)
+  const cornerFrozenCls = (sh.frozenRows > 1 || sh.frozenCols > 0) ? ' sh-frozen-corner' : '';
+  html += `<div class="sh-corner${cornerFrozenCls}"></div>`;
 
   // Column headers
   for (let c = 0; c < totalCols; c++) {
     const col = columns[c];
-    html += `<div class="sh-col-header" data-col-id="${col.id}" data-col-idx="${c}"
+    const colHdrFrozen = (c === 0 && sh.frozenCols > 0) ? ' sh-frozen-col-hdr' : '';
+    html += `<div class="sh-col-header${colHdrFrozen}" data-col-id="${col.id}" data-col-idx="${c}"
+      onclick="window.shColHeaderCtx(event, '${col.id}')"
       oncontextmenu="event.preventDefault(); window.shColHeaderCtx(event, '${col.id}')"
       ondblclick="window.shAutoFitCol('${col.id}')">${col.name}</div>`;
   }
@@ -118,7 +126,9 @@ export function renderSheetMode() {
   for (let r = 0; r < totalRows; r++) {
     const row = rows[r];
     // Row header
-    html += `<div class="sh-row-header" data-row-id="${row.id}" data-row-idx="${r}"
+    const rowHdrFrozen = (r === 0 && sh.frozenRows > 1) ? ' sh-frozen-row-hdr' : '';
+    html += `<div class="sh-row-header${rowHdrFrozen}" data-row-id="${row.id}" data-row-idx="${r}"
+      onclick="window.shRowHeaderCtx(event, '${row.id}')"
       oncontextmenu="event.preventDefault(); window.shRowHeaderCtx(event, '${row.id}')">${r + 1}</div>`;
     // Cells
     for (let c = 0; c < totalCols; c++) {
@@ -135,11 +145,17 @@ export function renderSheetMode() {
       if (isInRange) cls.push('in-range');
       if (isEditing) cls.push('editing');
       if (typeof display === 'object' && display.error) cls.push('error');
+      // Frozen cell classes
+      if (r === 0 && sh.frozenRows > 1) cls.push('sh-frozen-row');
+      if (c === 0 && sh.frozenCols > 0) cls.push('sh-frozen-col');
 
       const displayText = (typeof display === 'object' && display.error) ? display.error : display;
+      // Cell background color
+      const cellBg = row.cellStyles && row.cellStyles[col.id] && row.cellStyles[col.id].bg;
+      const bgStyle = cellBg ? ` style="background:${cellBg}"` : '';
 
       html += `<div class="${cls.join(' ')}" data-row-id="${row.id}" data-col-id="${col.id}"
-        data-row-idx="${r}" data-col-idx="${c}"
+        data-row-idx="${r}" data-col-idx="${c}"${bgStyle}
         onmousedown="window.shCellMouseDown(event, '${row.id}', '${col.id}')"
         onclick="window.shCellClick(event, '${row.id}', '${col.id}')"
         ondblclick="window.shCellDblClick(event, '${row.id}', '${col.id}')"
@@ -189,6 +205,15 @@ export function shCellClick(event, rowId, colId) {
     return;
   }
 
+  // ── Formula ref mode: clicking a cell inserts its reference ──
+  if (_formulaRefMode && S.sheet.editingCell) {
+    if (S.sheet.editingCell.rowId === rowId && S.sheet.editingCell.colId === colId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    _insertCellRef(rowId, colId);
+    return;
+  }
+
   // If clicking a different cell while editing, commit first
   if (S.sheet.editingCell) {
     if (S.sheet.editingCell.rowId !== rowId || S.sheet.editingCell.colId !== colId) {
@@ -205,13 +230,29 @@ export function shCellClick(event, rowId, colId) {
 }
 
 /**
- * Mousedown on a cell — start drag-select.
+ * Mousedown on a cell — start drag-select or formula ref.
  */
 export function shCellMouseDown(event, rowId, colId) {
   // Only left-click; ignore if editing the same cell
   if (event.button !== 0) return;
   if (S.sheet.editingCell &&
       S.sheet.editingCell.rowId === rowId && S.sheet.editingCell.colId === colId) return;
+
+  // ── Formula ref mode: mousedown starts a potential range ref ──
+  if (_formulaRefMode && S.sheet.editingCell) {
+    event.preventDefault();
+    event.stopPropagation();
+    const sh = S.sheet.current;
+    const rIdx = sh.rows.findIndex(r => r.id === rowId);
+    const cIdx = sh.columns.findIndex(c => c.id === colId);
+    _formulaRefAnchor = { rowIdx: rIdx, colIdx: cIdx };
+    // Insert single ref immediately
+    _insertCellRef(rowId, colId);
+    // Listen for drag to extend to range
+    document.addEventListener('mousemove', _onFormulaRefDrag);
+    document.addEventListener('mouseup', _onFormulaRefDragEnd);
+    return;
+  }
 
   // Commit any current edit
   if (S.sheet.editingCell) shCommitEdit();
@@ -233,6 +274,128 @@ export function shCellMouseDown(event, rowId, colId) {
 }
 
 function _blockSelect(e) { e.preventDefault(); }
+
+// ── Formula reference insertion helpers ──
+
+/** Enter formula ref mode (called after inserting a function like =SUM( ) */
+export function shEnterFormulaRefMode() {
+  _formulaRefMode = true;
+  _formulaRefAnchor = null;
+}
+
+/** Exit formula ref mode */
+export function shExitFormulaRefMode() {
+  _formulaRefMode = false;
+  _formulaRefAnchor = null;
+}
+
+/** Get the cell coordinate label like "A1" from rowId/colId */
+function _cellLabel(rowId, colId) {
+  const sh = S.sheet.current;
+  if (!sh) return '';
+  const rIdx = sh.rows.findIndex(r => r.id === rowId);
+  const cIdx = sh.columns.findIndex(c => c.id === colId);
+  if (rIdx < 0 || cIdx < 0) return '';
+  return colIndexToLetter(cIdx) + (rIdx + 1);
+}
+
+function _cellLabelFromIdx(rowIdx, colIdx) {
+  return colIndexToLetter(colIdx) + (rowIdx + 1);
+}
+
+/**
+ * Insert a single cell reference into the formula cell being edited.
+ * Replaces any previous ref at cursor position (between last separator and cursor).
+ */
+function _insertCellRef(rowId, colId) {
+  if (!S.sheet.editingCell) return;
+  const { rowId: eRow, colId: eCol } = S.sheet.editingCell;
+  const cellEl = document.querySelector(`.sh-cell[data-row-id="${eRow}"][data-col-id="${eCol}"]`);
+  if (!cellEl) return;
+
+  const label = _cellLabel(rowId, colId);
+  if (!label) return;
+
+  const text = cellEl.innerText || '';
+  // Find the position to insert: after last ( , or :
+  const insertPos = _findRefInsertPos(text);
+  const before = text.slice(0, insertPos);
+  const after = text.slice(insertPos);
+  // Strip any existing partial ref from after (up to next , or ) or end)
+  const stripped = after.replace(/^[A-Z]+\d+(?::[A-Z]+\d+)?/, '');
+  cellEl.textContent = before + label + stripped;
+  cellEl.focus();
+  // Move cursor right after the inserted label
+  _setCursorAfter(cellEl, (before + label).length);
+}
+
+/**
+ * During formula ref drag, update ref to a range like A1:B3
+ */
+function _onFormulaRefDrag(e) {
+  if (!_formulaRefAnchor || !S.sheet.editingCell) return;
+  const hit = _cellFromPoint(e.clientX, e.clientY);
+  if (!hit) return;
+
+  const sh = S.sheet.current;
+  const rIdx = sh.rows.findIndex(r => r.id === hit.rowId);
+  const cIdx = sh.columns.findIndex(c => c.id === hit.colId);
+  if (rIdx < 0 || cIdx < 0) return;
+
+  const a = _formulaRefAnchor;
+  // If same cell, single ref
+  const label = (a.rowIdx === rIdx && a.colIdx === cIdx)
+    ? _cellLabelFromIdx(a.rowIdx, a.colIdx)
+    : _cellLabelFromIdx(a.rowIdx, a.colIdx) + ':' + _cellLabelFromIdx(rIdx, cIdx);
+
+  const { rowId: eRow, colId: eCol } = S.sheet.editingCell;
+  const cellEl = document.querySelector(`.sh-cell[data-row-id="${eRow}"][data-col-id="${eCol}"]`);
+  if (!cellEl) return;
+
+  const text = cellEl.innerText || '';
+  const insertPos = _findRefInsertPos(text);
+  const before = text.slice(0, insertPos);
+  const after = text.slice(insertPos);
+  const stripped = after.replace(/^[A-Z]+\d+(?::[A-Z]+\d+)?/, '');
+  cellEl.textContent = before + label + stripped;
+  cellEl.focus();
+  _setCursorAfter(cellEl, (before + label).length);
+}
+
+function _onFormulaRefDragEnd(e) {
+  document.removeEventListener('mousemove', _onFormulaRefDrag);
+  document.removeEventListener('mouseup', _onFormulaRefDragEnd);
+  _formulaRefAnchor = null;
+}
+
+/** Find where to insert/replace a cell reference in formula text */
+function _findRefInsertPos(text) {
+  // Find last occurrence of ( , or : — insert after it
+  let pos = text.length;
+  for (let i = text.length - 1; i >= 0; i--) {
+    const ch = text[i];
+    if (ch === '(' || ch === ',' || ch === ':') {
+      pos = i + 1;
+      break;
+    }
+    // If we hit a letter/digit that's part of a ref, continue scanning back
+    if (ch === ')') { pos = i; break; }
+  }
+  return pos;
+}
+
+/** Set cursor position in a contenteditable element */
+function _setCursorAfter(el, charPos) {
+  const textNode = el.firstChild;
+  if (!textNode) return;
+  const range = document.createRange();
+  const pos = Math.min(charPos, textNode.length);
+  range.setStart(textNode, pos);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
 
 function _cellFromPoint(x, y) {
   const el = document.elementFromPoint(x, y);
@@ -370,6 +533,14 @@ export function shStartEdit(rowId, colId) {
 }
 
 function _onCellInput(e) {
+  const text = (e.target.innerText || '').trim().toUpperCase();
+  // Auto-enter formula ref mode if text looks like =FUNC( with open paren
+  if (text.startsWith('=') && text.includes('(') && !text.includes(')')) {
+    if (!_formulaRefMode) shEnterFormulaRefMode();
+  } else if (text.startsWith('=') && text.includes(')')) {
+    // Has closing paren — exit ref mode
+    if (_formulaRefMode) shExitFormulaRefMode();
+  }
   shShowFuncPicker(e.target);
 }
 
@@ -385,6 +556,7 @@ export function shCommitEdit() {
   cellEl.contentEditable = 'false';
   cellEl.removeEventListener('input', _onCellInput);
   shHideFuncPicker();
+  shExitFormulaRefMode();
 
   // Check if value actually changed before pushing undo
   const sh = S.sheet.current;
@@ -406,6 +578,7 @@ export function shCancelEdit() {
     cellEl.removeEventListener('input', _onCellInput);
   }
   shHideFuncPicker();
+  shExitFormulaRefMode();
   S.sheet.editingCell = null;
   renderSheetMode();
 }
@@ -1241,16 +1414,12 @@ export function shInsertFunction(funcName) {
   const { rowId, colId } = S.sheet.editingCell;
   const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
   if (!cellEl) return;
-  cellEl.textContent = `=${funcName}(`;
+  cellEl.textContent = `=${funcName}()`;
   cellEl.focus();
-  // Move cursor to end
-  const range = document.createRange();
-  range.selectNodeContents(cellEl);
-  range.collapse(false);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
+  // Place cursor between the parens: =SUM(|)
+  _setCursorAfter(cellEl, `=${funcName}(`.length);
   shHideFuncPicker();
+  shEnterFormulaRefMode();
 }
 
 /**
@@ -1311,31 +1480,282 @@ export function shInsertFuncFromToolbar(funcName) {
   requestAnimationFrame(() => {
     const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
     if (!cellEl) return;
-    cellEl.textContent = `=${funcName}(`;
+    cellEl.textContent = `=${funcName}()`;
     cellEl.focus();
-    const range = document.createRange();
-    range.selectNodeContents(cellEl);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+    _setCursorAfter(cellEl, `=${funcName}(`.length);
+    shEnterFormulaRefMode();
   });
 }
 
 // ═══════════════════════════════════════════
-// CONTEXT MENUS (placeholder — will use renderCtxMenuPopup in Step 7)
+// CELL BACKGROUND COLOR
 // ═══════════════════════════════════════════
 
+const MONET_PALETTE = [
+  '#2C3E6B','#4A6FA5','#6B8FC5','#8FAFD5', // Monet Blues
+  '#C4783A','#D9945A','#E8B07A','#F0C89A', // Monet Oranges
+  '#3A6B3A','#5A8A5A','#7AAF7A','#9ACF9A', // Monet Greens
+  '#6B4A6B','#8B6B8B','#A889A8','#C4A5C4', // Monet Purples
+  '#8B6B4A','#A88A6A','#C4A882','#D9C8A5', // Monet Earth
+  '#1a1a1a','#2a2a2a','#333333','#555555', // Dark grays
+  '#888888','#aaaaaa','#cccccc','#ffffff', // Light grays
+  'transparent', // clear
+];
+
+export function shSetCellBg(color) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+
+  // Apply to range or single cell
+  const rangeSet = _getRangeSet();
+  const targets = [];
+  if (rangeSet) {
+    for (const key of rangeSet) {
+      const [rowId, colId] = key.split(':');
+      targets.push({ rowId, colId });
+    }
+  } else if (S.sheet.selectedCell) {
+    targets.push(S.sheet.selectedCell);
+  }
+  if (targets.length === 0) return;
+
+  shPushUndo();
+  for (const { rowId, colId } of targets) {
+    const row = sh.rows.find(r => r.id === rowId);
+    if (!row) continue;
+    if (!row.cellStyles) row.cellStyles = {};
+    if (!row.cellStyles[colId]) row.cellStyles[colId] = {};
+    if (color === 'transparent') {
+      delete row.cellStyles[colId].bg;
+    } else {
+      row.cellStyles[colId].bg = color;
+    }
+  }
+  shAutoSave();
+  renderSheetMode();
+}
+
+let _shBgPickerEl = null;
+
+export function shToggleBgPicker() {
+  if (_shBgPickerEl && _shBgPickerEl.style.display === 'block') {
+    _shBgPickerEl.style.display = 'none';
+    return;
+  }
+  if (!_shBgPickerEl) {
+    _shBgPickerEl = document.createElement('div');
+    _shBgPickerEl.className = 'sh-bg-picker';
+    document.body.appendChild(_shBgPickerEl);
+  }
+  _shBgPickerEl.innerHTML = MONET_PALETTE.map(c =>
+    `<div class="sh-bg-swatch" style="background:${c === 'transparent' ? '#1a1a1a' : c};${c === 'transparent' ? 'background-image:linear-gradient(45deg,#333 25%,transparent 25%,transparent 75%,#333 75%),linear-gradient(45deg,#333 25%,transparent 25%,transparent 75%,#333 75%);background-size:8px 8px;background-position:0 0,4px 4px;' : ''}"
+     title="${c}" onmousedown="event.preventDefault(); window.shSetCellBg('${c}'); document.querySelector('.sh-bg-picker').style.display='none';"></div>`
+  ).join('');
+
+  const btn = document.getElementById('shBgColorBtn');
+  if (btn) {
+    const r = btn.getBoundingClientRect();
+    _shBgPickerEl.style.left = r.left + 'px';
+    _shBgPickerEl.style.top = (r.bottom + 4) + 'px';
+  }
+  _shBgPickerEl.style.display = 'block';
+
+  setTimeout(() => {
+    document.addEventListener('click', function _c(ev) {
+      if (_shBgPickerEl && !_shBgPickerEl.contains(ev.target)) {
+        _shBgPickerEl.style.display = 'none';
+        document.removeEventListener('click', _c);
+      }
+    });
+  }, 10);
+}
+
+// ═══════════════════════════════════════════
+// HEADER CONTEXT MENUS + FREEZE
+// ═══════════════════════════════════════════
+
+let _shHeaderMenuEl = null;
+
+function _showHeaderMenu(event, items) {
+  event.stopPropagation();
+  // If menu is already visible, hide it (toggle behavior)
+  if (_shHeaderMenuEl && _shHeaderMenuEl.style.display === 'block') {
+    _shHeaderMenuEl.style.display = 'none';
+    return;
+  }
+  if (!_shHeaderMenuEl) {
+    _shHeaderMenuEl = document.createElement('div');
+    _shHeaderMenuEl.className = 'sh-header-menu';
+    document.body.appendChild(_shHeaderMenuEl);
+  }
+  _shHeaderMenuEl.innerHTML = items.map(it =>
+    it.divider ? '<div class="sh-hm-divider"></div>' :
+    `<div class="sh-hm-item${it.disabled ? ' disabled' : ''}" onclick="event.stopPropagation();${it.disabled ? '' : it.action};this.closest('.sh-header-menu').style.display='none';">
+      <span>${it.label}</span>${it.info ? `<span class="sh-hm-info">${it.info}</span>` : ''}
+    </div>`
+  ).join('');
+
+  // Position above the clicked element
+  const target = event.currentTarget || event.target;
+  const rect = target.getBoundingClientRect();
+  _shHeaderMenuEl.style.display = 'block';
+  const menuH = _shHeaderMenuEl.offsetHeight;
+  let top = rect.top - menuH - 4;
+  // If not enough room above, show below
+  if (top < 4) top = rect.bottom + 4;
+  _shHeaderMenuEl.style.left = rect.left + 'px';
+  _shHeaderMenuEl.style.top = top + 'px';
+
+  setTimeout(() => {
+    document.addEventListener('click', function _c() {
+      if (_shHeaderMenuEl) _shHeaderMenuEl.style.display = 'none';
+      document.removeEventListener('click', _c);
+    });
+  }, 10);
+}
+
 export function shCellCtx(event, rowId, colId) {
-  // TODO: Step 7 — right-click context menu
+  // Simple cell context menu
+  _showHeaderMenu(event, [
+    { label: 'Copy', action: 'window.shCopy()', info: 'Ctrl+C' },
+    { label: 'Cut', action: 'window.shCut()', info: 'Ctrl+X' },
+    { label: 'Paste', action: 'window.shPaste()', info: 'Ctrl+V' },
+    { divider: true },
+    { label: 'Clear cell', action: `window.shPushUndo(); window.shSetCellValue('${rowId}','${colId}',''); window.renderSheetMode();` },
+  ]);
 }
 
 export function shColHeaderCtx(event, colId) {
-  // TODO: Step 7
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const colIdx = sh.columns.findIndex(c => c.id === colId);
+  const isFirst = colIdx === 0;
+  const isFrozen = sh.frozenCols > 0;
+  _showHeaderMenu(event, [
+    { label: 'Copy column', action: `window.shCopyCol('${colId}')` },
+    { label: 'Paste into column', action: `window.shPasteCol('${colId}')` },
+    { divider: true },
+    { label: 'Insert column left', action: `window.shPushUndo(); window.shInsertColAt('${colId}', 'before')` },
+    { label: 'Insert column right', action: `window.shPushUndo(); window.shInsertColAt('${colId}', 'after')` },
+    { label: 'Delete column', action: `window.shPushUndo(); window.shDeleteCol('${colId}')`, disabled: sh.columns.length <= 1 },
+    { divider: true },
+    { label: isFrozen ? 'Unfreeze first column' : 'Freeze first column',
+      action: `window.shToggleFreezeCol()`, disabled: !isFirst && !isFrozen },
+  ]);
 }
 
 export function shRowHeaderCtx(event, rowId) {
-  // TODO: Step 7
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const rowIdx = sh.rows.findIndex(r => r.id === rowId);
+  const isFirst = rowIdx === 0;
+  const isFrozen = sh.frozenRows > 1; // frozenRows default=1 means header only; >1 means first data row frozen
+  _showHeaderMenu(event, [
+    { label: 'Copy row', action: `window.shCopyRow('${rowId}')` },
+    { label: 'Paste into row', action: `window.shPasteRow('${rowId}')` },
+    { divider: true },
+    { label: 'Insert row above', action: `window.shPushUndo(); window.shInsertRowAt('${rowId}', 'before')` },
+    { label: 'Insert row below', action: `window.shPushUndo(); window.shInsertRowAt('${rowId}', 'after')` },
+    { label: 'Delete row', action: `window.shPushUndo(); window.shDeleteRow('${rowId}')`, disabled: sh.rows.length <= 1 },
+    { divider: true },
+    { label: isFrozen ? 'Unfreeze first row' : 'Freeze first row',
+      action: `window.shToggleFreezeRow()`, disabled: !isFirst && !isFrozen },
+  ]);
+}
+
+// ── Insert row/col at position ──
+
+export function shInsertRowAt(rowId, pos) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const idx = sh.rows.findIndex(r => r.id === rowId);
+  if (idx < 0) return;
+  const cells = {};
+  sh.columns.forEach(col => { cells[col.id] = ''; });
+  const newRow = { id: shId('row'), cells };
+  sh.rows.splice(pos === 'before' ? idx : idx + 1, 0, newRow);
+  renderSheetMode();
+  shAutoSave();
+}
+
+export function shInsertColAt(colId, pos) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const idx = sh.columns.findIndex(c => c.id === colId);
+  if (idx < 0) return;
+  const insertIdx = pos === 'before' ? idx : idx + 1;
+  const newCol = { id: shId('col'), name: '', width: DEFAULT_COL_WIDTH };
+  sh.columns.splice(insertIdx, 0, newCol);
+  sh.columns.forEach((c, i) => { c.name = colIndexToLetter(i); });
+  sh.rows.forEach(row => { row.cells[newCol.id] = ''; });
+  renderSheetMode();
+  shAutoSave();
+}
+
+// ── Copy/Paste entire row/col ──
+
+export function shCopyRow(rowId) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const row = sh.rows.find(r => r.id === rowId);
+  if (!row) return;
+  const vals = sh.columns.map(col => row.cells[col.id] || '');
+  _copyToClipboard(vals.join('\t'));
+}
+
+export function shCopyCol(colId) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const vals = sh.rows.map(row => row.cells[colId] || '');
+  _copyToClipboard(vals.join('\n'));
+}
+
+export async function shPasteRow(rowId) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const text = await _readFromClipboard();
+  if (!text) return;
+  shPushUndo();
+  const row = sh.rows.find(r => r.id === rowId);
+  if (!row) return;
+  const vals = text.split('\t');
+  for (let c = 0; c < Math.min(vals.length, sh.columns.length); c++) {
+    row.cells[sh.columns[c].id] = vals[c];
+  }
+  shAutoSave();
+  renderSheetMode();
+}
+
+export async function shPasteCol(colId) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const text = await _readFromClipboard();
+  if (!text) return;
+  shPushUndo();
+  const vals = text.split(/[\n\t]/);
+  for (let r = 0; r < Math.min(vals.length, sh.rows.length); r++) {
+    sh.rows[r].cells[colId] = vals[r];
+  }
+  shAutoSave();
+  renderSheetMode();
+}
+
+// ── Freeze toggle ──
+
+export function shToggleFreezeRow() {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  sh.frozenRows = sh.frozenRows > 1 ? 1 : 2; // 1=header only, 2=header+first data row
+  renderSheetMode();
+  shAutoSave();
+}
+
+export function shToggleFreezeCol() {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  sh.frozenCols = sh.frozenCols > 0 ? 0 : 1;
+  renderSheetMode();
+  shAutoSave();
 }
 
 // ═══════════════════════════════════════════

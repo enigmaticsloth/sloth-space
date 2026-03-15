@@ -640,11 +640,17 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .sh-add-col-btn {
   background:#1a1a1a;
   border-bottom:1px solid #2a2a2a;
-  display:flex; align-items:center; justify-content:center;
-  font-size:14px; color:#555; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  font-size:11px; color:#555; cursor:pointer;
   user-select:none; position:sticky; top:0; z-index:2;
   transition:background 0.15s, color 0.15s;
+  padding:4px 2px; min-width:32px;
+  writing-mode:vertical-rl; text-orientation:mixed;
 }
+.sh-add-col-btn .sh-batch-input {
+  writing-mode:horizontal-tb; width:26px; height:16px; font-size:9px;
+}
+.sh-add-col-btn .sh-batch-add { writing-mode:horizontal-tb; font-size:9px; white-space:nowrap; }
 .sh-add-col-btn:hover { background:#252525; color:#7886A5; }
 .sh-add-col-spacer { background:transparent; }
 .sh-add-row-btn {
@@ -685,9 +691,49 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .sh-func-item .sh-func-name { font-size:12px; font-weight:600; color:#7886A5; font-family:monospace; }
 .sh-func-item .sh-func-desc { font-size:10px; color:#888; margin-top:1px; }
 
-/* Frozen row/col sticky support (will be activated in Step 5) */
-/* .sh-grid .sh-cell.frozen-row { position:sticky; top:32px; z-index:1; } */
-/* .sh-grid .sh-cell.frozen-col { position:sticky; left:40px; z-index:1; } */
+/* ── Frozen row/col sticky ── */
+.sh-grid .sh-cell.sh-frozen-row { position:sticky; top:32px; z-index:3; background:#1a1e2a; border-bottom:2px solid #4A6FA5; }
+.sh-grid .sh-cell.sh-frozen-col { position:sticky; left:40px; z-index:3; background:#1a1e2a; border-right:2px solid #4A6FA5; }
+.sh-grid .sh-cell.sh-frozen-row.sh-frozen-col { z-index:4; }
+/* Frozen row headers and corner also sticky */
+.sh-grid .sh-row-header.sh-frozen-row-hdr { position:sticky; top:32px; z-index:4; background:#1a1a1a; border-bottom:2px solid #4A6FA5; }
+.sh-grid .sh-col-header.sh-frozen-col-hdr { position:sticky; left:40px; z-index:4; background:#1a1a1a; border-right:2px solid #4A6FA5; }
+.sh-grid .sh-corner.sh-frozen-corner { position:sticky; top:0; left:0; z-index:5; }
+
+/* ── Cell Background Picker ── */
+.sh-bg-picker {
+  position:fixed; z-index:800;
+  background:#1e1e1e; border:1px solid #333; border-radius:8px;
+  padding:8px; box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  width:200px;
+  grid-template-columns:repeat(4, 1fr); gap:4px;
+  display:none;
+}
+.sh-bg-picker[style*="display: block"], .sh-bg-picker[style*="display:block"] {
+  display:grid !important;
+}
+.sh-bg-swatch {
+  width:100%; aspect-ratio:1; border-radius:4px; cursor:pointer;
+  border:1.5px solid transparent; transition:border-color 0.15s, transform 0.1s;
+}
+.sh-bg-swatch:hover { border-color:#7886A5; transform:scale(1.15); z-index:1; }
+
+/* ── Header Context Menu ── */
+.sh-header-menu {
+  display:none; position:fixed; z-index:900;
+  background:#1e1e1e; border:1px solid #333; border-radius:8px;
+  padding:4px 0; min-width:180px; box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  font-family:Arial,sans-serif;
+}
+.sh-hm-item {
+  padding:7px 14px; font-size:12px; color:#ddd; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  transition:background 0.12s;
+}
+.sh-hm-item:hover { background:rgba(120,134,165,0.15); }
+.sh-hm-item.disabled { color:#555; cursor:default; pointer-events:none; }
+.sh-hm-info { font-size:10px; color:#666; font-family:monospace; }
+.sh-hm-divider { height:1px; background:#2a2a2a; margin:3px 0; }
 
 /* ─── Workspace Canvas ─── */
 .workspace-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; }

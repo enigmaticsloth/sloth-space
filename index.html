@@ -579,9 +579,12 @@
       <button class="undo-redo-btn" id="undoBtn" onclick="modeUndo()" title="Undo (Ctrl+Z)">&#8630;</button>
       <button class="undo-redo-btn" id="redoBtn" onclick="modeRedo()" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
     </div>
-    <!-- Sheet-only: Function picker -->
+    <!-- Sheet-only: Function picker + Cell BG color -->
     <div class="dt-group tb-sheet-only" style="display:none;">
       <button class="dt-btn" id="shFuncBtn" onclick="shToggleFuncPickerToolbar()" title="Insert function" style="font-style:italic;font-weight:700;font-family:serif;font-size:13px;">ƒx</button>
+      <button class="dt-btn" id="shBgColorBtn" onclick="shToggleBgPicker()" title="Cell background color" style="position:relative;">
+        <span style="font-size:11px;font-weight:700;">A</span><span style="display:block;width:14px;height:3px;background:linear-gradient(90deg,#4A6FA5,#D9945A,#5A8A5A);border-radius:1px;margin:0 auto;"></span>
+      </button>
     </div>
     <!-- Doc-only: Block type -->
     <div class="dt-group tb-doc-only" style="display:none;">
