@@ -5,14 +5,14 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260315u';
-import * as slide from './slide.js?v=20260315u';
-import * as doc from './doc.js?v=20260315u';
-import * as workspace from './workspace.js?v=20260315u';
-import * as ai from './ai.js?v=20260315u';
-import * as ui from './ui.js?v=20260315u';
-import * as storage from './storage.js?v=20260315u';
-import * as keys from './keys.js?v=20260315u';
+import { S } from './state.js?v=20260315v';
+import * as slide from './slide.js?v=20260315v';
+import * as doc from './doc.js?v=20260315v';
+import * as workspace from './workspace.js?v=20260315v';
+import * as ai from './ai.js?v=20260315v';
+import * as ui from './ui.js?v=20260315v';
+import * as storage from './storage.js?v=20260315v';
+import * as keys from './keys.js?v=20260315v';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -45,31 +45,20 @@ slide.initToolbar();
 slide.initFreeformCanvas();
 keys.initKeys();
 
-// 3. Restore all persisted data (deck, doc, mode)
+// 3. Restore all persisted data FIRST (deck, doc, mode backup)
 storage.autoLoad();
 
-// 4. Restore chat tabs
+// 4. Enter saved mode or show welcome (data is already loaded from step 3)
+ui.checkWelcomeScreen();
+
+// 5. Restore chat tabs
 ai.initChatTabs();
 
-// 5. Check share link (may override loaded deck)
+// 6. Check share link (may override loaded deck)
 storage.checkShareLink();
 
-// 6. Enter the correct mode — single deterministic path
-const _hasConfig = window.isConfigured && window.isConfigured();
-const _savedMode = sessionStorage.getItem('sloth_mode') || localStorage.getItem('sloth_last_mode');
-const _wasActive = sessionStorage.getItem('sloth_active');
-
-if (_hasConfig && _savedMode && _wasActive) {
-  // Returning user (refresh / restore) — enter their last mode directly
-  ui.modeEnter(_savedMode);
-} else if (_hasConfig && _savedMode) {
-  // Tab was closed and reopened (sessionStorage cleared, localStorage has mode)
-  ui.modeEnter(_savedMode);
-} else {
-  // First time or no config — show welcome / mode picker
-  ui.checkWelcomeScreen();
-  ui.renderApp(); // render default slide behind welcome overlay
-}
+// 7. Final render — safety net, ensures current mode is fully rendered
+ui.renderApp();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── Typewriter placeholder animation ──

@@ -23,6 +23,16 @@ function renderApp(){
     window.renderWorkspaceMode(); return;
   }
 
+  // ── Slide mode: ensure all slide UI is visible and correct ──
+  // (This acts as a safety net — even if modeEnter wasn't called perfectly)
+  const _sp=document.querySelector('.slide-panel'); if(_sp) _sp.style.display='';
+  const _sc=document.getElementById('slideCanvas'); if(_sc) _sc.style.display='';
+  const _sb2=document.querySelector('.slide-bar'); if(_sb2) _sb2.style.display='';
+  const _pills=document.getElementById('presetPills'); if(_pills) _pills.style.display='flex';
+  // Hide doc/workspace canvases if they exist
+  const _dc=document.getElementById('docCanvas'); if(_dc) _dc.style.display='none';
+  const _wc=document.getElementById('workspaceCanvas'); if(_wc) _wc.style.display='none';
+
   // Auto-save on every render (deck changes trigger render)
   window.autoSave();
 
@@ -931,9 +941,11 @@ function enterDocMode(){
 // ═══════════════════════════════════════════
 function checkWelcomeScreen() {
   const hasConfig = window.loadConfig();
-  // Only skip welcome if user was actively working (refresh), not fresh tab/URL entry
-  if (hasConfig && window.isConfigured() && sessionStorage.getItem('sloth_active')) {
-    const savedMode=sessionStorage.getItem('sloth_mode')||'slide';
+  // Skip welcome if user was actively working
+  // Check sessionStorage first (refresh), then localStorage (tab reopen)
+  const isActive = sessionStorage.getItem('sloth_active') || localStorage.getItem('sloth_last_mode');
+  if (hasConfig && window.isConfigured() && isActive) {
+    const savedMode=sessionStorage.getItem('sloth_mode')||localStorage.getItem('sloth_last_mode')||'slide';
     if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
     else { pickMode(savedMode); }
   }
