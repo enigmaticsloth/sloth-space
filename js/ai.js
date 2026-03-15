@@ -249,7 +249,7 @@ INTENTS:
   Examples: "這篇在寫什麼", "目前內容是什麼", "summarize this", "what does this say", "這份簡報講什麼", "幫我摘要", "內容簡介", "現在寫了什麼"
   IMPORTANT: This is about the EXISTING content the user has open, NOT about Sloth Space the app.
 
-"about" — user is asking ABOUT Sloth Space itself: what it is, features, how to use it, a specific mode, etc.
+"about" — user is asking ABOUT Sloth Space THE APP itself: what it is, features, how to use it, a specific mode.
   Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
   topic guide:
     "general" — asking about Sloth Space overall: "Sloth Space是什麼", "what is this app", "介紹一下", "有什麼功能"
@@ -257,8 +257,14 @@ INTENTS:
     "doc" — asking about document mode: "文件模式是什麼", "how does doc mode work", "怎麼寫文章"
     "sheet" — asking about sheet/data mode: "表格怎麼用", "how do sheets work", "怎麼建數據表"
     "workspace" — asking about workspace/file management: "工作區是什麼", "how does workspace work", "怎麼管理檔案"
-  IMPORTANT: Only use "about" when the user is asking ABOUT the app itself. If the user wants to CREATE content about Sloth Space (e.g. "生成關於Sloth Space的簡報"), that is "generate" NOT "about".
-  Distinction: "簡報模式怎麼用?" → about (topic:slides). "做一份Sloth Space的pitch deck" → generate.
+  CRITICAL DISTINCTIONS for "about":
+    - "about" is ONLY for meta-questions about the app's features/usage/identity.
+    - If user mentions specific files, items, or data INSIDE workspace (e.g. "workspace裡面的X", "你看得到Y嗎", "有沒有Z檔案", "打開那個X"), this is NOT about — it is "chat" or "generate" depending on context.
+    - If user asks about CONTENT they see/have (e.g. "你看得到嗎", "裡面有什麼", "哪些檔案"), this is "chat" NOT "about", even if they mention "workspace" or "sloth space".
+    - "Sloth Space是什麼?" → about. "workspace裡的sloth_space檔案" → NOT about.
+    - "簡報模式怎麼用?" → about. "做一份Sloth Space的pitch deck" → generate.
+    - "你看得到workspace裡面的東西嗎" → chat (asking about AI's ability to see their content).
+    - Rule of thumb: if the user references things INSIDE the workspace or their documents, it's about their data, not about the app.
 
 "generate" — create NEW content from scratch. User provides a topic or confirms generation.
   Any mode. Includes: 生成X, 寫X, 介紹X, X的介紹, write about X, create article about X, 做一份簡報, 加三頁.
@@ -275,7 +281,7 @@ PRIORITY RULES (follow in order):
 1. Undo words (恢復/復原/還原/回復/撤銷/undo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (刪除/刪掉/移除/delete/remove) → "content_edit" with delete:true.
 3. Asking what the current content says/summarize → "describe".
-4. Questions about Sloth Space the app itself → "about".
+4. Questions about Sloth Space THE APP itself (features, how-to-use, what-is-this) → "about". BUT if user asks about specific files/items/content INSIDE workspace, that is NOT "about".
 5. Topic/creation requests (including creating content ABOUT Sloth Space) → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
 5. Edit existing specific content → "content_edit".
 6. Style/visual changes → "style" (slide only).
@@ -589,13 +595,41 @@ function _snapshotActiveTab(){
   tab.history=S.chatHistory;
   const msgs=document.getElementById('chatMessages');
   if(msgs) tab.messagesHTML=msgs.innerHTML;
-  // Auto-title: first user message (first 6 chars)
-  if(tab.title==='New'||tab.title==='Chat'){
-    const firstUser=tab.history.find(m=>m.role==='user');
-    if(firstUser){
-      const t=(firstUser.content||'').trim().slice(0,6);
-      if(t) tab.title=t;
+}
+
+// AI-generated tab title (1-2 English words)
+let _titleGenTimer=null;
+function scheduleTabTitleGen(){
+  // Debounce: wait 2s after last message, then generate title
+  if(_titleGenTimer) clearTimeout(_titleGenTimer);
+  _titleGenTimer=setTimeout(()=>{ _genTabTitle(); },2000);
+}
+async function _genTabTitle(){
+  const tab=S.chatTabs[S.activeChatTab];
+  if(!tab)return;
+  // Only generate if still default title or short snippet
+  if(tab.title!=='New'&&tab.title!=='Chat'&&tab._titleDone)return;
+  // Need at least 1 user message
+  const msgs=tab.history.filter(m=>m.role==='user');
+  if(msgs.length===0)return;
+  const sample=msgs.map(m=>(m.content||'').slice(0,60)).join(' | ').slice(0,200);
+  try{
+    const title=await callLLM(
+      'You name chat conversations. Given the user messages below, output ONLY 1-2 English words as a short tab title. No quotes, no punctuation, no explanation. Examples: "Weather Deck", "AI Trends", "Q1 Report", "Stock Doc", "Resume".',
+      [{role:'user',content:sample}],
+      {max_tokens:10,temperature:0.3,useRouter:true}
+    );
+    const clean=title.replace(/["""'`.!?\n]/g,'').trim().slice(0,14);
+    if(clean&&clean.length>=2){
+      tab.title=clean;
+      tab._titleDone=true;
+      renderChatTabs();
+      saveChatTabs();
     }
+  }catch(e){
+    // Fallback: use first 6 chars of first message
+    const fallback=(msgs[0].content||'').trim().slice(0,6);
+    if(fallback){ tab.title=fallback; tab._titleDone=true; renderChatTabs(); saveChatTabs(); }
   }
 }
 
@@ -1236,33 +1270,8 @@ async function sendMessage(){
       }
     }
 
-    // ── Smart fallback: detect misrouted intents ──
-    // 1. If router says "generate" but user is actually asking HOW to use a feature → about
-    if(intent==='generate'||intent==='chat'){
-      const isAskingHowToUse=/怎麼用|怎麼使用|如何使用|怎麼操作|how\s*to\s*use|how\s*does.*work|how\s*do.*work|是什麼意思|幹嘛的|幹什麼的|怎麼弄|是做什麼/i.test(text);
-      const isAboutSloth=/sloth\s*space|這個app|這個工具|這是什麼|what is this|how does this work/i.test(text);
-      const featureMatch=/(slide|簡報|投影片|ppt)(s|模式)?\s*(怎|如何|是什麼|mode)/i.test(text)
-        ||/(doc|文件|文章|文檔)(s|模式)?\s*(怎|如何|是什麼|mode)/i.test(text)
-        ||/(sheet|表格|數據|資料)(s|模式)?\s*(怎|如何|是什麼|mode)/i.test(text)
-        ||/(workspace|工作區|工作空間|檔案管理)(s)?\s*(怎|如何|是什麼)/i.test(text)
-        ||/怎麼.*(slide|簡報|投影片|ppt|doc|文件|文章|sheet|表格|workspace|工作區)/i.test(text);
-      if(isAboutSloth){
-        console.log('Smart fallback: '+intent+' → about (asking about Sloth Space)');
-        intent='about';
-        if(!routerData.topic) routerData.topic='general';
-      }else if(isAskingHowToUse||featureMatch){
-        // Detect which topic they're asking about
-        let detectedTopic='general';
-        if(/slide|簡報|投影片|ppt/i.test(text)) detectedTopic='slides';
-        else if(/doc|文件|文章|文檔/i.test(text)) detectedTopic='doc';
-        else if(/sheet|表格|數據|資料表/i.test(text)) detectedTopic='sheet';
-        else if(/workspace|工作區|工作空間|檔案/i.test(text)) detectedTopic='workspace';
-        console.log('Smart fallback: '+intent+' → about (topic:'+detectedTopic+', asking how-to-use)');
-        intent='about';
-        routerData.topic=detectedTopic;
-      }
-    }
-    // 2. If still "chat" and message has substance → generate
+    // ── Smart fallback: minimal safety net (router LLM handles most classification) ──
+    // If still "chat" and message has substance → generate
     if(intent==='chat'){
       const hasSubject=text.length>4&&!/^(你好|hi|hello|hey|嗨|哈囉|what|how|why|who|when|where|是什麼|怎麼|可以|能不能|幫我|help)$/i.test(text.trim());
       const hasGenerateHint=/關於|介紹|生成|寫|做|建|create|make|write|about|build|draft|pitch|簡報|文章|內容|報告|deck/i.test(text);
@@ -1552,6 +1561,7 @@ async function sendMessage(){
     sendBtn.innerHTML=SEND_ARROW_SVG;
     window.autoSave(); // Save chat history after every message
     saveChatTabs(); // Persist chat tabs
+    scheduleTabTitleGen(); // AI-generate tab title if needed
   }
 }
 
@@ -1703,7 +1713,7 @@ async function doDocGenerate(statusDiv,userText,wsContext){
   statusDiv.remove();
   addMessage(`✓ Generated document "${S.currentDoc.title}" (${newBlocks.length} blocks)`,'ai');
   window.renderDocMode();
-  window.docAutoSave();
+  window.docSaveNow(); // immediate save, not debounced — survives quick refresh
 }
 
 export {

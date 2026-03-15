@@ -612,6 +612,7 @@ function modeEnter(mode){
   document.getElementById('modePickerOverlay').classList.add('hidden');
   sessionStorage.setItem('sloth_active','1');
   sessionStorage.setItem('sloth_mode',mode);
+  if(window.saveCurrentMode) window.saveCurrentMode(); // persist to localStorage too
   updateModeBadge(mode);
   modeShowUI(mode);
   updateToolbarForMode(mode);
@@ -1259,8 +1260,10 @@ function loadFileFromNav(id){
         document.getElementById('chatMessages').innerHTML='';
         window.addMessage(`✓ Loaded "${S.currentDeck.title||'Untitled'}" (${S.currentDeck.slides.length} slides)`,'system');
         window.autoSave();
-        renderApp();
         closeFileNav();
+        // Switch to slide mode if not already there
+        if(S.currentMode!=='slide') modeEnter('slide');
+        else renderApp();
       }
     }catch(e){window.addMessage('Failed to load: '+e.message,'system');}
   }else if(id.startsWith('cloud_')){

@@ -22,8 +22,14 @@ export function autoSave(){
   }catch(e){console.warn('Auto-save failed:',e);}
 }
 
+// Persist current mode to localStorage (survives tab close, not just refresh)
+export function saveCurrentMode(){
+  try{ localStorage.setItem('sloth_last_mode', S.currentMode); }catch(e){}
+}
+
 export function autoLoad(){
   try{
+    // Restore slide deck
     const saved=localStorage.getItem(STORAGE_KEY);
     if(saved){
       const data=JSON.parse(saved);
@@ -33,6 +39,22 @@ export function autoLoad(){
         S.currentSlide=Math.min(data.slide||0,data.deck.slides.length-1);
         window.addMessage(`✓ Restored: "${S.currentDeck.title||'Untitled'}" (${S.currentDeck.slides.length} slides)`,'system');
       }
+    }
+    // Restore current doc (if user was in doc mode)
+    const savedDoc=localStorage.getItem('sloth_current_doc');
+    if(savedDoc){
+      try{
+        const parsed=JSON.parse(savedDoc);
+        if(parsed&&parsed.blocks&&parsed.blocks.length){
+          S.currentDoc=parsed;
+        }
+      }catch(e){}
+    }
+    // Restore last mode to localStorage (backup for sessionStorage)
+    const lastMode=localStorage.getItem('sloth_last_mode');
+    if(lastMode&&!sessionStorage.getItem('sloth_mode')){
+      sessionStorage.setItem('sloth_mode',lastMode);
+      sessionStorage.setItem('sloth_active','1');
     }
     // Chat history is now managed by chat tabs (initChatTabs)
     // Legacy fallback: only load if no chat tabs exist yet

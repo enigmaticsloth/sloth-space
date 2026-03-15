@@ -2040,5 +2040,7 @@ export function docLoadFromWorkspace(docId){
     if(!b.meta) b.meta={};
     return b;
   });
+  // Immediately persist to localStorage (don't wait for debounced auto-save)
+  try{ localStorage.setItem('sloth_current_doc', JSON.stringify(S.currentDoc)); }catch(e){}
   return true;
 }
