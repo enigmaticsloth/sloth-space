@@ -200,6 +200,7 @@ export const S = {
   wsView: 'recent',          // 'recent' | 'projects' | 'all' | 'unlinked' | 'project-detail'
   wsTypeFilters: { slide: true, doc: true, sheet: true, image: true },  // file type filter checkboxes
   wsSearchQuery: '',         // search bar text
+  wsProjectSearch: '',       // project list search text
   wsSortBy: 'date',          // 'date' | 'name' | 'type'
   wsSortAsc: false,          // false = newest/Z-A first, true = oldest/A-Z first
 

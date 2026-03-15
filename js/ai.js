@@ -382,26 +382,38 @@ Asia Pacific,$3.1M,+22%
 
   workspace:`📁 **Workspace**
 
-Workspace is your file management hub — organize, search, and connect all your content.
+Workspace is where you organize everything in Sloth Space — and the **Project** is the core concept.
 
-**File types:** Slides (decks), Docs (documents), Sheets (data tables), Images (drag-drop or paste)
-**Projects:** Group related files into project folders. When you're inside a project, AI automatically uses all linked files as context.
-**Search & Filter:** Full-text search across all files, filter by type (slides/doc/sheet/image), sort by date or name.
+**What is a Project?**
+A Project is a folder that groups related files together. Think of it as a context container — when you open a Project and create content inside it, AI automatically reads all linked files as context. This means your presentations can reference your data sheets, your documents can pull from your research notes, and everything stays connected.
 
-**Key features:**
-• **Batch operations** — select multiple files to delete, move to project, or export
-• **Image support** — drag-drop or paste images; stored with automatic compression
-• **Cross-file AI context** — mention any file by name in your prompt and AI reads its content
-• **Project detail view** — see all linked files, edit project name/description, add files
+**How Projects work:**
+• Create a Project for any initiative (e.g. "Q1 Report", "Product Launch", "Research Paper")
+• Link files to a Project — Slides, Docs, Sheets, Images all live together
+• AI auto-references linked files when generating new content inside that Project
+• Search and filter across Projects as your workspace grows
+• Unlink or reorganize files between Projects at any time
+
+**File types you can create:**
+• **Slides** — AI-generated presentations
+• **Doc** — long-form documents and articles
+• **Sheet** — structured data tables (CSV-style)
+• **Images** — drag-drop or paste; stored with compression
 
 **Quick-create commands:**
 • /doc Title — creates a new document
 • /sheet Title + CSV data — creates a new data sheet
-• Use the "+" menu in workspace for slides, docs, sheets, or images`
+• Use the "+" menu for slides, docs, sheets, or images`
 };
 
 // Translation prompt for about texts
-const ABOUT_TRANSLATE_PROMPT=`You are a translator. Translate the following product introduction text to the target language. Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, emojis, markdown bold markers, numbered lists, line breaks. Only translate the text content. Output ONLY the translated text, nothing else.`;
+const ABOUT_TRANSLATE_PROMPT=`You are a translator. Translate the following product introduction text to the target language.
+
+CRITICAL — DO NOT translate these terms (keep them exactly as-is in English):
+Sloth Space, Slides, Doc, Sheet, Workspace, Project, PPTX, PowerPoint, CSV, AI, Undo, Redo, Monet, Seurat
+
+Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, emojis, markdown bold markers, numbered lists, line breaks.
+Only translate the regular text content. Output ONLY the translated text, nothing else.`;
 
 // ── Pass 2b: slide generation mode ──
 const GEN_PROMPT=`You are Sloth Space, an AI presentation designer. Output ONLY valid JSON — no text, no markdown, no code fences, no explanation.
@@ -952,21 +964,40 @@ async function sendMessage(){
       }
     }
 
-    // ── Smart fallback: if router says "chat" but message has substance, escalate ──
-    if(intent==='chat'){
-      // Check if user is asking about Sloth Space itself → escalate to "about"
+    // ── Smart fallback: detect misrouted intents ──
+    // 1. If router says "generate" but user is actually asking HOW to use a feature → about
+    if(intent==='generate'||intent==='chat'){
+      const isAskingHowToUse=/怎麼用|怎麼使用|如何使用|怎麼操作|how\s*to\s*use|how\s*does.*work|how\s*do.*work|是什麼意思|幹嘛的|幹什麼的|怎麼弄|是做什麼/i.test(text);
       const isAboutSloth=/sloth\s*space|這個app|這個工具|這是什麼|what is this|how does this work/i.test(text);
+      const featureMatch=/(slide|簡報|投影片|ppt)(s|模式)?\s*(怎|如何|是什麼|mode)/i.test(text)
+        ||/(doc|文件|文章|文檔)(s|模式)?\s*(怎|如何|是什麼|mode)/i.test(text)
+        ||/(sheet|表格|數據|資料)(s|模式)?\s*(怎|如何|是什麼|mode)/i.test(text)
+        ||/(workspace|工作區|工作空間|檔案管理)(s)?\s*(怎|如何|是什麼)/i.test(text)
+        ||/怎麼.*(slide|簡報|投影片|ppt|doc|文件|文章|sheet|表格|workspace|工作區)/i.test(text);
       if(isAboutSloth){
-        console.log('Smart fallback: chat → about (asking about Sloth Space)');
+        console.log('Smart fallback: '+intent+' → about (asking about Sloth Space)');
         intent='about';
-      }else{
-        const hasSubject=text.length>4&&!/^(你好|hi|hello|hey|嗨|哈囉|what|how|why|who|when|where|是什麼|怎麼|可以|能不能|幫我|help)$/i.test(text.trim());
-        const hasGenerateHint=/關於|介紹|生成|寫|做|建|create|make|write|about|build|draft|pitch|簡報|文章|內容|報告|deck/i.test(text);
-        const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2));
-        if(hasSubject&&(hasGenerateHint||noDeckOrDoc)){
-          console.log('Smart fallback: chat → generate (message has topic substance)');
-          intent='generate';
-        }
+        if(!routerData.topic) routerData.topic='general';
+      }else if(isAskingHowToUse||featureMatch){
+        // Detect which topic they're asking about
+        let detectedTopic='general';
+        if(/slide|簡報|投影片|ppt/i.test(text)) detectedTopic='slides';
+        else if(/doc|文件|文章|文檔/i.test(text)) detectedTopic='doc';
+        else if(/sheet|表格|數據|資料表/i.test(text)) detectedTopic='sheet';
+        else if(/workspace|工作區|工作空間|檔案/i.test(text)) detectedTopic='workspace';
+        console.log('Smart fallback: '+intent+' → about (topic:'+detectedTopic+', asking how-to-use)');
+        intent='about';
+        routerData.topic=detectedTopic;
+      }
+    }
+    // 2. If still "chat" and message has substance → generate
+    if(intent==='chat'){
+      const hasSubject=text.length>4&&!/^(你好|hi|hello|hey|嗨|哈囉|what|how|why|who|when|where|是什麼|怎麼|可以|能不能|幫我|help)$/i.test(text.trim());
+      const hasGenerateHint=/關於|介紹|生成|寫|做|建|create|make|write|about|build|draft|pitch|簡報|文章|內容|報告|deck/i.test(text);
+      const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2));
+      if(hasSubject&&(hasGenerateHint||noDeckOrDoc)){
+        console.log('Smart fallback: chat → generate (message has topic substance)');
+        intent='generate';
       }
     }
 

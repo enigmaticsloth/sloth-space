@@ -428,13 +428,14 @@ export function wsShowAddFilePicker(projectId) {
     return;
   }
 
-  // Build a simple checklist overlay
+  const needsSearch = unlinked.length > 5;
   let html = `<div class="ws-link-picker">
     <div class="ws-link-picker-title">Add files to project:</div>
-    <div class="ws-link-picker-list">`;
+    ${needsSearch ? `<input class="ws-picker-search" type="text" placeholder="Search files..." oninput="wsFilterPickerList(this)" autofocus>` : ''}
+    <div class="ws-link-picker-list" id="wsLinkPickerList">`;
   for (const f of unlinked) {
     const typeLabel = (f.type || 'slide').charAt(0).toUpperCase() + (f.type || 'slide').slice(1);
-    html += `<label class="ws-link-picker-item">
+    html += `<label class="ws-link-picker-item" data-name="${escapeHtml((f.title||'').toLowerCase())}">
       <input type="checkbox" onchange="wsToggleFileLink('${f.id}','${projectId}',this.checked)">
       <span>${escapeHtml(f.title || 'Untitled')}</span>
       <span class="ws-link-count">${typeLabel}</span>
@@ -741,26 +742,31 @@ export function wsShowLinkPicker(fileId) {
     return;
   }
 
-  // Build checklist of projects
   const file = wsGetFile(fileId);
   const fname = file ? file.title : fileId;
+  const needsSearch = projects.length > 5;
+
   let html = `<div class="ws-link-picker">
     <div class="ws-link-picker-title">Link "${escapeHtml(fname)}" to projects:</div>
-    <div class="ws-link-picker-list">`;
+    ${needsSearch ? `<input class="ws-picker-search" type="text" placeholder="Search projects..." oninput="wsFilterPickerList(this)" autofocus>` : ''}
+    <div class="ws-link-picker-list" id="wsLinkPickerList">`;
   for (const p of projects) {
     const checked = linkedIds.has(p.id) ? 'checked' : '';
-    html += `<label class="ws-link-picker-item">
+    const c = wsGetProjectColor(p);
+    html += `<label class="ws-link-picker-item" data-name="${escapeHtml(p.name.toLowerCase())}">
       <input type="checkbox" ${checked} onchange="wsToggleFileLink('${fileId}','${p.id}',this.checked)">
-      <span>${escapeHtml(p.name)}</span>
+      <span class="ws-picker-dot" style="background:${c.dot}"></span>
+      <span class="ws-picker-name">${escapeHtml(p.name)}</span>
       <span class="ws-link-count">${wsProjectFileCount(p.id)} files</span>
     </label>`;
   }
   html += `</div>
-    <button class="ws-link-picker-new" onclick="wsQuickNewProjectAndLink('${fileId}')">+ New Project</button>
-    <button class="ws-link-picker-close" onclick="closeLinkPicker()">Done</button>
+    <div class="ws-link-picker-footer">
+      <button class="ws-link-picker-new" onclick="wsQuickNewProjectAndLink('${fileId}')">+ New Project</button>
+      <button class="ws-link-picker-close" onclick="closeLinkPicker()">Done</button>
+    </div>
   </div>`;
 
-  // Show as overlay
   let overlay = document.getElementById('wsLinkPickerOverlay');
   if (!overlay) {
     overlay = document.createElement('div');
@@ -771,6 +777,19 @@ export function wsShowLinkPicker(fileId) {
   }
   overlay.innerHTML = `<div class="ws-modal">${html}</div>`;
   overlay.style.display = 'flex';
+  // Auto-focus search if present
+  const searchEl = overlay.querySelector('.ws-picker-search');
+  if (searchEl) setTimeout(() => searchEl.focus(), 50);
+}
+
+/** Filter link picker list items by search query */
+export function wsFilterPickerList(inputEl) {
+  const q = (inputEl.value || '').toLowerCase().trim();
+  const items = document.querySelectorAll('#wsLinkPickerList .ws-link-picker-item');
+  items.forEach(item => {
+    const name = item.getAttribute('data-name') || '';
+    item.style.display = name.includes(q) ? '' : 'none';
+  });
 }
 
 export function closeLinkPicker() {
@@ -1048,15 +1067,33 @@ function renderFileCard(item) {
 
 /** Render projects list view */
 function renderProjectsListView() {
-  const projects = wsListProjects();
-  if (projects.length === 0) {
+  const allProjects = wsListProjects();
+  if (allProjects.length === 0) {
     return `<div class="ws-empty">
       <div class="ws-empty-text">No projects yet</div>
       <button class="ws-new-btn project" onclick="showWsNewProject()" style="margin-top:12px;">Create Your First Project</button>
     </div>`;
   }
 
-  return `<div class="ws-project-list">${projects.map(p => {
+  // Filter by search query if present
+  const q = (S.wsProjectSearch || '').toLowerCase().trim();
+  const projects = q
+    ? allProjects.filter(p => (p.name||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q))
+    : allProjects;
+
+  // Search bar (show when > 5 projects)
+  const searchHtml = allProjects.length > 5
+    ? `<div class="ws-project-search-bar">
+        <input class="ws-project-search-input" type="text" placeholder="Search ${allProjects.length} projects..." value="${escapeHtml(S.wsProjectSearch||'')}" oninput="wsSetProjectSearch(this.value)">
+        ${q ? `<button class="ws-project-search-clear" onclick="wsSetProjectSearch('')">✕</button>` : ''}
+      </div>`
+    : '';
+
+  const noResults = q && projects.length === 0
+    ? `<div class="ws-empty"><div class="ws-empty-text">No projects matching "${escapeHtml(q)}"</div></div>`
+    : '';
+
+  return `${searchHtml}${noResults}<div class="ws-project-list">${projects.map(p => {
     const fileCount = wsProjectFileCount(p.id);
     const status = p.status || 'active';
     const date = p.modified ? new Date(p.modified).toLocaleDateString() : '';
@@ -1150,11 +1187,14 @@ function renderProjectDetailView() {
       <div class="ws-pd-stats">${statsText} · Created ${new Date(project.created).toLocaleDateString()}</div>
     </div>
     <div class="ws-pd-file-header">
-      <span class="ws-pd-file-label">Linked Files</span>
-      <button class="ws-pd-add-file-btn" onclick="wsShowAddFilePicker('${project.id}')">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add File
-      </button>
+      <span class="ws-pd-file-label">Linked Files (${files.length})</span>
+      <div class="ws-pd-file-header-actions">
+        ${files.length > 0 ? `<button class="ws-pd-unlink-all-btn" onclick="if(confirm('Unlink all ${files.length} files from this project?'))wsUnlinkAllFromProject('${project.id}')">Unlink All</button>` : ''}
+        <button class="ws-pd-add-file-btn" onclick="wsShowAddFilePicker('${project.id}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add File
+        </button>
+      </div>
     </div>
     ${filesHtml}
   </div>`;
@@ -1190,6 +1230,16 @@ function renderProjectFileCard(item, projectId) {
 export function wsUnlinkAndRefresh(fileId, projectId) {
   wsUnlinkFile(fileId, projectId);
   renderWorkspaceMode();
+}
+
+/** Unlink ALL files from a project */
+export function wsUnlinkAllFromProject(projectId) {
+  const files = wsGetProjectFiles(projectId);
+  for (const f of files) {
+    wsUnlinkFile(f.id, projectId);
+  }
+  renderWorkspaceMode();
+  window.addMessage(`✓ Unlinked ${files.length} file${files.length > 1 ? 's' : ''} from project`, 'system');
 }
 
 /**
@@ -1447,6 +1497,16 @@ export function wsSetSort(by) {
     S.wsSortAsc = by === 'name'; // name defaults A-Z, others default desc
   }
   renderWorkspaceMode();
+}
+
+/** Set project search query and re-render */
+export function wsSetProjectSearch(query) {
+  S.wsProjectSearch = query;
+  renderWorkspaceMode();
+  setTimeout(() => {
+    const input = document.querySelector('.ws-project-search-input');
+    if (input) { input.focus(); input.selectionStart = input.selectionEnd = input.value.length; }
+  }, 0);
 }
 
 /**

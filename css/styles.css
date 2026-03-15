@@ -699,6 +699,24 @@ body.mode-workspace .chat-panel .input-area textarea { height:234px; }
 .ws-link-picker-new:hover { border-color:rgba(255,255,255,0.3); color:#ccc; }
 .ws-link-picker-close { width:100%; padding:8px; border:none; border-radius:6px; background:rgba(120,134,165,0.15); color:#9BA8C4; font-size:12px; font-family:Arial; cursor:pointer; font-weight:600; transition:all 0.15s; }
 .ws-link-picker-close:hover { background:rgba(120,134,165,0.25); }
+.ws-link-picker-footer { display:flex; flex-direction:column; gap:8px; }
+/* Picker search input */
+.ws-picker-search { width:100%; padding:8px 12px; border:1px solid rgba(255,255,255,0.1); border-radius:6px; background:rgba(0,0,0,0.3); color:#e0e0e0; font-size:12px; font-family:Arial; outline:none; margin-bottom:12px; box-sizing:border-box; }
+.ws-picker-search:focus { border-color:rgba(120,134,165,0.4); }
+.ws-picker-search::placeholder { color:#666; }
+.ws-picker-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.ws-picker-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Project list search */
+.ws-project-search-bar { position:relative; margin-bottom:12px; }
+.ws-project-search-input { width:100%; padding:10px 32px 10px 14px; border:1px solid rgba(255,255,255,0.08); border-radius:8px; background:rgba(0,0,0,0.2); color:#e0e0e0; font-size:13px; font-family:Arial; outline:none; box-sizing:border-box; }
+.ws-project-search-input:focus { border-color:rgba(120,134,165,0.4); background:rgba(0,0,0,0.3); }
+.ws-project-search-input::placeholder { color:#555; }
+.ws-project-search-clear { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#666; cursor:pointer; font-size:14px; padding:4px; }
+.ws-project-search-clear:hover { color:#ccc; }
+/* Unlink all button */
+.ws-pd-unlink-all-btn { padding:4px 10px; border:1px solid rgba(255,80,80,0.2); border-radius:4px; background:transparent; color:#e66; font-size:11px; cursor:pointer; transition:all 0.15s; }
+.ws-pd-unlink-all-btn:hover { background:rgba(255,80,80,0.1); border-color:rgba(255,80,80,0.4); }
+.ws-pd-file-header-actions { display:flex; align-items:center; gap:8px; }
 
 /* ─── Welcome screen (Monet palette) ─── */
 .welcome-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:600; display:flex; align-items:center; justify-content:center;
