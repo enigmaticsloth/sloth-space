@@ -5,14 +5,14 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260315v';
-import * as slide from './slide.js?v=20260315v';
-import * as doc from './doc.js?v=20260315v';
-import * as workspace from './workspace.js?v=20260315v';
-import * as ai from './ai.js?v=20260315v';
-import * as ui from './ui.js?v=20260315v';
-import * as storage from './storage.js?v=20260315v';
-import * as keys from './keys.js?v=20260315v';
+import { S } from './state.js?v=20260315w';
+import * as slide from './slide.js?v=20260315w';
+import * as doc from './doc.js?v=20260315w';
+import * as workspace from './workspace.js?v=20260315w';
+import * as ai from './ai.js?v=20260315w';
+import * as ui from './ui.js?v=20260315w';
+import * as storage from './storage.js?v=20260315w';
+import * as keys from './keys.js?v=20260315w';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -35,29 +35,27 @@ for (const [name, fn] of Object.entries(allExports)) {
 // Also expose the state object
 window.S = S;
 
-// ─── Initialization sequence (order matters) ───
-// 1. Load config + auth
-ai.loadConfig();
-storage.initAuth();
-
-// 2. Init slide infrastructure (toolbar, canvas, keys)
+// ─── Initialization sequence (order matches app.html exactly) ───
+// 1. Init slide infrastructure (toolbar, canvas, keys)
 slide.initToolbar();
 slide.initFreeformCanvas();
 keys.initKeys();
 
-// 3. Restore all persisted data FIRST (deck, doc, mode backup)
+// 2. Check welcome screen / enter saved mode (calls loadConfig internally)
+ui.checkWelcomeScreen();
+ui.initOllamaGuide();
+
+// 3. Auth + restore persisted data (AFTER mode is established)
+storage.initAuth();
 storage.autoLoad();
 
-// 4. Enter saved mode or show welcome (data is already loaded from step 3)
-ui.checkWelcomeScreen();
-
-// 5. Restore chat tabs
+// 4. Restore chat tabs
 ai.initChatTabs();
 
-// 6. Check share link (may override loaded deck)
+// 5. Check share link (may override loaded deck)
 storage.checkShareLink();
 
-// 7. Final render — safety net, ensures current mode is fully rendered
+// 6. Final render
 ui.renderApp();
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -7,31 +7,17 @@ function renderApp(){
   // Skip re-render while user is inline-editing text (would destroy cursor + edit state)
   if(window.isInlineEditing())return;
 
-  // If NOT in slide mode, delegate to the correct renderer — enforce mode isolation
+  // If in doc or workspace mode, don't render slide UI — enforce mode isolation
   if(S.currentMode==='doc'){
     document.getElementById('slideCanvas').style.display='none';
     const sb=document.querySelector('.slide-bar'); if(sb) sb.style.display='none';
-    const sp=document.querySelector('.slide-panel'); if(sp) sp.style.display='none';
-    const pills=document.getElementById('presetPills'); if(pills) pills.style.display='none';
     window.renderDocMode(); return;
   }
   if(S.currentMode==='workspace'){
     document.getElementById('slideCanvas').style.display='none';
     const sb=document.querySelector('.slide-bar'); if(sb) sb.style.display='none';
-    const sp=document.querySelector('.slide-panel'); if(sp) sp.style.display='none';
-    const pills=document.getElementById('presetPills'); if(pills) pills.style.display='none';
     window.renderWorkspaceMode(); return;
   }
-
-  // ── Slide mode: ensure all slide UI is visible and correct ──
-  // (This acts as a safety net — even if modeEnter wasn't called perfectly)
-  const _sp=document.querySelector('.slide-panel'); if(_sp) _sp.style.display='';
-  const _sc=document.getElementById('slideCanvas'); if(_sc) _sc.style.display='';
-  const _sb2=document.querySelector('.slide-bar'); if(_sb2) _sb2.style.display='';
-  const _pills=document.getElementById('presetPills'); if(_pills) _pills.style.display='flex';
-  // Hide doc/workspace canvases if they exist
-  const _dc=document.getElementById('docCanvas'); if(_dc) _dc.style.display='none';
-  const _wc=document.getElementById('workspaceCanvas'); if(_wc) _wc.style.display='none';
 
   // Auto-save on every render (deck changes trigger render)
   window.autoSave();
@@ -576,11 +562,9 @@ function modeShowUI(mode){
     }
     // Move name bar into doc-canvas (before content)
     if(nameBar) dc.prepend(nameBar);
-    // Hide ALL slide-specific UI
+    // Hide slide-panel entirely
     const spDoc=document.querySelector('.slide-panel');
     if(spDoc) spDoc.style.display='none';
-    if(slideCanvas) slideCanvas.style.display='none';
-    if(slideBar) slideBar.style.display='none';
     dc.style.display='';
   } else if(mode==='workspace'){
     let wc=wsCanvas;
@@ -941,11 +925,9 @@ function enterDocMode(){
 // ═══════════════════════════════════════════
 function checkWelcomeScreen() {
   const hasConfig = window.loadConfig();
-  // Skip welcome if user was actively working
-  // Check sessionStorage first (refresh), then localStorage (tab reopen)
-  const isActive = sessionStorage.getItem('sloth_active') || localStorage.getItem('sloth_last_mode');
-  if (hasConfig && window.isConfigured() && isActive) {
-    const savedMode=sessionStorage.getItem('sloth_mode')||localStorage.getItem('sloth_last_mode')||'slide';
+  // Only skip welcome if user was actively working (refresh), not fresh tab/URL entry
+  if (hasConfig && window.isConfigured() && sessionStorage.getItem('sloth_active')) {
+    const savedMode=sessionStorage.getItem('sloth_mode')||'slide';
     if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
     else { pickMode(savedMode); }
   }
