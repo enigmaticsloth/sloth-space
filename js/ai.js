@@ -270,8 +270,10 @@ INTENTS:
     "calculate the average for me", "what's the total", "explain this table", "what do these cells mean", "what does this row mean", "analyze this table", "review these numbers for me"
   IMPORTANT: This is about the EXISTING content the user has open, NOT about Sloth Space the app.
   IMPORTANT: In sheet mode, ANY question about the data, cells, columns, rows, formulas, or analysis → "describe".
-  PROJECT-LEVEL queries (always "describe"): "what is this project about", "summarize the project", "what conclusions does this project have", "what do the other files say", "how does this relate to the other docs", "cross-reference with the sheet data"
-  WORKSPACE MODE: If the user is in workspace mode and asks about a specific project by name (e.g. "what is project X about", "summarize project Y"), this is ALWAYS "describe" — NOT "about" or "chat".
+  PROJECT-LEVEL queries (describe ONLY if no creation request): "what is this project about", "summarize the project", "what conclusions does this project have", "what do the other files say", "how does this relate to the other docs", "cross-reference with the sheet data"
+  BUT: if the user also asks to CREATE/MAKE/WRITE a document or file → that is "generate", NOT "describe".
+  WORKSPACE MODE: If the user is in workspace mode and asks about a specific project by name (e.g. "what is project X about", "summarize project Y"), this is "describe" — NOT "about" or "chat".
+  EXCEPTION: If the user asks to CREATE/MAKE/WRITE a document or file (e.g. "make a document explaining project X", "write a report about project Y content"), this is ALWAYS "generate" NOT "describe".
 
 "about" — user is asking ABOUT Sloth Space THE APP itself: what it is, features, how to use it, a specific mode.
   Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
@@ -306,14 +308,15 @@ INTENTS:
 PRIORITY RULES (follow in order):
 1. Undo words (undo/redo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (delete/remove) → "content_edit" with delete:true.
-3. Asking what the current content says/summarize → "describe".
-4. Questions about Sloth Space THE APP itself (features, how-to-use, what-is-this) → "about". BUT if user asks about specific files/items/content INSIDE workspace, that is NOT "about".
-5. Topic/creation requests (including creating content ABOUT Sloth Space) → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
-5. Edit existing specific content → "content_edit".
-6. Style/visual changes → "style" (slide only).
-7. Image manipulation → "image" (slide only).
-8. Batch edits → "deck_edit".
-9. ONLY if NONE of the above apply → "chat".
+3. **CRITICAL OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation → ALWAYS "generate", even if the message ALSO asks about content. Example: "what is project X about, make a document" → generate (NOT describe). The creation request takes priority.
+4. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
+5. Questions about Sloth Space THE APP itself (features, how-to-use, what-is-this) → "about". BUT if user asks about specific files/items/content INSIDE workspace, that is NOT "about".
+6. Topic/creation requests (including creating content ABOUT Sloth Space) → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
+7. Edit existing specific content → "content_edit".
+8. Style/visual changes → "style" (slide only).
+9. Image manipulation → "image" (slide only).
+10. Batch edits → "deck_edit".
+11. ONLY if NONE of the above apply → "chat".
 
 MODE-SPECIFIC:
 - "style" and "image" intents ONLY in slide mode. In doc mode use content_edit or generate.
@@ -1395,6 +1398,24 @@ async function sendMessage(){
       const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2))||(S.currentMode==='workspace');
       if(hasSubject&&(hasGenerateHint||noDeckOrDoc)){
         console.log('Smart fallback: chat → generate (message has topic substance)');
+        intent='generate';
+      }
+    }
+
+    // ── Smart fallback: describe → generate when user asks to CREATE a file ──
+    // This catches cases where the router picks "describe" but the user actually
+    // wants to create a document/report/slides (e.g. "做份文件解釋" / "make a doc explaining")
+    if(intent==='describe'){
+      // Check if router detected a target (doc/slide) — means it saw creation intent
+      if(routerData.target){
+        console.log('Smart fallback: describe → generate (router detected target:'+routerData.target+')');
+        intent='generate';
+      }
+      // English fallback for creation keywords
+      const hasCreateFileHint=/document|doc|report|article|file|slide|presentation|deck/i.test(text)
+        && /create|make|write|draft|build|generate|produce/i.test(text);
+      if(hasCreateFileHint){
+        console.log('Smart fallback: describe → generate (user wants to CREATE a file, not just describe)');
         intent='generate';
       }
     }
