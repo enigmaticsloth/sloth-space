@@ -38,6 +38,8 @@ export const VALID_LAYOUTS = ['title','content','two-column','image-top','image-
 
 // ── Storage Keys ──
 export const WS_STORAGE_KEY = 'sloth_workspace_files';
+export const WS_PROJECTS_KEY = 'sloth_workspace_projects';
+export const WS_LINKS_KEY = 'sloth_workspace_links';
 export const STORAGE_KEY = 'sloth_space_deck';
 export const STORAGE_HISTORY_KEY = 'sloth_space_chat';
 export const CONFIG_KEY = 'sloth_space_config';
@@ -166,6 +168,8 @@ export const S = {
   // ── Workspace ──
   wsSelectedIds: new Set(),
   wsModalType: 'doc',
+  wsActiveProjectId: null,   // currently viewing/working in this project
+  wsView: 'recent',          // 'recent' | 'projects' | 'all' | 'unlinked' | 'project-detail'
 
   // ── File Nav ──
   fileNavTab: 'all',

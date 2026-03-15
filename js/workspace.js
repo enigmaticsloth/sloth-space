@@ -4,7 +4,7 @@
 // Manages workspace file storage (docs, sheets, slides).
 // Persists to localStorage and syncs with cloud (Supabase).
 
-import { S, WS_STORAGE_KEY } from './state.js';
+import { S, WS_STORAGE_KEY, WS_PROJECTS_KEY, WS_LINKS_KEY } from './state.js';
 
 // Doc content:  { blocks: [ { id, type:"paragraph"|"heading"|"list", text } ] }
 // Sheet content: { columns: ["A","B",...], rows: [ [val, val, ...], ... ] }
@@ -282,6 +282,193 @@ export function wsDetectReferences(text) {
 }
 
 // ═══════════════════════════════════════════
+// PROJECTS — CRUD
+// ═══════════════════════════════════════════
+
+function loadProjects() {
+  try { return JSON.parse(localStorage.getItem(WS_PROJECTS_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveProjects(projects) {
+  try { localStorage.setItem(WS_PROJECTS_KEY, JSON.stringify(projects)); }
+  catch(e) { console.warn('Projects save failed:', e); }
+}
+
+export function wsCreateProject(name, description) {
+  const projects = loadProjects();
+  const project = {
+    id: 'prj_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    name: name || 'Untitled Project',
+    description: description || '',
+    status: 'active',
+    created: new Date().toISOString(),
+    modified: new Date().toISOString()
+  };
+  projects.push(project);
+  saveProjects(projects);
+  return project;
+}
+
+export function wsGetProject(id) {
+  return loadProjects().find(p => p.id === id) || null;
+}
+
+export function wsListProjects() {
+  return loadProjects().filter(p => p.status !== 'archived');
+}
+
+export function wsUpdateProject(id, updates) {
+  const projects = loadProjects();
+  const idx = projects.findIndex(p => p.id === id);
+  if (idx === -1) return null;
+  Object.assign(projects[idx], updates, { modified: new Date().toISOString() });
+  saveProjects(projects);
+  return projects[idx];
+}
+
+export function wsDeleteProject(id) {
+  const projects = loadProjects().filter(p => p.id !== id);
+  saveProjects(projects);
+  // Also remove all links to this project
+  const links = loadLinks().filter(l => l.projectId !== id);
+  saveLinks(links);
+  // If this was the active project, clear it
+  if (S.wsActiveProjectId === id) {
+    S.wsActiveProjectId = null;
+    S.wsView = 'projects';
+  }
+}
+
+export function wsArchiveProject(id) {
+  wsUpdateProject(id, { status: 'archived' });
+}
+
+// ═══════════════════════════════════════════
+// FILE-LINKS — Many-to-Many
+// ═══════════════════════════════════════════
+
+function loadLinks() {
+  try { return JSON.parse(localStorage.getItem(WS_LINKS_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveLinks(links) {
+  try { localStorage.setItem(WS_LINKS_KEY, JSON.stringify(links)); }
+  catch(e) { console.warn('Links save failed:', e); }
+}
+
+/** Link a file to a project */
+export function wsLinkFile(fileId, projectId, note) {
+  const links = loadLinks();
+  // Prevent duplicate
+  if (links.some(l => l.fileId === fileId && l.projectId === projectId)) return null;
+  const link = {
+    fileId,
+    projectId,
+    linkedAt: new Date().toISOString(),
+    note: note || ''
+  };
+  links.push(link);
+  saveLinks(links);
+  // Touch project modified time
+  wsUpdateProject(projectId, {});
+  return link;
+}
+
+/** Unlink a file from a project */
+export function wsUnlinkFile(fileId, projectId) {
+  const links = loadLinks().filter(l => !(l.fileId === fileId && l.projectId === projectId));
+  saveLinks(links);
+}
+
+/** Get all files linked to a project */
+export function wsGetProjectFiles(projectId) {
+  const links = loadLinks().filter(l => l.projectId === projectId);
+  const files = wsLoad();
+  return links.map(l => {
+    const file = files.find(f => f.id === l.fileId);
+    return file ? { ...file, _link: l } : null;
+  }).filter(Boolean);
+}
+
+/** Get all projects a file belongs to */
+export function wsGetFileProjects(fileId) {
+  const links = loadLinks().filter(l => l.fileId === fileId);
+  const projects = loadProjects();
+  return links.map(l => {
+    const proj = projects.find(p => p.id === l.projectId);
+    return proj ? { ...proj, _link: l } : null;
+  }).filter(Boolean);
+}
+
+/** Get all unlinked files (not in any project) */
+export function wsGetUnlinkedFiles() {
+  const links = loadLinks();
+  const linkedFileIds = new Set(links.map(l => l.fileId));
+  return wsLoad().filter(f => !linkedFileIds.has(f.id));
+}
+
+/** Get project file count */
+export function wsProjectFileCount(projectId) {
+  return loadLinks().filter(l => l.projectId === projectId).length;
+}
+
+// ═══════════════════════════════════════════
+// PROJECT-SCOPED AI CONTEXT
+// ═══════════════════════════════════════════
+
+/**
+ * Build full context string for a project (all linked files serialized).
+ * Used by AI module to inject into LLM prompts.
+ */
+export function wsProjectContext(projectId) {
+  if (!projectId) return '';
+  const project = wsGetProject(projectId);
+  if (!project) return '';
+  const files = wsGetProjectFiles(projectId);
+  if (files.length === 0) return '';
+  let ctx = `[PROJECT CONTEXT: "${project.name}" (${files.length} files)]\n`;
+  if (project.description) ctx += `Description: ${project.description}\n`;
+  ctx += '---\n';
+  for (const f of files) {
+    ctx += wsFileToContext(f) + '\n---\n';
+  }
+  return ctx;
+}
+
+/**
+ * Get the active project context for AI injection.
+ * Returns empty string if no project is active.
+ */
+export function wsGetActiveProjectContext() {
+  return wsProjectContext(S.wsActiveProjectId);
+}
+
+/**
+ * Set the active project (for AI context scoping).
+ */
+export function wsSetActiveProject(projectId) {
+  S.wsActiveProjectId = projectId;
+  // Notify user
+  if (projectId) {
+    const proj = wsGetProject(projectId);
+    if (proj) {
+      const fileCount = wsProjectFileCount(projectId);
+      window.addMessage(`📁 Working in project: "${proj.name}" (${fileCount} file${fileCount !== 1 ? 's' : ''} in context)`, 'system');
+    }
+  }
+}
+
+/**
+ * Clear active project context.
+ */
+export function wsClearActiveProject() {
+  S.wsActiveProjectId = null;
+  window.addMessage('📁 Project context cleared', 'system');
+}
+
+// ═══════════════════════════════════════════
 // WORKSPACE UI — Mode and Multi-select
 // ═══════════════════════════════════════════
 
@@ -293,14 +480,137 @@ export function enterWorkspaceMode() {
 }
 
 /**
- * Render the workspace mode UI with file list and batch controls.
+ * Set the workspace navigation view.
+ */
+export function wsSetView(view) {
+  S.wsView = view;
+  if (view !== 'project-detail') S.wsActiveProjectId = null;
+  S.wsSelectedIds.clear();
+  renderWorkspaceMode();
+}
+
+/**
+ * Open a project detail view.
+ */
+export function wsOpenProject(projectId) {
+  S.wsActiveProjectId = projectId;
+  S.wsView = 'project-detail';
+  S.wsSelectedIds.clear();
+  renderWorkspaceMode();
+}
+
+/**
+ * Show project create modal (reuses ws modal).
+ */
+export function showWsNewProject() {
+  const name = prompt('Project name:');
+  if (!name || !name.trim()) return;
+  const desc = prompt('Description (optional):') || '';
+  const proj = wsCreateProject(name.trim(), desc.trim());
+  window.addMessage(`✓ Created project "${proj.name}"`, 'system');
+  wsOpenProject(proj.id);
+}
+
+/**
+ * Show link-file-to-project picker.
+ */
+export function wsShowLinkPicker(fileId) {
+  const projects = wsListProjects();
+  const fileProjects = wsGetFileProjects(fileId);
+  const linkedIds = new Set(fileProjects.map(p => p.id));
+
+  if (projects.length === 0) {
+    if (confirm('No projects yet. Create one now?')) {
+      showWsNewProject();
+    }
+    return;
+  }
+
+  // Build checklist of projects
+  const file = wsGetFile(fileId);
+  const fname = file ? file.title : fileId;
+  let html = `<div class="ws-link-picker">
+    <div class="ws-link-picker-title">Link "${escapeHtml(fname)}" to projects:</div>
+    <div class="ws-link-picker-list">`;
+  for (const p of projects) {
+    const checked = linkedIds.has(p.id) ? 'checked' : '';
+    html += `<label class="ws-link-picker-item">
+      <input type="checkbox" ${checked} onchange="wsToggleFileLink('${fileId}','${p.id}',this.checked)">
+      <span>${escapeHtml(p.name)}</span>
+      <span class="ws-link-count">${wsProjectFileCount(p.id)} files</span>
+    </label>`;
+  }
+  html += `</div>
+    <button class="ws-link-picker-new" onclick="wsQuickNewProjectAndLink('${fileId}')">+ New Project</button>
+    <button class="ws-link-picker-close" onclick="closeLinkPicker()">Done</button>
+  </div>`;
+
+  // Show as overlay
+  let overlay = document.getElementById('wsLinkPickerOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'wsLinkPickerOverlay';
+    overlay.className = 'ws-modal-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) closeLinkPicker(); };
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `<div class="ws-modal">${html}</div>`;
+  overlay.style.display = 'flex';
+}
+
+export function closeLinkPicker() {
+  const overlay = document.getElementById('wsLinkPickerOverlay');
+  if (overlay) overlay.style.display = 'none';
+  renderWorkspaceMode(); // refresh to show updated links
+}
+
+export function wsToggleFileLink(fileId, projectId, checked) {
+  if (checked) wsLinkFile(fileId, projectId);
+  else wsUnlinkFile(fileId, projectId);
+}
+
+export function wsQuickNewProjectAndLink(fileId) {
+  const name = prompt('New project name:');
+  if (!name || !name.trim()) return;
+  const proj = wsCreateProject(name.trim());
+  wsLinkFile(fileId, proj.id);
+  closeLinkPicker();
+  window.addMessage(`✓ Created project "${proj.name}" and linked file`, 'system');
+}
+
+/**
+ * Render the workspace mode UI with multi-view navigation.
  */
 export function renderWorkspaceMode() {
   const canvas = document.getElementById('workspaceCanvas');
   if (!canvas) return;
-  const saved = wsLoad();
 
-  // Batch action bar (visible when items selected)
+  const view = S.wsView || 'recent';
+
+  // Build navigation tabs
+  const tabs = [
+    { id: 'recent', label: 'Recent', icon: '🕐' },
+    { id: 'projects', label: 'Projects', icon: '📁' },
+    { id: 'all', label: 'All Files', icon: '📄' },
+    { id: 'unlinked', label: 'Unlinked', icon: '📎' }
+  ];
+  const navHtml = `<div class="ws-nav">
+    ${tabs.map(t => `<button class="ws-nav-tab${view === t.id ? ' active' : ''}" onclick="wsSetView('${t.id}')">${t.icon} ${t.label}</button>`).join('')}
+  </div>`;
+
+  // Active project badge
+  let projectBadge = '';
+  if (S.wsActiveProjectId && view !== 'project-detail') {
+    const proj = wsGetProject(S.wsActiveProjectId);
+    if (proj) {
+      projectBadge = `<div class="ws-project-badge" onclick="wsOpenProject('${proj.id}')">
+        📁 AI Context: <strong>${escapeHtml(proj.name)}</strong>
+        <button onclick="event.stopPropagation();wsClearActiveProject()" title="Clear project context">✕</button>
+      </div>`;
+    }
+  }
+
+  // Batch bar
   let batchHtml = '';
   if (S.wsSelectedIds.size > 0) {
     batchHtml = `<div class="ws-batch-bar">
@@ -311,55 +621,184 @@ export function renderWorkspaceMode() {
     </div>`;
   }
 
-  let itemsHtml = '';
-  if (saved.length === 0) {
-    itemsHtml = `
-      <div class="ws-empty">
-        <div style="font-size:14px;color:#888;margin-bottom:12px;">No files yet</div>
-        <div style="font-size:12px;color:#555;line-height:1.6;">Create your first document or presentation from the mode picker.</div>
-      </div>`;
+  // Content based on view
+  let contentHtml = '';
+  if (view === 'project-detail') {
+    contentHtml = renderProjectDetailView();
+  } else if (view === 'projects') {
+    contentHtml = renderProjectsListView();
   } else {
-    itemsHtml = saved
-      .map((item, i) => {
-        const type = item.type || 'slide';
-        const isSelected = S.wsSelectedIds.has(item.id);
-        const selClass = isSelected ? ' ws-selected' : '';
-        const date = item.updated
-          ? new Date(item.updated).toLocaleDateString()
-          : item.modified
-          ? new Date(item.modified).toLocaleDateString()
-          : '';
-        // Mini preview based on type
-        const preview = wsRenderFilePreview(item);
-        return `<div class="ws-file-card${selClass}" data-ws-id="${item.id}">
-        <div class="ws-check" onclick="event.stopPropagation();wsToggleSelect('${item.id}')">${isSelected ? '✓' : ''}</div>
-        <div onclick="openWorkspaceItem(${i})" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;">
-          ${preview}
-          <div class="ws-file-info">
-            <div class="ws-file-name">${escapeHtml(item.title || item.name || 'Untitled')}</div>
-            <div class="ws-file-meta">${type.charAt(0).toUpperCase() + type.slice(1)} · ${date}</div>
-          </div>
-        </div>
-      </div>`;
-      })
-      .join('');
+    // recent / all / unlinked — file list views
+    contentHtml = renderFileListView(view);
   }
+
   canvas.innerHTML = `
     <div class="ws-page">
       <div class="ws-header">
         <div class="ws-title">Workspace</div>
-        <div class="ws-subtitle">Your files and projects</div>
+        <div class="ws-header-actions">
+          <button class="ws-new-btn" onclick="showModePicker()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New File
+          </button>
+          <button class="ws-new-btn project" onclick="showWsNewProject()">+ Project</button>
+        </div>
       </div>
-      <div class="ws-actions">
-        <button class="ws-new-btn" onclick="showModePicker()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New
-        </button>
-      </div>
+      ${projectBadge}
+      ${navHtml}
       ${batchHtml}
-      <div class="ws-file-list">${itemsHtml}</div>
+      <div class="ws-content">${contentHtml}</div>
     </div>
   `;
+}
+
+/** Render file list for recent / all / unlinked views */
+function renderFileListView(view) {
+  let files;
+  if (view === 'unlinked') {
+    files = wsGetUnlinkedFiles();
+  } else {
+    files = wsLoad();
+  }
+
+  // Sort by updated (recent first)
+  files.sort((a, b) => {
+    const da = new Date(a.updated || a.created || 0).getTime();
+    const db = new Date(b.updated || b.created || 0).getTime();
+    return db - da;
+  });
+
+  if (view === 'recent') {
+    // Show only last 20
+    files = files.slice(0, 20);
+  }
+
+  if (files.length === 0) {
+    const msg = view === 'unlinked'
+      ? 'All files are linked to projects. Nice!'
+      : 'No files yet. Create one to get started.';
+    return `<div class="ws-empty"><div class="ws-empty-text">${msg}</div></div>`;
+  }
+
+  return `<div class="ws-file-list">${files.map(f => renderFileCard(f)).join('')}</div>`;
+}
+
+/** Render a single file card */
+function renderFileCard(item) {
+  const allFiles = wsLoad();
+  const idx = allFiles.findIndex(f => f.id === item.id);
+  const type = item.type || 'slide';
+  const isSelected = S.wsSelectedIds.has(item.id);
+  const selClass = isSelected ? ' ws-selected' : '';
+  const date = item.updated ? new Date(item.updated).toLocaleDateString() : '';
+  const preview = wsRenderFilePreview(item);
+  const status = item.status || 'draft';
+
+  // Project tags
+  const fileProjects = wsGetFileProjects(item.id);
+  let tagsHtml = '';
+  if (fileProjects.length > 0) {
+    tagsHtml = `<div class="ws-file-tags">${fileProjects.map(p =>
+      `<span class="ws-file-tag" onclick="event.stopPropagation();wsOpenProject('${p.id}')" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>`
+    ).join('')}</div>`;
+  }
+
+  return `<div class="ws-file-card${selClass}" data-ws-id="${item.id}">
+    <div class="ws-check" onclick="event.stopPropagation();wsToggleSelect('${item.id}')">${isSelected ? '✓' : ''}</div>
+    <div onclick="openWorkspaceItem(${idx})" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer;">
+      ${preview}
+      <div class="ws-file-info">
+        <div class="ws-file-name">${escapeHtml(item.title || 'Untitled')}</div>
+        <div class="ws-file-meta">
+          <span class="ws-status-dot ${status}"></span>
+          ${type.charAt(0).toUpperCase() + type.slice(1)} · ${date}
+        </div>
+        ${tagsHtml}
+      </div>
+    </div>
+    <div class="ws-file-actions">
+      <button class="ws-link-btn" onclick="event.stopPropagation();wsShowLinkPicker('${item.id}')" title="Link to project">🔗</button>
+    </div>
+  </div>`;
+}
+
+/** Render projects list view */
+function renderProjectsListView() {
+  const projects = wsListProjects();
+  if (projects.length === 0) {
+    return `<div class="ws-empty">
+      <div class="ws-empty-text">No projects yet</div>
+      <button class="ws-new-btn project" onclick="showWsNewProject()" style="margin-top:12px;">Create Your First Project</button>
+    </div>`;
+  }
+
+  return `<div class="ws-project-list">${projects.map(p => {
+    const fileCount = wsProjectFileCount(p.id);
+    const status = p.status || 'active';
+    const date = p.modified ? new Date(p.modified).toLocaleDateString() : '';
+    const isActive = S.wsActiveProjectId === p.id;
+    return `<div class="ws-project-card${isActive ? ' active-context' : ''}" onclick="wsOpenProject('${p.id}')">
+      <div class="ws-project-icon">📁</div>
+      <div class="ws-project-info">
+        <div class="ws-project-name">${escapeHtml(p.name)}</div>
+        <div class="ws-project-meta">
+          <span class="ws-status-dot ${status}"></span>
+          ${fileCount} file${fileCount !== 1 ? 's' : ''} · ${date}
+        </div>
+        ${p.description ? `<div class="ws-project-desc">${escapeHtml(p.description)}</div>` : ''}
+      </div>
+      <div class="ws-project-actions">
+        <button class="ws-ctx-btn${isActive ? ' active' : ''}" onclick="event.stopPropagation();${isActive ? 'wsClearActiveProject()' : `wsSetActiveProject('${p.id}')`}" title="${isActive ? 'Clear AI context' : 'Set as AI context'}">
+          ${isActive ? '🧠 Active' : '🧠'}
+        </button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+/** Render project detail view (files in a project) */
+function renderProjectDetailView() {
+  const project = wsGetProject(S.wsActiveProjectId);
+  if (!project) {
+    S.wsView = 'projects';
+    return renderProjectsListView();
+  }
+
+  const files = wsGetProjectFiles(S.wsActiveProjectId);
+  const isActive = S.wsActiveProjectId === project.id;
+
+  let filesHtml;
+  if (files.length === 0) {
+    filesHtml = `<div class="ws-empty">
+      <div class="ws-empty-text">No files linked yet</div>
+      <div class="ws-empty-hint">Use the 🔗 button on any file to link it here, or create a new file.</div>
+    </div>`;
+  } else {
+    filesHtml = `<div class="ws-file-list">${files.map(f => renderFileCard(f)).join('')}</div>`;
+  }
+
+  return `<div class="ws-project-detail">
+    <div class="ws-pd-header">
+      <button class="ws-back-btn" onclick="wsSetView('projects')">← Projects</button>
+      <div class="ws-pd-title-row">
+        <div class="ws-pd-title">${escapeHtml(project.name)}</div>
+        <div class="ws-pd-actions">
+          <button class="ws-ctx-btn${isActive ? ' active' : ''}" onclick="${isActive ? 'wsClearActiveProject()' : `wsSetActiveProject('${project.id}')`}">
+            ${isActive ? '🧠 AI Context Active' : '🧠 Use as AI Context'}
+          </button>
+          <select class="ws-pd-status" onchange="wsUpdateProject('${project.id}',{status:this.value});renderWorkspaceMode()">
+            <option value="active"${project.status === 'active' ? ' selected' : ''}>Active</option>
+            <option value="paused"${project.status === 'paused' ? ' selected' : ''}>Paused</option>
+            <option value="done"${project.status === 'done' ? ' selected' : ''}>Done</option>
+          </select>
+          <button class="ws-pd-btn danger" onclick="if(confirm('Delete this project? Files will not be deleted.'))wsDeleteProject('${project.id}')">Delete</button>
+        </div>
+      </div>
+      ${project.description ? `<div class="ws-pd-desc">${escapeHtml(project.description)}</div>` : ''}
+      <div class="ws-pd-stats">${files.length} file${files.length !== 1 ? 's' : ''} · Created ${new Date(project.created).toLocaleDateString()}</div>
+    </div>
+    ${filesHtml}
+  </div>`;
 }
 
 /**

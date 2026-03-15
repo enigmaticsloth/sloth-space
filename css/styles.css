@@ -504,6 +504,86 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .ws-batch-cancel { background:none; border:none; color:#888; font-size:11px; cursor:pointer; padding:4px 8px; font-family:Arial; }
 .ws-batch-cancel:hover { color:#ccc; }
 
+/* Workspace header layout */
+.ws-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.ws-header-actions { display:flex; gap:8px; }
+.ws-new-btn.project { background:rgba(107,142,123,0.15); border-color:rgba(107,142,123,0.3); color:#8FB89F; }
+.ws-new-btn.project:hover { background:rgba(107,142,123,0.25); border-color:rgba(107,142,123,0.5); }
+
+/* Navigation tabs */
+.ws-nav { display:flex; gap:4px; margin-bottom:16px; background:rgba(255,255,255,0.03); border-radius:10px; padding:4px; }
+.ws-nav-tab { flex:1; padding:8px 12px; border:none; background:transparent; color:#777; font-size:11px; font-family:Arial; font-weight:500; cursor:pointer; border-radius:7px; transition:all 0.2s; white-space:nowrap; }
+.ws-nav-tab:hover { color:#aaa; background:rgba(255,255,255,0.04); }
+.ws-nav-tab.active { background:rgba(139,123,168,0.15); color:#A899C4; }
+
+/* Project badge (shows active AI context) */
+.ws-project-badge { display:flex; align-items:center; gap:6px; padding:6px 12px; background:rgba(120,134,165,0.1); border:1px solid rgba(120,134,165,0.2); border-radius:8px; margin-bottom:12px; font-size:11px; color:#9BA8C4; cursor:pointer; transition:all 0.2s; }
+.ws-project-badge:hover { border-color:rgba(120,134,165,0.4); }
+.ws-project-badge strong { color:#B8C4D8; }
+.ws-project-badge button { background:none; border:none; color:#666; cursor:pointer; font-size:12px; padding:0 4px; }
+.ws-project-badge button:hover { color:#aaa; }
+
+/* Content area */
+.ws-content { min-height:200px; }
+.ws-empty-text { font-size:14px; color:#666; margin-bottom:8px; }
+.ws-empty-hint { font-size:11px; color:#555; line-height:1.5; }
+
+/* File card updates */
+.ws-file-actions { display:flex; gap:4px; flex-shrink:0; opacity:0; transition:opacity 0.15s; }
+.ws-file-card:hover .ws-file-actions { opacity:1; }
+.ws-link-btn { background:none; border:none; font-size:14px; cursor:pointer; padding:4px 6px; border-radius:4px; transition:background 0.15s; }
+.ws-link-btn:hover { background:rgba(255,255,255,0.08); }
+.ws-file-tags { display:flex; gap:4px; flex-wrap:wrap; margin-top:3px; }
+.ws-file-tag { font-size:9px; padding:1px 6px; background:rgba(139,123,168,0.12); border:1px solid rgba(139,123,168,0.2); border-radius:4px; color:#A899C4; cursor:pointer; transition:all 0.15s; }
+.ws-file-tag:hover { background:rgba(139,123,168,0.2); border-color:rgba(139,123,168,0.35); }
+.ws-status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+.ws-status-dot.draft { background:#666; }
+.ws-status-dot.active, .ws-status-dot.in_progress { background:#7886A5; }
+.ws-status-dot.done { background:#6B8E7B; }
+.ws-status-dot.paused { background:#A08060; }
+
+/* Project list */
+.ws-project-list { display:flex; flex-direction:column; gap:6px; }
+.ws-project-card { display:flex; align-items:center; gap:14px; padding:14px 16px; background:rgba(30,30,30,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:10px; cursor:pointer; transition:all 0.2s; }
+.ws-project-card:hover { background:rgba(40,40,40,0.8); border-color:rgba(255,255,255,0.12); }
+.ws-project-card.active-context { border-color:rgba(120,134,165,0.3); background:rgba(120,134,165,0.06); }
+.ws-project-icon { font-size:24px; flex-shrink:0; }
+.ws-project-info { flex:1; min-width:0; }
+.ws-project-name { font-size:14px; font-weight:600; color:#e0e0e0; }
+.ws-project-meta { font-size:10px; color:#666; margin-top:2px; }
+.ws-project-desc { font-size:11px; color:#888; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:360px; }
+.ws-project-actions { display:flex; gap:6px; flex-shrink:0; }
+.ws-ctx-btn { padding:5px 10px; border-radius:6px; font-size:11px; font-family:Arial; cursor:pointer; border:1px solid rgba(120,134,165,0.2); background:rgba(120,134,165,0.08); color:#9BA8C4; transition:all 0.2s; white-space:nowrap; }
+.ws-ctx-btn:hover { background:rgba(120,134,165,0.15); border-color:rgba(120,134,165,0.4); }
+.ws-ctx-btn.active { background:rgba(120,134,165,0.2); border-color:rgba(120,134,165,0.5); color:#B8C4D8; }
+
+/* Project detail view */
+.ws-pd-header { margin-bottom:20px; }
+.ws-back-btn { background:none; border:1px solid rgba(255,255,255,0.1); color:#888; padding:5px 12px; border-radius:6px; font-size:11px; font-family:Arial; cursor:pointer; margin-bottom:12px; transition:all 0.15s; }
+.ws-back-btn:hover { border-color:rgba(255,255,255,0.2); color:#ccc; }
+.ws-pd-title-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.ws-pd-title { font-size:20px; font-weight:700; color:#e0e0e0; }
+.ws-pd-actions { display:flex; align-items:center; gap:8px; }
+.ws-pd-status { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#aaa; padding:4px 8px; border-radius:5px; font-size:11px; font-family:Arial; cursor:pointer; }
+.ws-pd-btn { padding:5px 10px; border-radius:5px; font-size:11px; font-family:Arial; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:#aaa; transition:all 0.15s; }
+.ws-pd-btn.danger { color:#e47474; }
+.ws-pd-btn.danger:hover { background:rgba(228,116,116,0.12); border-color:rgba(228,116,116,0.3); }
+.ws-pd-desc { font-size:12px; color:#888; margin-top:8px; line-height:1.5; }
+.ws-pd-stats { font-size:10px; color:#555; margin-top:6px; }
+
+/* Link picker modal */
+.ws-link-picker { padding:20px; }
+.ws-link-picker-title { font-size:14px; font-weight:600; color:#e0e0e0; margin-bottom:16px; }
+.ws-link-picker-list { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; max-height:300px; overflow-y:auto; }
+.ws-link-picker-item { display:flex; align-items:center; gap:10px; padding:8px 12px; background:rgba(255,255,255,0.03); border-radius:6px; cursor:pointer; font-size:12px; color:#ccc; transition:background 0.15s; }
+.ws-link-picker-item:hover { background:rgba(255,255,255,0.06); }
+.ws-link-picker-item input[type="checkbox"] { accent-color:#7886A5; }
+.ws-link-picker-item .ws-link-count { font-size:10px; color:#666; margin-left:auto; }
+.ws-link-picker-new { width:100%; padding:8px; border:1px dashed rgba(255,255,255,0.15); border-radius:6px; background:transparent; color:#888; font-size:12px; font-family:Arial; cursor:pointer; transition:all 0.15s; margin-bottom:8px; }
+.ws-link-picker-new:hover { border-color:rgba(255,255,255,0.3); color:#ccc; }
+.ws-link-picker-close { width:100%; padding:8px; border:none; border-radius:6px; background:rgba(120,134,165,0.15); color:#9BA8C4; font-size:12px; font-family:Arial; cursor:pointer; font-weight:600; transition:all 0.15s; }
+.ws-link-picker-close:hover { background:rgba(120,134,165,0.25); }
+
 /* ─── Welcome screen (Monet palette) ─── */
 .welcome-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:600; display:flex; align-items:center; justify-content:center;
   background:linear-gradient(135deg, #0e0e0e 0%, #2a1f3a 15%, #2a4060 30%, #4a2a50 50%, #2a4a3a 70%, #3a2a40 85%, #0e0e0e 100%);

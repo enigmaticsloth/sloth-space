@@ -708,14 +708,26 @@ async function sendMessage(){
   sendBtn.disabled=true;
   sendBtn.textContent='...';
 
-  // ── Workspace cross-file reference detection ──
-  const wsRefs=window.wsDetectReferences(text);
+  // ── Project-scoped AI context injection ──
   let wsContext='';
+  const projectCtx=window.wsGetActiveProjectContext ? window.wsGetActiveProjectContext() : '';
+  if(projectCtx){
+    wsContext+='\n\n## PROJECT CONTEXT\nThe user is working inside a project. All linked files are provided below as context. Use this data when generating or editing content.\n\n'+projectCtx;
+  }
+
+  // ── Workspace cross-file reference detection (additive to project context) ──
+  const wsRefs=window.wsDetectReferences(text);
   if(wsRefs.length>0){
-    wsContext='\n\n## WORKSPACE REFERENCE DATA\nThe user referenced the following workspace files. Use this data to generate or edit slides:\n\n';
-    wsRefs.forEach(f=>{
-      wsContext+=window.wsFileToContext(f)+'\n\n';
-    });
+    // Filter out files already in project context to avoid duplication
+    const projectFileIds=new Set();
+    if(S.wsActiveProjectId && window.wsGetProjectFiles){
+      window.wsGetProjectFiles(S.wsActiveProjectId).forEach(f=>projectFileIds.add(f.id));
+    }
+    const extraRefs=wsRefs.filter(f=>!projectFileIds.has(f.id));
+    if(extraRefs.length>0){
+      wsContext+='\n\n## ADDITIONAL REFERENCED FILES\nThe user also referenced these files by name:\n\n';
+      extraRefs.forEach(f=>{ wsContext+=window.wsFileToContext(f)+'\n\n'; });
+    }
     const refNames=wsRefs.map(f=>`"${f.title}"`).join(', ');
     addMessage(`📎 Using workspace data: ${refNames}`,'system');
   }
