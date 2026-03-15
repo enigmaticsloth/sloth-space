@@ -301,6 +301,41 @@ INTENTS:
   WORKSPACE MODE: If the user asks to CREATE/WRITE/GENERATE a document, report, article, presentation, or slide deck based on project data, this is ALWAYS "generate" NOT "describe". The key distinction: "summarize project X" → describe, but "write a document about project X" / "make a report for project X" / "create slides for project X" → generate.
   Output {"intent":"generate","target":"doc"} for document/report/article requests, or {"intent":"generate","target":"slide"} for presentation/slide requests.
 
+"ui_action" — user wants to NAVIGATE, SWITCH MODES, OPEN FILES, MANAGE PROJECTS, or CONTROL THE APP UI.
+  This is for app-level operations, NOT content creation.
+  Output: {"intent":"ui_action","actions":[{"fn":"functionName","args":["arg1"]}],"message":"Human-readable description"}
+
+  Available functions:
+  - modeEnter(mode) — switch to 'slide', 'doc', 'sheet', 'workspace'
+  - wsSetView(view) — switch workspace tab: 'recent', 'projects', 'all', 'unlinked'
+  - wsOpenProject(projectNameOrId) — open a project detail view (can use project name)
+  - openWorkspaceItem(fileNameOrIndex) — open a file (can use file name, will be resolved)
+  - wsNewFile(type) — create empty file: 'slide', 'doc', 'sheet'
+  - wsCreateProject(name, description) — create a new project
+  - wsLinkFile(fileNameOrId, projectNameOrId) — link file to project (can use names)
+  - wsUnlinkFile(fileId, projectId) — unlink file from project
+  - wsSetActiveProject(projectNameOrId) — set project as AI context
+  - wsClearActiveProject() — clear active project context
+  - openSettings() — open settings panel
+  - openFileNav() — open file navigator sidebar
+  - applyPreset(presetName) — apply a slide theme
+  - wsSetSearch(query) — search workspace files
+  - wsSetSort(by) — sort files: 'date', 'name', 'type'
+  - wsDeleteFile(fileId) — delete a file (requires confirmation)
+  - wsDeleteProject(projectId) — delete a project (requires confirmation)
+
+  Examples:
+  - "switch to workspace" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["workspace"]}],"message":"Switching to Workspace"}
+  - "open Budget Tracker" → {"intent":"ui_action","actions":[{"fn":"openWorkspaceItem","args":["Budget Tracker"]}],"message":"Opening Budget Tracker"}
+  - "create a project called Q2 Planning" → {"intent":"ui_action","actions":[{"fn":"wsCreateProject","args":["Q2 Planning",""]}],"message":"Created project Q2 Planning"}
+  - "go to projects tab" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["workspace"]},{"fn":"wsSetView","args":["projects"]}],"message":"Switching to Projects"}
+  - "put the budget file into Q2 project" → {"intent":"ui_action","actions":[{"fn":"wsLinkFile","args":["budget","Q2 Planning"]}],"message":"Linked budget to Q2 Planning"}
+  - "open settings" → {"intent":"ui_action","actions":[{"fn":"openSettings","args":[]}],"message":"Opening settings"}
+  - "switch to doc mode" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["doc"]}],"message":"Switching to Doc mode"}
+
+  CRITICAL: ui_action is for NAVIGATION and MANAGEMENT only. If user wants to CREATE CONTENT (write a doc, generate slides), use "generate" instead. If user wants to EDIT existing content, use "content_edit".
+  Rule of thumb: "open X" / "switch to X" / "go to X" / "create a project" / "link files" → ui_action. "Write about X" / "make a presentation about X" → generate.
+
 "chat" — ONLY for pure greetings with NO topic and NOT asking about Sloth Space.
   "hello", "hi", "hey"
   CRITICAL: If the message mentions ANY subject/topic (even with typos), it is NOT chat — it is "generate".
@@ -308,15 +343,16 @@ INTENTS:
 PRIORITY RULES (follow in order):
 1. Undo words (undo/redo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (delete/remove) → "content_edit" with delete:true.
-3. **CRITICAL OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation → ALWAYS "generate", even if the message ALSO asks about content. Example: "what is project X about, make a document" → generate (NOT describe). The creation request takes priority.
+3. **CRITICAL OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation → ALWAYS "generate", even if the message ALSO asks about content.
 4. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
-5. Questions about Sloth Space THE APP itself (features, how-to-use, what-is-this) → "about". BUT if user asks about specific files/items/content INSIDE workspace, that is NOT "about".
-6. Topic/creation requests (including creating content ABOUT Sloth Space) → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
-7. Edit existing specific content → "content_edit".
-8. Style/visual changes → "style" (slide only).
-9. Image manipulation → "image" (slide only).
-10. Batch edits → "deck_edit".
-11. ONLY if NONE of the above apply → "chat".
+5. Questions about Sloth Space THE APP itself → "about".
+6. Navigation, mode switching, opening files, managing projects, UI control → "ui_action".
+7. Topic/creation requests → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
+8. Edit existing specific content → "content_edit".
+9. Style/visual changes → "style" (slide only).
+10. Image manipulation → "image" (slide only).
+11. Batch edits → "deck_edit".
+12. ONLY if NONE of the above apply → "chat".
 
 MODE-SPECIFIC:
 - "style" and "image" intents ONLY in slide mode. In doc mode use content_edit or generate.
@@ -1198,6 +1234,22 @@ async function sendMessage(){
     if(/^(?:zoom\s*reset|reset\s*zoom|100%)$/i.test(trimText)){ window.docZoomReset(); addMessage('🔍 Zoom reset to 100%','system'); return; }
   }
 
+  // ── Pending UI action confirmation ──
+  if(S._pendingUIActions && /^(yes|ok|confirm|go|do it|sure|y|是|好|確認|對)$/i.test(trimText)){
+    const { actions, message } = S._pendingUIActions;
+    S._pendingUIActions = null;
+    executeUIActions(actions, `✓ Confirmed: ${message}`);
+    S.chatHistory.push({role:'assistant',content:`[Confirmed UI action: ${message}]`});
+    return;
+  }
+  if(S._pendingUIActions && /^(no|cancel|n|不|取消|算了)$/i.test(trimText)){
+    S._pendingUIActions = null;
+    addMessage('Action cancelled.','system');
+    return;
+  }
+  // Clear pending if user sends something else entirely
+  if(S._pendingUIActions) S._pendingUIActions = null;
+
   // Workspace quick-create: "/doc Title\nContent..." or "/sheet Title\nCSV..."
   const docMatch=trimText.match(/^\/(doc)\s+(.+)/is);
   if(docMatch){
@@ -1361,16 +1413,23 @@ async function sendMessage(){
     if(S.selectedRegion) ctx.push(`User has selected region "${S.selectedRegion.regionId}" (${S.selectedRegion.role}) on slide ${S.selectedRegion.slideIdx+1}.`);
     if(wsRefs.length>0) ctx.push('User referenced workspace files: '+wsRefs.map(f=>f.title).join(', ')+'.');
     if(_resolvedProjectId) ctx.push('Project context is loaded and available for this query.');
-    // In workspace mode, list available projects so router knows what exists
-    if(S.currentMode==='workspace' && window.wsListProjects){
+    // List available projects and files so router can resolve names for ui_action
+    if(window.wsListProjects){
       const allProj=window.wsListProjects();
-      if(allProj.length>0) ctx.push('Available projects: '+allProj.map(p=>`"${p.name}"`).join(', ')+'.');
+      if(allProj.length>0) ctx.push('Available projects: '+allProj.map(p=>`"${p.name}" (id:${p.id})`).join(', ')+'.');
+    }
+    if(window.wsLoad){
+      const allFiles=window.wsLoad();
+      if(allFiles.length>0){
+        const fileList=allFiles.slice(0,20).map((f,i)=>`[${i}] "${f.title}" (${f.type})`).join(', ');
+        ctx.push('Workspace files: '+fileList+'.');
+      }
     }
     if(S.currentMode==='slide'&&!S.currentDeck) ctx.push('No deck loaded yet.');
     if(ctx.length>0) routerMsgs.push({role:'system',content:'[Context: '+ctx.join(' ')+']'});
 
     statusDiv.textContent='Routing...';
-    const routerRaw=await callLLM(ROUTER_PROMPT,routerMsgs,{useRouter:true,temperature:0,max_tokens:128,json:true});
+    const routerRaw=await callLLM(ROUTER_PROMPT,routerMsgs,{useRouter:true,temperature:0,max_tokens:512,json:true});
     let intent='chat';
     let routerData={};
     try{
@@ -1697,6 +1756,33 @@ async function sendMessage(){
         _autoLinkToProject(_resolvedProjectId);
       }
 
+    }else if(intent==='ui_action'){
+      // ── UI ACTION: AI controls the app interface ──
+      statusDiv.remove();
+      const actions = routerData.actions || [];
+      const message = routerData.message || '';
+      if(actions.length === 0){
+        addMessage(message || 'No actions to perform.', 'ai');
+      } else {
+        // Resolve fuzzy names → real IDs/indices
+        const resolved = resolveActionRefs(actions);
+        // Check if any action requires confirmation
+        const needsConfirm = resolved.some(a => ALLOWED_ACTIONS[a.fn]?.confirm);
+        if(needsConfirm){
+          // Store pending actions for confirmation
+          S._pendingUIActions = { actions: resolved, message };
+          addMessage(`⚠️ ${message}\nAI wants to perform a destructive action. Reply "yes" to confirm.`, 'system');
+          S.chatHistory.push({role:'assistant',content:`[Waiting for confirmation: ${message}]`});
+        } else {
+          const results = executeUIActions(resolved, message);
+          const failCount = results.filter(r => r.error).length;
+          if(failCount > 0){
+            addMessage(`⚠️ ${failCount} action(s) failed. Check console for details.`, 'system');
+          }
+          S.chatHistory.push({role:'assistant',content:`[UI action: ${message}]`});
+        }
+      }
+
     }else{
       // ── CHAT: general conversation (inject project context if available) ──
       statusDiv.textContent='...';
@@ -1923,6 +2009,249 @@ async function doDocGenerate(statusDiv,userText,wsContext){
   if(S.currentDoc && S.currentDoc.id) S._wsCurrentFileId = S.currentDoc.id;
 }
 
+// ═══════════════════════════════════════════
+// AI UI CONTROL — Phase 3
+// ═══════════════════════════════════════════
+// Whitelist of functions the AI is allowed to call.
+// Anything not in this map is silently ignored.
+const ALLOWED_ACTIONS = {
+  // ── Mode switching ──
+  modeEnter:          { confirm: false, label: 'Switch mode' },
+  showModePicker:     { confirm: false, label: 'Show mode picker' },
+  // ── Workspace navigation ──
+  wsSetView:          { confirm: false, label: 'Switch workspace tab' },
+  wsOpenProject:      { confirm: false, label: 'Open project' },
+  openWorkspaceItem:  { confirm: false, label: 'Open file' },
+  enterWorkspaceMode: { confirm: false, label: 'Enter workspace' },
+  // ── File operations ──
+  wsNewFile:          { confirm: false, label: 'Create new file' },
+  wsCreateDoc:        { confirm: false, label: 'Create document' },
+  wsCreateSheet:      { confirm: false, label: 'Create spreadsheet' },
+  wsDeleteFile:       { confirm: true,  label: 'Delete file' },
+  // ── Project management ──
+  wsCreateProject:    { confirm: false, label: 'Create project' },
+  wsDeleteProject:    { confirm: true,  label: 'Delete project' },
+  wsUpdateProject:    { confirm: false, label: 'Update project' },
+  wsLinkFile:         { confirm: false, label: 'Link file to project' },
+  wsUnlinkFile:       { confirm: false, label: 'Unlink file from project' },
+  wsSetActiveProject: { confirm: false, label: 'Set active project' },
+  wsClearActiveProject:{ confirm: false, label: 'Clear active project' },
+  // ── UI panels ──
+  openSettings:       { confirm: false, label: 'Open settings' },
+  closeSettings:      { confirm: false, label: 'Close settings' },
+  openFileNav:        { confirm: false, label: 'Open file navigator' },
+  // ── Slide/doc operations ──
+  applyPreset:        { confirm: false, label: 'Apply theme' },
+  // ── Search / sort ──
+  wsSetSearch:        { confirm: false, label: 'Search files' },
+  wsSetSort:          { confirm: false, label: 'Sort files' },
+};
+
+// Parameter validation schemas (lightweight — type checks only)
+const ACTION_SCHEMA = {
+  modeEnter:      [{ type: 'string', enum: ['slide', 'doc', 'sheet', 'workspace'] }],
+  wsSetView:      [{ type: 'string', enum: ['recent', 'projects', 'all', 'unlinked'] }],
+  wsOpenProject:  [{ type: 'string' }],
+  openWorkspaceItem: [{ type: 'number' }],
+  wsNewFile:      [{ type: 'string', enum: ['slide', 'doc', 'sheet'] }],
+  wsCreateDoc:    [{ type: 'string' }, { type: 'string', optional: true }],
+  wsCreateSheet:  [{ type: 'string' }, { type: 'string', optional: true }],
+  wsCreateProject:[{ type: 'string' }, { type: 'string', optional: true }],
+  wsDeleteFile:   [{ type: 'string' }],
+  wsDeleteProject:[{ type: 'string' }],
+  wsUpdateProject:[{ type: 'string' }, { type: 'object' }],
+  wsLinkFile:     [{ type: 'string' }, { type: 'string' }],
+  wsUnlinkFile:   [{ type: 'string' }, { type: 'string' }],
+  wsSetActiveProject: [{ type: 'string' }],
+  applyPreset:    [{ type: 'string' }],
+  wsSetSearch:    [{ type: 'string' }],
+  wsSetSort:      [{ type: 'string', enum: ['date', 'name', 'type'] }],
+};
+
+/* ── AI Action Overlay ── */
+function _showAIActionOverlay(text) {
+  // Remove any existing overlay
+  _hideAIActionOverlay();
+  const el = document.createElement('div');
+  el.id = 'ai-action-overlay';
+  el.innerHTML = `
+    <div class="ai-action-spinner"></div>
+    <span class="ai-action-text">${text}</span>
+  `;
+  // Inline styles — Monet orange floating banner
+  Object.assign(el.style, {
+    position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
+    zIndex: '99999',
+    display: 'flex', alignItems: 'center', gap: '10px',
+    background: 'linear-gradient(135deg, rgba(200,168,112,0.92), rgba(180,140,80,0.95))',
+    color: '#fff', fontWeight: '600', fontSize: '14px',
+    padding: '10px 22px', borderRadius: '12px',
+    boxShadow: '0 4px 24px rgba(200,160,100,0.45), 0 0 0 1px rgba(255,255,255,0.08)',
+    backdropFilter: 'blur(8px)',
+    animation: 'aiOverlayIn 0.3s ease',
+    pointerEvents: 'none',
+  });
+  // Inject keyframes + spinner style if not present
+  if (!document.getElementById('ai-action-overlay-style')) {
+    const style = document.createElement('style');
+    style.id = 'ai-action-overlay-style';
+    style.textContent = `
+      @keyframes aiOverlayIn { from { opacity:0; transform:translateX(-50%) translateY(-12px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+      @keyframes aiOverlayOut { from { opacity:1; transform:translateX(-50%) translateY(0); } to { opacity:0; transform:translateX(-50%) translateY(-12px); } }
+      @keyframes aiSpinRotate { to { transform:rotate(360deg); } }
+      .ai-action-spinner {
+        width:16px; height:16px; border:2.5px solid rgba(255,255,255,0.35);
+        border-top-color:#fff; border-radius:50%;
+        animation: aiSpinRotate 0.7s linear infinite;
+        flex-shrink:0;
+      }
+      .ai-action-text { white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,0.2); }
+    `;
+    document.head.appendChild(style);
+  }
+  document.body.appendChild(el);
+  return el;
+}
+function _hideAIActionOverlay() {
+  const el = document.getElementById('ai-action-overlay');
+  if (!el) return;
+  el.style.animation = 'aiOverlayOut 0.25s ease forwards';
+  setTimeout(() => el.remove(), 260);
+}
+function _updateAIActionOverlay(text) {
+  const el = document.getElementById('ai-action-overlay');
+  if (el) {
+    const span = el.querySelector('.ai-action-text');
+    if (span) span.textContent = text;
+  }
+}
+
+/**
+ * Execute an array of AI-driven UI actions.
+ * Each action: { fn: 'functionName', args: [...] }
+ * Returns array of results/errors for logging.
+ */
+function executeUIActions(actions, message) {
+  if (message) addMessage(`✦ ${message}`, 'system');
+  // Show Monet-orange overlay
+  _showAIActionOverlay(`AI operating: ${message || 'Performing actions...'}`);
+  const results = [];
+  let stepIdx = 0;
+  for (const action of actions) {
+    stepIdx++;
+    const fnName = action.fn;
+    const args = action.args || [];
+    const rule = ALLOWED_ACTIONS[fnName];
+    // Update overlay with current step
+    _updateAIActionOverlay(`AI ▸ ${rule?.label || fnName} (${stepIdx}/${actions.length})`);
+    // Whitelist check
+    if (!rule) {
+      console.warn(`[AI UI] Blocked non-whitelisted action: ${fnName}`);
+      results.push({ fn: fnName, error: 'not allowed' });
+      continue;
+    }
+    // Schema validation (lightweight)
+    const schema = ACTION_SCHEMA[fnName];
+    if (schema) {
+      let valid = true;
+      for (let i = 0; i < schema.length; i++) {
+        const s = schema[i];
+        if (s.optional && args[i] === undefined) continue;
+        if (s.type === 'number' && typeof args[i] !== 'number') { valid = false; break; }
+        if (s.type === 'string' && typeof args[i] !== 'string') { valid = false; break; }
+        if (s.type === 'object' && typeof args[i] !== 'object') { valid = false; break; }
+        if (s.enum && !s.enum.includes(args[i])) { valid = false; break; }
+      }
+      if (!valid) {
+        console.warn(`[AI UI] Invalid args for ${fnName}:`, args);
+        results.push({ fn: fnName, error: 'invalid args', args });
+        continue;
+      }
+    }
+    // Execute
+    const fn = window[fnName];
+    if (typeof fn !== 'function') {
+      console.warn(`[AI UI] Function not found on window: ${fnName}`);
+      results.push({ fn: fnName, error: 'not found' });
+      continue;
+    }
+    try {
+      fn(...args);
+      results.push({ fn: fnName, ok: true });
+    } catch (e) {
+      console.error(`[AI UI] Error executing ${fnName}:`, e);
+      results.push({ fn: fnName, error: e.message });
+    }
+  }
+  // Done — show completion briefly then hide
+  const failCount = results.filter(r => r.error).length;
+  if (failCount > 0) {
+    _updateAIActionOverlay(`AI ▸ Done (${failCount} failed)`);
+  } else {
+    _updateAIActionOverlay('AI ▸ Done ✓');
+  }
+  setTimeout(_hideAIActionOverlay, 1200);
+  return results;
+}
+
+/**
+ * Resolve fuzzy file/project references in AI actions.
+ * Converts human-readable names to actual IDs/indices.
+ */
+function resolveActionRefs(actions) {
+  const files = window.wsLoad ? window.wsLoad() : [];
+  const projects = window.wsListProjects ? window.wsListProjects() : [];
+
+  return actions.map(a => {
+    const resolved = { ...a, args: [...(a.args || [])] };
+
+    // openWorkspaceItem: if arg is string (filename), resolve to index
+    if (a.fn === 'openWorkspaceItem' && typeof a.args[0] === 'string') {
+      const name = a.args[0].toLowerCase();
+      const idx = files.findIndex(f => (f.title || '').toLowerCase().includes(name));
+      if (idx >= 0) resolved.args[0] = idx;
+      else {
+        console.warn(`[AI UI] File not found: "${a.args[0]}"`);
+        return null; // skip this action
+      }
+    }
+
+    // wsOpenProject: if arg looks like a name (not an ID), resolve to projectId
+    if (a.fn === 'wsOpenProject' && typeof a.args[0] === 'string' && !a.args[0].startsWith('proj_')) {
+      const name = a.args[0].toLowerCase();
+      const proj = projects.find(p => (p.name || '').toLowerCase().includes(name));
+      if (proj) resolved.args[0] = proj.id;
+      else {
+        console.warn(`[AI UI] Project not found: "${a.args[0]}"`);
+        return null;
+      }
+    }
+
+    // wsSetActiveProject: same resolution
+    if (a.fn === 'wsSetActiveProject' && typeof a.args[0] === 'string' && !a.args[0].startsWith('proj_')) {
+      const name = a.args[0].toLowerCase();
+      const proj = projects.find(p => (p.name || '').toLowerCase().includes(name));
+      if (proj) resolved.args[0] = proj.id;
+    }
+
+    // wsLinkFile: resolve file name → fileId, project name → projectId
+    if (a.fn === 'wsLinkFile') {
+      if (typeof a.args[0] === 'string' && !a.args[0].startsWith('ws_') && !a.args[0].startsWith('doc_')) {
+        const name = a.args[0].toLowerCase();
+        const f = files.find(f => (f.title || '').toLowerCase().includes(name));
+        if (f) resolved.args[0] = f.id;
+      }
+      if (typeof a.args[1] === 'string' && !a.args[1].startsWith('proj_')) {
+        const name = a.args[1].toLowerCase();
+        const p = projects.find(p => (p.name || '').toLowerCase().includes(name));
+        if (p) resolved.args[1] = p.id;
+      }
+    }
+
+    return resolved;
+  }).filter(Boolean); // remove nulls from failed resolution
+}
+
 export {
   loadConfig,
   saveConfig,
@@ -1940,6 +2269,9 @@ export {
   placeImageOnSlide,
   applyImageAction,
   autoDesignImagePlacement,
+  executeUIActions,
+  resolveActionRefs,
+  ALLOWED_ACTIONS,
   STYLE_PROMPT,
   CONTENT_EDIT_PROMPT,
   DECK_EDIT_PROMPT,
