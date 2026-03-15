@@ -1,4 +1,4 @@
-import { S, PRESETS, LAYOUTS, STORAGE_KEY, STORAGE_HISTORY_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, CLOUD_BUCKET, WS_STORAGE_KEY } from './state.js';
+import { S, PRESETS, LAYOUTS, STORAGE_KEY, STORAGE_HISTORY_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, CLOUD_BUCKET, WS_STORAGE_KEY, LLM_DEFAULTS, CLOUD_PROVIDERS, CONFIG_KEY } from './state.js';
 
 // ═══════════════════════════════════════════
 // AUTO-SAVE / AUTO-LOAD (localStorage)
@@ -477,8 +477,8 @@ export function setAuthUser(user){
     const name=user.user_metadata?.full_name||user.email?.split('@')[0]||'User';
     const email=user.email||'';
     const initial=name.charAt(0).toUpperCase();
-    const cfg=window.llmConfig||S.llmConfig||{provider:'groq'};
-    const providerDef=(window.LLM_DEFAULTS||{})[cfg.provider]||{label:'AI',color:'#8B9E8B',desc:''};
+    const cfg=S.llmConfig||{provider:'groq'};
+    const providerDef=(LLM_DEFAULTS||{})[cfg.provider]||{label:'AI',color:'#8B9E8B',desc:''};
     bar.innerHTML=`
       <span class="auth-name">${name}</span>
       <div class="user-menu-wrap">
@@ -527,8 +527,8 @@ export function setAuthUser(user){
     if(!S._authSyncDone){
       S._authSyncDone=true;
       if(window.restoreConfigFromCloud) window.restoreConfigFromCloud(user);
-      if(window.llmConfig&&!window.llmConfig.displayName){
-        window.llmConfig.displayName=name;
+      if(S.llmConfig&&!S.llmConfig.displayName){
+        S.llmConfig.displayName=name;
         if(window.saveConfig) window.saveConfig();
       }
       if(window.isConfigured&&window.isConfigured()){
@@ -618,35 +618,35 @@ export function showWelcome(){
   if(configPanel)configPanel.classList.remove('active');
   // If already configured, pre-fill and show Connected state
   if(window.isConfigured()){
-    window.welcomeProvider=window.llmConfig.provider;
+    window.welcomeProvider=S.llmConfig.provider;
     // Pre-fill the config panel fields (in case user clicks to re-configure)
     const grid=document.getElementById('welcomeProviderGrid');
-    grid.innerHTML=Object.entries(window.LLM_DEFAULTS).map(([key,def])=>
-      `<div class="wb-pgrid-item${key===window.welcomeProvider?' active':''}" data-provider="${key}" onclick="setWelcomeProvider('${key}')">
+    grid.innerHTML=Object.entries(LLM_DEFAULTS).map(([key,def])=>
+      `<div class="wb-pgrid-item${key===S.llmConfig.provider?' active':''}" data-provider="${key}" onclick="setWelcomeProvider('${key}')">
         <div class="wpg-dot" style="background:${def.color}"></div>
         <div class="wpg-name">${def.label}</div>
         <div class="wpg-desc">${def.desc}</div>
       </div>`
     ).join('');
-    window.setWelcomeProvider(window.welcomeProvider);
+    window.setWelcomeProvider(S.llmConfig.provider);
     // Fill saved values after setWelcomeProvider clears them
-    const isCloud=window.CLOUD_PROVIDERS.includes(window.llmConfig.provider);
+    const isCloud=CLOUD_PROVIDERS.includes(S.llmConfig.provider);
     if(isCloud){
-      document.getElementById('welcomeApiKey').value=window.llmConfig.apiKey||'';
-    }else if(window.llmConfig.provider==='ollama'){
-      document.getElementById('welcomeOllamaUrl').value=window.llmConfig.url||'http://localhost:11434';
-      document.getElementById('welcomeOllamaModel').value=window.llmConfig.model||'llama3.1:8b';
-    }else if(window.llmConfig.provider==='custom'){
-      document.getElementById('welcomeCustomUrl').value=window.llmConfig.url||'';
-      document.getElementById('welcomeCustomKey').value=window.llmConfig.apiKey||'';
-      document.getElementById('welcomeCustomModel').value=window.llmConfig.model||'';
-      document.getElementById('welcomeCustomRouter').value=window.llmConfig.router||'';
+      document.getElementById('welcomeApiKey').value=S.llmConfig.apiKey||'';
+    }else if(S.llmConfig.provider==='ollama'){
+      document.getElementById('welcomeOllamaUrl').value=S.llmConfig.url||'http://localhost:11434';
+      document.getElementById('welcomeOllamaModel').value=S.llmConfig.model||'llama3.1:8b';
+    }else if(S.llmConfig.provider==='custom'){
+      document.getElementById('welcomeCustomUrl').value=S.llmConfig.url||'';
+      document.getElementById('welcomeCustomKey').value=S.llmConfig.apiKey||'';
+      document.getElementById('welcomeCustomModel').value=S.llmConfig.model||'';
+      document.getElementById('welcomeCustomRouter').value=S.llmConfig.router||'';
     }
-    document.getElementById('welcomeDisplayName').value=window.llmConfig.displayName||'';
+    document.getElementById('welcomeDisplayName').value=S.llmConfig.displayName||'';
     // Show Connected on button
     const btn=document.getElementById('wbConnectBtn');
-    const def=window.LLM_DEFAULTS[window.llmConfig.provider]||{};
-    btn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${def.color||'#8B9E8B'};margin-right:6px;"></span> Connected to ${def.label||window.llmConfig.provider}`;
+    const def=LLM_DEFAULTS[S.llmConfig.provider]||{};
+    btn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${def.color||'#8B9E8B'};margin-right:6px;"></span> Connected to ${def.label||S.llmConfig.provider}`;
     btn.style.color='#fff'; btn.style.borderColor=def.color||'#8B9E8B';
     btn.classList.add('connected');
     btn._providerConfirmed=true;
@@ -665,13 +665,13 @@ export async function doLogout(){
 
 // Clear config from memory & localStorage only (cloud keeps it)
 export function clearLocalConfig(){
-  window.llmConfig.apiKey='';
-  window.llmConfig.provider='groq';
-  window.llmConfig.url=window.LLM_DEFAULTS.groq.url;
-  window.llmConfig.model=window.LLM_DEFAULTS.groq.model;
-  window.llmConfig.router=window.LLM_DEFAULTS.groq.router;
-  window.llmConfig.displayName='';
-  localStorage.removeItem(window.CONFIG_KEY);
+  S.llmConfig.apiKey='';
+  S.llmConfig.provider='groq';
+  S.llmConfig.url=LLM_DEFAULTS.groq.url;
+  S.llmConfig.model=LLM_DEFAULTS.groq.model;
+  S.llmConfig.router=LLM_DEFAULTS.groq.router;
+  S.llmConfig.displayName='';
+  localStorage.removeItem(CONFIG_KEY);
 }
 
 export async function doWelcomeSignOut(){

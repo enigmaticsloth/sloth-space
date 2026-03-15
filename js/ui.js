@@ -925,7 +925,16 @@ function enterDocMode(){
 // ═══════════════════════════════════════════
 function checkWelcomeScreen() {
   const hasConfig = window.loadConfig();
-  // Only skip welcome if user was actively working (refresh), not fresh tab/URL entry
+  // Restore sessionStorage from localStorage backup (survives tab close)
+  // Must happen here BEFORE the check, since autoLoad runs after this
+  if(hasConfig && !sessionStorage.getItem('sloth_active')){
+    const lastMode=localStorage.getItem('sloth_last_mode');
+    if(lastMode){
+      sessionStorage.setItem('sloth_mode',lastMode);
+      sessionStorage.setItem('sloth_active','1');
+    }
+  }
+  // Only skip welcome if user was actively working (refresh or restored), not fresh setup
   if (hasConfig && window.isConfigured() && sessionStorage.getItem('sloth_active')) {
     const savedMode=sessionStorage.getItem('sloth_mode')||'slide';
     if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
