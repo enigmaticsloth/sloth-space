@@ -198,7 +198,7 @@ export const S = {
     { id:'monet-mist',    bg:'rgba(130,155,160,0.15)', border:'rgba(130,155,160,0.35)', text:'#A8BFC4', dot:'#829BA0' },
   ],
   wsView: 'recent',          // 'recent' | 'projects' | 'all' | 'unlinked' | 'project-detail'
-  wsTypeFilters: { slide: true, doc: true, sheet: true },  // file type filter checkboxes
+  wsTypeFilters: { slide: true, doc: true, sheet: true, image: true },  // file type filter checkboxes
   wsSearchQuery: '',         // search bar text
   wsSortBy: 'date',          // 'date' | 'name' | 'type'
   wsSortAsc: false,          // false = newest/Z-A first, true = oldest/A-Z first

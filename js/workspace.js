@@ -168,6 +168,33 @@ export function wsCreateSheet(title, csvOrText) {
 }
 
 /**
+ * Create a new image in workspace.
+ * @param {string} title - Image title
+ * @param {string} dataUrl - Base64 data URL of the image
+ * @param {object} meta - Optional metadata { mimeType, width, height, size }
+ */
+export function wsCreateImage(title, dataUrl, meta = {}) {
+  const files = wsLoad();
+  const img = {
+    id: wsId(),
+    type: 'image',
+    title: title || 'Untitled Image',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    content: {
+      dataUrl: dataUrl,
+      mimeType: meta.mimeType || 'image/png',
+      width: meta.width || 0,
+      height: meta.height || 0,
+      size: meta.size || 0
+    }
+  };
+  files.push(img);
+  wsSave(files);
+  return img;
+}
+
+/**
  * Delete a workspace file by ID.
  */
 export function wsDeleteFile(id) {
@@ -247,6 +274,10 @@ export function wsFileToContext(file) {
   }
   if (file.type === 'slides') {
     return `[WORKSPACE SLIDES: "${file.title}" (id: ${file.id})]\n${JSON.stringify(file.content)}`;
+  }
+  if (file.type === 'image') {
+    const c = file.content;
+    return `[WORKSPACE IMAGE: "${file.title}" (id: ${file.id}) ${c.width}×${c.height} ${c.mimeType}]`;
   }
   return '';
 }
@@ -361,6 +392,64 @@ export function wsDeleteProject(id) {
 
 export function wsArchiveProject(id) {
   wsUpdateProject(id, { status: 'archived' });
+}
+
+/** Rename a project via prompt */
+export function wsRenameProject(id) {
+  const project = wsGetProject(id);
+  if (!project) return;
+  const name = prompt('Rename project:', project.name);
+  if (name && name.trim() && name.trim() !== project.name) {
+    wsUpdateProject(id, { name: name.trim() });
+    renderWorkspaceMode();
+  }
+}
+
+/** Edit project description via prompt */
+export function wsEditProjectDesc(id) {
+  const project = wsGetProject(id);
+  if (!project) return;
+  const desc = prompt('Project description:', project.description || '');
+  if (desc !== null) {
+    wsUpdateProject(id, { description: desc.trim() });
+    renderWorkspaceMode();
+  }
+}
+
+/** Show a picker to add (link) existing files to a project */
+export function wsShowAddFilePicker(projectId) {
+  const allFiles = wsLoad();
+  const linkedFiles = wsGetProjectFiles(projectId);
+  const linkedIds = new Set(linkedFiles.map(f => f.id));
+  const unlinked = allFiles.filter(f => !linkedIds.has(f.id));
+
+  if (unlinked.length === 0) {
+    window.addMessage('All files are already linked to this project.', 'system');
+    return;
+  }
+
+  // Build a simple checklist overlay
+  let html = `<div class="ws-link-picker">
+    <div class="ws-link-picker-title">Add files to project:</div>
+    <div class="ws-link-picker-list">`;
+  for (const f of unlinked) {
+    const typeLabel = (f.type || 'slide').charAt(0).toUpperCase() + (f.type || 'slide').slice(1);
+    html += `<label class="ws-link-picker-item">
+      <input type="checkbox" onchange="wsToggleFileLink('${f.id}','${projectId}',this.checked)">
+      <span>${escapeHtml(f.title || 'Untitled')}</span>
+      <span class="ws-link-count">${typeLabel}</span>
+    </label>`;
+  }
+  html += `</div>
+    <button class="ws-link-picker-close" onclick="closeLinkPicker();renderWorkspaceMode()">Done</button>
+  </div>`;
+
+  // Show in modal overlay
+  const overlay = document.getElementById('wsModalOverlay');
+  if (overlay) {
+    overlay.querySelector('.ws-modal-content').innerHTML = html;
+    overlay.style.display = 'flex';
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -556,7 +645,85 @@ export function wsNewFile(type) {
     window.enterDocMode();
   } else if (type === 'sheet') {
     window.enterSheetMode ? window.enterSheetMode() : window.addMessage('Sheet mode coming soon!', 'system');
+  } else if (type === 'image') {
+    wsPickImageFile();
   }
+}
+
+/**
+ * Open a file picker for image upload.
+ */
+export function wsPickImageFile() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.multiple = true;
+  input.onchange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    for (const file of files) {
+      wsHandleImageFile(file);
+    }
+  };
+  input.click();
+}
+
+/**
+ * Process an image File object and add it to workspace.
+ * Resizes large images and converts to data URL.
+ */
+export function wsHandleImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+
+  // Max image size: 2MB after encoding (to keep localStorage manageable)
+  const MAX_DIMENSION = 1920;
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width;
+      let h = img.height;
+
+      // Downscale if too large
+      if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+
+      // Draw to canvas for resizing + compression
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Try JPEG first for photos (smaller), fallback to PNG
+      let dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      if (dataUrl.length > MAX_FILE_SIZE) {
+        dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      }
+      if (dataUrl.length > MAX_FILE_SIZE) {
+        window.addMessage('Image too large even after compression. Try a smaller image.', 'system');
+        return;
+      }
+
+      const title = file.name.replace(/\.[^.]+$/, '') || 'Untitled Image';
+      const created = wsCreateImage(title, dataUrl, {
+        mimeType: 'image/jpeg',
+        width: w,
+        height: h,
+        size: dataUrl.length
+      });
+
+      window.addMessage(`✓ Added image "${created.title}" (${w}×${h})`, 'system');
+      if (S.currentMode === 'workspace') renderWorkspaceMode();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 /**
@@ -721,6 +888,7 @@ export function renderWorkspaceMode() {
               <button class="ws-new-menu-item" onclick="wsNewFile('slide')"><span class="ws-nm-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span> Slide Deck</button>
               <button class="ws-new-menu-item" onclick="wsNewFile('doc')"><span class="ws-nm-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span> Document</button>
               <button class="ws-new-menu-item" onclick="wsNewFile('sheet')"><span class="ws-nm-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span> Spreadsheet</button>
+              <button class="ws-new-menu-item" onclick="wsNewFile('image')"><span class="ws-nm-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span> Image</button>
             </div>
           </div>
           <button class="ws-new-btn project" onclick="showWsNewProject()" style="font-size:13px;">
@@ -736,13 +904,17 @@ export function renderWorkspaceMode() {
       <div class="ws-content">${contentHtml}</div>
     </div>
   `;
+
+  // Init drag-drop & paste handlers
+  wsInitDragDrop();
+  wsInitPasteHandler();
 }
 
 /** Toggle file type filter */
 export function wsToggleTypeFilter(type) {
   S.wsTypeFilters[type] = !S.wsTypeFilters[type];
   // Ensure at least one is checked
-  if (!S.wsTypeFilters.slide && !S.wsTypeFilters.doc && !S.wsTypeFilters.sheet) {
+  if (!S.wsTypeFilters.slide && !S.wsTypeFilters.doc && !S.wsTypeFilters.sheet && !S.wsTypeFilters.image) {
     S.wsTypeFilters[type] = true; // revert — can't uncheck all
   }
   renderWorkspaceMode();
@@ -761,6 +933,9 @@ function renderTypeFilters() {
     </label>
     <label class="ws-filter-check${f.sheet ? ' active' : ''}">
       <input type="checkbox" ${f.sheet ? 'checked' : ''} onchange="wsToggleTypeFilter('sheet')"> Sheets
+    </label>
+    <label class="ws-filter-check${f.image ? ' active' : ''}">
+      <input type="checkbox" ${f.image ? 'checked' : ''} onchange="wsToggleTypeFilter('image')"> Images
     </label>
   </div>`;
 }
@@ -932,12 +1107,27 @@ function renderProjectDetailView() {
   }
 
   const c = wsGetProjectColor(project);
-  const statusLabel = { active:'Active', paused:'Paused', done:'Done' }[project.status] || project.status;
+
+  // File count breakdown by type
+  const typeCounts = {};
+  for (const f of files) {
+    const t = f.type || 'slide';
+    typeCounts[t] = (typeCounts[t] || 0) + 1;
+  }
+  const typeLabels = { slide:'slide', slides:'slide', doc:'doc', sheet:'sheet', image:'image' };
+  const breakdownParts = Object.entries(typeCounts).map(([t, n]) => {
+    const label = typeLabels[t] || t;
+    return `${n} ${label}${n > 1 ? 's' : ''}`;
+  });
+  const statsText = files.length === 0
+    ? 'No files'
+    : breakdownParts.join(', ');
+
   return `<div class="ws-project-detail">
     <div class="ws-pd-header" style="border-left:3px solid ${c.dot};padding-left:16px;">
       <button class="ws-back-btn" onclick="wsSetView('projects')">← Projects</button>
       <div class="ws-pd-title-row">
-        <div class="ws-pd-title">${escapeHtml(project.name)}</div>
+        <div class="ws-pd-title" onclick="wsRenameProject('${project.id}')" title="Click to rename">${escapeHtml(project.name)}<svg class="ws-pd-edit-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
         <button class="ws-color-btn" onclick="wsCycleProjectColor('${project.id}')" title="Change color"><span class="ws-color-dot" style="background:${c.dot}"></span></button>
       </div>
       <div class="ws-pd-actions-row">
@@ -951,8 +1141,20 @@ function renderProjectDetailView() {
         </div>
         <button class="ws-pd-btn danger" onclick="if(confirm('Delete this project? Files will not be deleted.'))wsDeleteProject('${project.id}')">Delete</button>
       </div>
-      ${project.description ? `<div class="ws-pd-desc">${escapeHtml(project.description)}</div>` : ''}
-      <div class="ws-pd-stats">${files.length} file${files.length !== 1 ? 's' : ''} · Created ${new Date(project.created).toLocaleDateString()}</div>
+      <div class="ws-pd-desc-wrap" onclick="wsEditProjectDesc('${project.id}')" title="Click to edit description">
+        ${project.description
+          ? `<div class="ws-pd-desc">${escapeHtml(project.description)}</div>`
+          : `<div class="ws-pd-desc ws-pd-desc-placeholder">Add a description...</div>`}
+        <svg class="ws-pd-edit-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </div>
+      <div class="ws-pd-stats">${statsText} · Created ${new Date(project.created).toLocaleDateString()}</div>
+    </div>
+    <div class="ws-pd-file-header">
+      <span class="ws-pd-file-label">Linked Files</span>
+      <button class="ws-pd-add-file-btn" onclick="wsShowAddFilePicker('${project.id}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add File
+      </button>
     </div>
     ${filesHtml}
   </div>`;
@@ -1065,6 +1267,17 @@ export function wsRenderFilePreview(item) {
           .fill('<div style="background:rgba(255,255,255,0.05);border-radius:1px;"></div>')
           .join('')}
       </div>
+    </div>`;
+  }
+  if (type === 'image') {
+    const src = item.content?.dataUrl || '';
+    if (src) {
+      return `<div class="ws-file-preview img-prev">
+        <img src="${src}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">
+      </div>`;
+    }
+    return `<div class="ws-file-preview img-prev">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     </div>`;
   }
   return `<div class="ws-file-preview" style="background:rgba(255,255,255,0.05);">?</div>`;
@@ -1257,6 +1470,11 @@ export const wsItemLoaders = {
   sheet(item) {
     // TODO: load sheet from workspace item
     return true;
+  },
+  image(item) {
+    // Open image viewer overlay
+    wsShowImageViewer(item);
+    return false; // don't switch modes — stays in workspace
   }
 };
 
@@ -1358,4 +1576,135 @@ export function saveWsModal() {
   }
   closeWsModal();
   window.refreshFileList();
+}
+
+// ═══════════════════════════════════════════
+// IMAGE VIEWER
+// ═══════════════════════════════════════════
+
+/**
+ * Show full-screen image viewer overlay.
+ */
+export function wsShowImageViewer(item) {
+  // Remove existing viewer if any
+  wsCloseImageViewer();
+
+  const src = item.content?.dataUrl || '';
+  if (!src) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'wsImageViewer';
+  overlay.className = 'ws-img-viewer-overlay';
+  overlay.innerHTML = `
+    <div class="ws-img-viewer-header">
+      <span class="ws-img-viewer-title">${escapeHtml(item.title)}</span>
+      <span class="ws-img-viewer-meta">${item.content.width}×${item.content.height}</span>
+      <button class="ws-img-viewer-close" onclick="wsCloseImageViewer()">✕</button>
+    </div>
+    <div class="ws-img-viewer-body">
+      <img src="${src}" alt="${escapeHtml(item.title)}" class="ws-img-viewer-img">
+    </div>
+    <div class="ws-img-viewer-footer">
+      <button class="ws-img-viewer-btn" onclick="wsImageDownload('${item.id}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </button>
+      <button class="ws-img-viewer-btn danger" onclick="if(confirm('Delete this image?')){wsDeleteFile('${item.id}');wsCloseImageViewer();renderWorkspaceMode();}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Delete
+      </button>
+    </div>
+  `;
+
+  // Click backdrop to close
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) wsCloseImageViewer();
+  });
+
+  document.body.appendChild(overlay);
+}
+
+/**
+ * Close the image viewer overlay.
+ */
+export function wsCloseImageViewer() {
+  const el = document.getElementById('wsImageViewer');
+  if (el) el.remove();
+}
+
+/**
+ * Download a workspace image to the user's device.
+ */
+export function wsImageDownload(fileId) {
+  const file = wsGetFile(fileId);
+  if (!file || !file.content?.dataUrl) return;
+  const a = document.createElement('a');
+  a.href = file.content.dataUrl;
+  a.download = (file.title || 'image') + '.jpg';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// ═══════════════════════════════════════════
+// DRAG & DROP / PASTE IMAGE UPLOAD
+// ═══════════════════════════════════════════
+
+/**
+ * Initialize workspace drag-and-drop zone.
+ * Called when entering workspace mode.
+ */
+export function wsInitDragDrop() {
+  const canvas = document.getElementById('workspaceCanvas');
+  if (!canvas || canvas._wsDragDropInit) return;
+  canvas._wsDragDropInit = true;
+
+  canvas.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    canvas.classList.add('ws-drag-over');
+  });
+
+  canvas.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    canvas.classList.remove('ws-drag-over');
+  });
+
+  canvas.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    canvas.classList.remove('ws-drag-over');
+
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    for (const file of files) {
+      wsHandleImageFile(file);
+    }
+  });
+}
+
+/**
+ * Initialize paste handler for images.
+ * Listens globally for Ctrl+V with image data.
+ */
+export function wsInitPasteHandler() {
+  if (window._wsPasteInit) return;
+  window._wsPasteInit = true;
+
+  document.addEventListener('paste', (e) => {
+    // Only handle paste when in workspace mode
+    if (S.currentMode !== 'workspace') return;
+    // Don't capture paste if focus is in an input/textarea
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    const items = Array.from(e.clipboardData?.items || []);
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) wsHandleImageFile(file);
+      }
+    }
+  });
 }
