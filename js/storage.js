@@ -34,9 +34,13 @@ export function autoLoad(){
         window.addMessage(`✓ Restored: "${S.currentDeck.title||'Untitled'}" (${S.currentDeck.slides.length} slides)`,'system');
       }
     }
-    const savedHistory=localStorage.getItem(STORAGE_HISTORY_KEY);
-    if(savedHistory){
-      S.chatHistory=JSON.parse(savedHistory);
+    // Chat history is now managed by chat tabs (initChatTabs)
+    // Legacy fallback: only load if no chat tabs exist yet
+    if(!S.chatTabs||S.chatTabs.length===0){
+      const savedHistory=localStorage.getItem(STORAGE_HISTORY_KEY);
+      if(savedHistory){
+        S.chatHistory=JSON.parse(savedHistory);
+      }
     }
   }catch(e){console.warn('Auto-load failed:',e);}
 }
@@ -516,6 +520,7 @@ export function setAuthUser(user){
         if(window.addMessage) window.addMessage('☁️ Settings synced from cloud.','system');
       }
       if(window.syncWorkspaceFromCloud) window.syncWorkspaceFromCloud();
+      if(window.loadChatTabsFromCloud) window.loadChatTabsFromCloud();
     }
   }catch(e){
     console.warn('[Auth] setAuthUser error (non-fatal):',e.message);

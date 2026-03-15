@@ -42,6 +42,7 @@ export const WS_PROJECTS_KEY = 'sloth_workspace_projects';
 export const WS_LINKS_KEY = 'sloth_workspace_links';
 export const STORAGE_KEY = 'sloth_space_deck';
 export const STORAGE_HISTORY_KEY = 'sloth_space_chat';
+export const CHAT_TABS_KEY = 'sloth_chat_tabs';
 export const CONFIG_KEY = 'sloth_space_config';
 
 // ── LLM Provider Defaults ──
@@ -206,6 +207,10 @@ export const S = {
 
   // ── File Nav ──
   fileNavTab: 'all',
+
+  // ── Chat Tabs ──
+  chatTabs: [],       // [{id, title, history[], messagesHTML}] — max 3
+  activeChatTab: 0,   // index into chatTabs
 
   // ── Chat Input ──
   inputCollapsed: false,

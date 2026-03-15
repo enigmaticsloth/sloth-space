@@ -1,4 +1,4 @@
-import { S, LLM_DEFAULTS, CONFIG_KEY, VALID_PRESETS, VALID_LAYOUTS, PRESETS, LAYOUTS } from './state.js';
+import { S, LLM_DEFAULTS, CONFIG_KEY, CHAT_TABS_KEY, VALID_PRESETS, VALID_LAYOUTS, PRESETS, LAYOUTS } from './state.js';
 
 // Send button arrow SVG (shared constant)
 const SEND_ARROW_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
@@ -244,6 +244,11 @@ INTENTS:
 "deck_edit" — batch edit ALL slides at once or restructure entire doc.
   "全部翻成英文", "translate everything", "重新整理這篇文章"
 
+"describe" — user is asking ABOUT THE CURRENT DOCUMENT/CONTENT: what it says, summarize it, what's in it.
+  Output: {"intent":"describe"}
+  Examples: "這篇在寫什麼", "目前內容是什麼", "summarize this", "what does this say", "這份簡報講什麼", "幫我摘要", "內容簡介", "現在寫了什麼"
+  IMPORTANT: This is about the EXISTING content the user has open, NOT about Sloth Space the app.
+
 "about" — user is asking ABOUT Sloth Space itself: what it is, features, how to use it, a specific mode, etc.
   Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
   topic guide:
@@ -269,8 +274,9 @@ INTENTS:
 PRIORITY RULES (follow in order):
 1. Undo words (恢復/復原/還原/回復/撤銷/undo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (刪除/刪掉/移除/delete/remove) → "content_edit" with delete:true.
-3. Questions about Sloth Space the app itself → "about".
-4. Topic/creation requests (including creating content ABOUT Sloth Space) → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
+3. Asking what the current content says/summarize → "describe".
+4. Questions about Sloth Space the app itself → "about".
+5. Topic/creation requests (including creating content ABOUT Sloth Space) → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
 5. Edit existing specific content → "content_edit".
 6. Style/visual changes → "style" (slide only).
 7. Image manipulation → "image" (slide only).
@@ -415,6 +421,49 @@ Sloth Space, Slides, Doc, Sheet, Workspace, Project, PPTX, PowerPoint, CSV, AI, 
 Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, emojis, markdown bold markers, numbered lists, line breaks.
 Only translate the regular text content. Output ONLY the translated text, nothing else.`;
 
+// Describe/summarize prompt for current content
+const DESCRIBE_PROMPT=`You are Sloth Space's content assistant. The user wants to know what their current document contains. Read the content below and give a concise, clear summary in the user's language.
+
+Rules:
+- Be concise: 2-5 sentences for a brief overview.
+- Mention the main topic/theme, key points, and structure (number of slides/sections).
+- Use the same language the user asked in.
+- Do NOT output JSON. Just plain text.
+- If the content is empty or minimal, tell the user there's not much content yet.`;
+
+// Helper: serialize current content as readable text for LLM
+function getCurrentContentText(){
+  if(S.currentMode==='slide'&&S.currentDeck&&S.currentDeck.slides.length>0){
+    const lines=S.currentDeck.slides.map((s,i)=>{
+      const parts=[`[Slide ${i+1} — ${s.layout}]`];
+      for(const[k,v]of Object.entries(s.content)){
+        if(typeof v==='string') parts.push(`  ${k}: ${v}`);
+        else if(v&&v.type==='list'&&v.items) parts.push(`  ${k}: `+v.items.join(', '));
+        else if(v&&v.type==='table') parts.push(`  ${k}: [table ${v.headers?.length||0} cols × ${v.rows?.length||0} rows]`);
+        else parts.push(`  ${k}: ${JSON.stringify(v)}`);
+      }
+      return parts.join('\n');
+    });
+    return `Slide deck "${S.currentDeck.title||'Untitled'}" (${S.currentDeck.slides.length} slides):\n\n`+lines.join('\n\n');
+  }
+  if(S.currentMode==='doc'&&S.currentDoc&&S.currentDoc.blocks.length>0){
+    const lines=S.currentDoc.blocks.map(b=>{
+      const text=window.blockPlainText(b);
+      return `[${b.type}] ${text}`;
+    }).filter(l=>l.trim().length>3);
+    return `Document "${S.currentDoc.title||'Untitled'}" (${S.currentDoc.blocks.length} blocks):\n\n`+lines.join('\n');
+  }
+  if(S.currentMode==='sheet'){
+    // Check if there's a current sheet open
+    const f=S.files&&S.files.find(f=>f.id===S.currentFileId&&f.type==='sheet');
+    if(f&&f.data){
+      const rows=f.data.split('\n').slice(0,20);
+      return `Sheet "${f.title||'Untitled'}":\n`+rows.join('\n')+(f.data.split('\n').length>20?'\n... (truncated)':'');
+    }
+  }
+  return '';
+}
+
 // ── Pass 2b: slide generation mode ──
 const GEN_PROMPT=`You are Sloth Space, an AI presentation designer. Output ONLY valid JSON — no text, no markdown, no code fences, no explanation.
 
@@ -478,6 +527,229 @@ function addMessage(text,type){
   msgs.appendChild(div);
   msgs.scrollTop=msgs.scrollHeight;
   return div;
+}
+
+// ═══════════════════════════════════════════
+// CHAT TABS (max 3 tabs)
+// ═══════════════════════════════════════════
+
+const MAX_CHAT_TABS=3;
+
+function makeTab(title){
+  return {id:Date.now()+'_'+Math.random().toString(36).slice(2,6), title:title||'New', history:[], messagesHTML:''};
+}
+
+// Initialize chat tabs on first load
+export function initChatTabs(){
+  // Try to restore from localStorage
+  try{
+    const saved=localStorage.getItem(CHAT_TABS_KEY);
+    if(saved){
+      const data=JSON.parse(saved);
+      if(data.tabs&&data.tabs.length>0){
+        S.chatTabs=data.tabs;
+        S.activeChatTab=Math.min(data.active||0,data.tabs.length-1);
+        // Restore active tab's messages + history
+        const tab=S.chatTabs[S.activeChatTab];
+        S.chatHistory=tab.history||[];
+        const msgs=document.getElementById('chatMessages');
+        if(msgs&&tab.messagesHTML) msgs.innerHTML=tab.messagesHTML;
+        renderChatTabs();
+        return;
+      }
+    }
+  }catch(e){console.warn('Chat tabs load failed:',e);}
+  // Default: one empty tab
+  S.chatTabs=[makeTab('Chat')];
+  S.activeChatTab=0;
+  S.chatHistory=[];
+  renderChatTabs();
+}
+
+// Save all tabs to localStorage (called after every message / tab switch)
+let _cloudSyncTimer=null;
+function saveChatTabs(){
+  // Snapshot current tab before saving
+  _snapshotActiveTab();
+  try{
+    localStorage.setItem(CHAT_TABS_KEY,JSON.stringify({
+      tabs:S.chatTabs.map(t=>({id:t.id,title:t.title,history:(t.history||[]).slice(-30),messagesHTML:t.messagesHTML||''})),
+      active:S.activeChatTab
+    }));
+  }catch(e){console.warn('Chat tabs save failed:',e);}
+  // Debounced cloud sync (every 10s max)
+  if(_cloudSyncTimer) clearTimeout(_cloudSyncTimer);
+  _cloudSyncTimer=setTimeout(()=>{ syncChatTabsToCloud(); },10000);
+}
+
+// Snapshot current active tab's state from the DOM
+function _snapshotActiveTab(){
+  const tab=S.chatTabs[S.activeChatTab];
+  if(!tab)return;
+  tab.history=S.chatHistory;
+  const msgs=document.getElementById('chatMessages');
+  if(msgs) tab.messagesHTML=msgs.innerHTML;
+  // Auto-title: first user message (first 6 chars)
+  if(tab.title==='New'||tab.title==='Chat'){
+    const firstUser=tab.history.find(m=>m.role==='user');
+    if(firstUser){
+      const t=(firstUser.content||'').trim().slice(0,6);
+      if(t) tab.title=t;
+    }
+  }
+}
+
+// Render the tab bar UI
+function renderChatTabs(){
+  let bar=document.getElementById('chatTabBar');
+  if(!bar){
+    // Create tab bar and insert before chatMessages
+    bar=document.createElement('div');
+    bar.id='chatTabBar';
+    bar.className='chat-tab-bar';
+    const panel=document.getElementById('chatPanel');
+    const msgs=document.getElementById('chatMessages');
+    if(panel&&msgs) panel.insertBefore(bar,msgs);
+  }
+  bar.innerHTML='';
+  S.chatTabs.forEach((tab,i)=>{
+    const el=document.createElement('div');
+    el.className='chat-tab'+(i===S.activeChatTab?' active':'');
+    el.title=tab.title||'New';
+
+    const label=document.createElement('span');
+    label.className='chat-tab-label';
+    label.textContent=tab.title||'New';
+    el.appendChild(label);
+
+    // Close button (always available)
+    const closeBtn=document.createElement('span');
+    closeBtn.className='chat-tab-close';
+    closeBtn.textContent='×';
+    closeBtn.onclick=function(e){ e.stopPropagation(); closeChatTab(i); };
+    el.appendChild(closeBtn);
+
+    el.onclick=function(){ switchChatTab(i); };
+    bar.appendChild(el);
+  });
+
+  // Add tab button (if under max)
+  if(S.chatTabs.length<MAX_CHAT_TABS){
+    const addBtn=document.createElement('div');
+    addBtn.className='chat-tab chat-tab-add';
+    addBtn.textContent='+';
+    addBtn.title='New chat tab';
+    addBtn.onclick=function(){ addChatTab(); };
+    bar.appendChild(addBtn);
+  }
+}
+
+// Switch to a different tab
+export function switchChatTab(index){
+  if(index===S.activeChatTab)return;
+  // Save current tab
+  _snapshotActiveTab();
+  // Switch
+  S.activeChatTab=index;
+  const tab=S.chatTabs[index];
+  S.chatHistory=tab.history||[];
+  // Restore messages
+  const msgs=document.getElementById('chatMessages');
+  if(msgs) msgs.innerHTML=tab.messagesHTML||'';
+  renderChatTabs();
+  saveChatTabs();
+}
+
+// Add a new tab
+export function addChatTab(){
+  if(S.chatTabs.length>=MAX_CHAT_TABS)return;
+  _snapshotActiveTab();
+  const tab=makeTab('New');
+  S.chatTabs.push(tab);
+  S.activeChatTab=S.chatTabs.length-1;
+  S.chatHistory=[];
+  const msgs=document.getElementById('chatMessages');
+  if(msgs) msgs.innerHTML='';
+  renderChatTabs();
+  saveChatTabs();
+}
+
+// Close a tab
+export function closeChatTab(index){
+  // If only one tab, clear it (becomes a fresh tab)
+  if(S.chatTabs.length<=1){
+    S.chatTabs=[makeTab('New')];
+    S.activeChatTab=0;
+    S.chatHistory=[];
+    const msgs=document.getElementById('chatMessages');
+    if(msgs) msgs.innerHTML='';
+    renderChatTabs();
+    saveChatTabs();
+    return;
+  }
+  S.chatTabs.splice(index,1);
+  // Adjust active index
+  if(S.activeChatTab>=S.chatTabs.length) S.activeChatTab=S.chatTabs.length-1;
+  if(S.activeChatTab===index||S.activeChatTab>=S.chatTabs.length){
+    S.activeChatTab=Math.min(index,S.chatTabs.length-1);
+  }
+  // Load the now-active tab
+  const tab=S.chatTabs[S.activeChatTab];
+  S.chatHistory=tab.history||[];
+  const msgs=document.getElementById('chatMessages');
+  if(msgs) msgs.innerHTML=tab.messagesHTML||'';
+  renderChatTabs();
+  saveChatTabs();
+}
+
+// Cloud sync: save tabs to Supabase
+export async function syncChatTabsToCloud(){
+  if(!S.supabaseClient||!S.currentUser)return;
+  _snapshotActiveTab();
+  try{
+    const payload=JSON.stringify({
+      tabs:S.chatTabs.map(t=>({id:t.id,title:t.title,history:(t.history||[]).slice(-30)})),
+      active:S.activeChatTab,
+      savedAt:new Date().toISOString()
+    });
+    const path=S.currentUser.id+'/chat_tabs.json';
+    const blob=new Blob([payload],{type:'application/json'});
+    await S.supabaseClient.storage.from('decks').upload(path,blob,{upsert:true});
+  }catch(e){console.warn('Chat tabs cloud sync failed:',e);}
+}
+
+// Cloud sync: load tabs from Supabase
+export async function loadChatTabsFromCloud(){
+  if(!S.supabaseClient||!S.currentUser)return false;
+  try{
+    const path=S.currentUser.id+'/chat_tabs.json';
+    const{data,error}=await S.supabaseClient.storage.from('decks').download(path);
+    if(error||!data)return false;
+    const text=await data.text();
+    const parsed=JSON.parse(text);
+    if(parsed.tabs&&parsed.tabs.length>0){
+      // Cloud tabs don't have messagesHTML, rebuild from history
+      S.chatTabs=parsed.tabs.map(t=>{
+        const tab={id:t.id,title:t.title,history:t.history||[],messagesHTML:''};
+        // Rebuild messagesHTML from history
+        tab.messagesHTML=t.history.map(m=>{
+          const cls=m.role==='user'?'msg user':'msg ai';
+          const escaped=(m.content||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          return `<div class="${cls}">${escaped}</div>`;
+        }).join('');
+        return tab;
+      });
+      S.activeChatTab=Math.min(parsed.active||0,S.chatTabs.length-1);
+      const tab=S.chatTabs[S.activeChatTab];
+      S.chatHistory=tab.history||[];
+      const msgs=document.getElementById('chatMessages');
+      if(msgs) msgs.innerHTML=tab.messagesHTML||'';
+      renderChatTabs();
+      saveChatTabs(); // Cache locally
+      return true;
+    }
+  }catch(e){console.warn('Chat tabs cloud load failed:',e);}
+  return false;
 }
 
 function validateDeck(deck){
@@ -1034,6 +1306,27 @@ async function sendMessage(){
         }
       }
 
+    }else if(intent==='describe'){
+      // ── DESCRIBE: summarize current content ──
+      const contentText=getCurrentContentText();
+      if(!contentText){
+        statusDiv.remove();
+        addMessage('目前還沒有內容可以摘要。請先建立一份簡報、文件或表格！','ai');
+      }else{
+        statusDiv.textContent='Reading content...';
+        try{
+          const summary=await callLLM(DESCRIBE_PROMPT,[{role:'user',content:`User asked: "${text}"\n\nCurrent content:\n${contentText}`}],{max_tokens:1024});
+          statusDiv.remove();
+          const descDiv=addMessage('','ai');
+          descDiv.textContent=summary;
+          S.chatHistory.push({role:'assistant',content:summary});
+        }catch(e){
+          console.error('Describe failed:',e);
+          statusDiv.remove();
+          addMessage('抱歉，摘要時發生錯誤。','ai');
+        }
+      }
+
     }else if(intent==='undo'){
       // ── UNDO: restore previous state ──
       statusDiv.remove();
@@ -1258,6 +1551,7 @@ async function sendMessage(){
     sendBtn.disabled=false;
     sendBtn.innerHTML=SEND_ARROW_SVG;
     window.autoSave(); // Save chat history after every message
+    saveChatTabs(); // Persist chat tabs
   }
 }
 
