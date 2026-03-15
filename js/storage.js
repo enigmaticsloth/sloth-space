@@ -529,7 +529,9 @@ export function clearAuthUser(){
 }
 
 export async function doLogin(){
+  console.log('[Auth] doLogin called, supabaseClient:', !!S.supabaseClient);
   if(!S.supabaseClient){
+    console.warn('[Auth] No supabaseClient — opening settings');
     window.openSettings();
     return;
   }
@@ -537,16 +539,23 @@ export async function doLogin(){
   try{
     // Build redirect URL — must be http(s), not file://
     let redirect=window.location.href.split('#')[0].split('?')[0];
+    console.log('[Auth] redirect URL:', redirect);
     if(redirect.startsWith('file:')){
       window.addMessage('OAuth login requires http/https. Deploy to GitHub Pages or run a local server first.','system');
       return;
     }
-    const{error}=await S.supabaseClient.auth.signInWithOAuth({
+    console.log('[Auth] Calling signInWithOAuth...');
+    const{data,error}=await S.supabaseClient.auth.signInWithOAuth({
       provider:'github',
       options:{redirectTo:redirect}
     });
-    if(error)window.addMessage('Login error: '+error.message,'system');
+    console.log('[Auth] signInWithOAuth result:', {data, error});
+    if(error){
+      console.error('[Auth] OAuth error:', error);
+      window.addMessage('Login error: '+error.message,'system');
+    }
   }catch(e){
+    console.error('[Auth] doLogin exception:', e);
     window.addMessage('Login error: '+e.message,'system');
   }
 }
