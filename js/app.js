@@ -9,11 +9,11 @@ import { S } from './state.js?v=20260315aa';
 import * as slide from './slide.js?v=20260315aa';
 import * as doc from './doc.js?v=20260315aa';
 import * as workspace from './workspace.js?v=20260315aa';
-import * as ai from './ai.js?v=20260315aa';
+import * as ai from './ai.js?v=20260316jj';
 import * as ui from './ui.js?v=20260315aa';
 import * as storage from './storage.js?v=20260315aa';
 import * as keys from './keys.js?v=20260315aa';
-import * as sheet from './sheet.js?v=20260316ii';
+import * as sheet from './sheet.js?v=20260316jj';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work

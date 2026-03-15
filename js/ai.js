@@ -244,10 +244,14 @@ INTENTS:
 "deck_edit" — batch edit ALL slides at once or restructure entire doc.
   "全部翻成英文", "translate everything", "重新整理這篇文章"
 
-"describe" — user is asking ABOUT THE CURRENT DOCUMENT/CONTENT: what it says, summarize it, what's in it.
+"describe" — user is asking ABOUT THE CURRENT DOCUMENT/CONTENT: what it says, summarize it, what's in it, analyze data, calculate values, explain meaning.
   Output: {"intent":"describe"}
   Examples: "這篇在寫什麼", "目前內容是什麼", "summarize this", "what does this say", "這份簡報講什麼", "幫我摘要", "內容簡介", "現在寫了什麼"
+  SHEET-SPECIFIC examples (always "describe" when asking about existing sheet data):
+    "這欄的總和", "sum of column B", "average of this column", "這些數據的標準差", "這個表格在幹嘛", "這個表格屬於哪個專案",
+    "幫我算平均", "what's the total", "解釋這個表格", "這幾格是什麼意思", "這列的含義", "分析這個表格", "幫我看看這些數字"
   IMPORTANT: This is about the EXISTING content the user has open, NOT about Sloth Space the app.
+  IMPORTANT: In sheet mode, ANY question about the data, cells, columns, rows, formulas, or analysis → "describe".
 
 "about" — user is asking ABOUT Sloth Space THE APP itself: what it is, features, how to use it, a specific mode.
   Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
@@ -433,14 +437,35 @@ Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, e
 Only translate the regular text content. Output ONLY the translated text, nothing else.`;
 
 // Describe/summarize prompt for current content
-const DESCRIBE_PROMPT=`You are Sloth Space's content assistant. The user wants to know what their current document contains. Read the content below and give a concise, clear summary in the user's language.
+const DESCRIBE_PROMPT=`You are Sloth Space's content assistant. The user wants to understand their current document. Read the content below and respond to their specific question. Use the same language the user asked in.
 
 Rules:
-- Be concise: 2-5 sentences for a brief overview.
-- Mention the main topic/theme, key points, and structure (number of slides/sections).
-- Use the same language the user asked in.
+- Be concise but informative.
 - Do NOT output JSON. Just plain text.
-- If the content is empty or minimal, tell the user there's not much content yet.`;
+- If the content is empty or minimal, tell the user there's not much content yet.
+
+For SPREADSHEETS specifically:
+- You can see the full sheet data including formulas (shown as "=FORMULA → result") and plain values.
+- If the user asks about specific cells, columns, or rows, read and analyze that data directly.
+- If the user asks for calculations (sum, average, count, min, max, standard deviation, median, etc.), compute them from the visible data.
+- If the user asks what a column/row represents, infer from the header labels and data patterns.
+- If the user asks which project or purpose the sheet belongs to, infer from the title, headers, and data content.
+- If the user selects a range and asks a question, focus your answer on that range.
+- When referencing cells, use standard notation (A1, B2, etc.) so the user can find them.
+- Formulas in cells are shown as "=SUM(B2:C2) → 45". The left side is the formula, the right side is the computed value.
+
+DATA TYPE RECOGNITION — cells may contain various data types. You MUST recognize and handle them intelligently:
+- Dates: "2026/3/15", "2026.03.15", "3/15/2026", "2026-03-15", "Mar 15, 2026", "15 March 2026", "3月15日" etc. Recognize all common date formats. When computing with dates, understand chronological order, durations, and intervals.
+- Times: "1:30", "13:30", "1:30 PM", "14:00", "9:30:45" etc. Understand 12h/24h formats.
+- Date+Time: "2026/3/15 14:30", "2026-03-15T09:00" etc.
+- Decimals: "3.14", "0.5", "1,234.56" (comma as thousands separator), "-2.5". Treat them as numbers for calculations.
+- Currency: "$100", "NT$500", "€50", "¥1000". Strip the symbol for calculations, but mention the currency in your response.
+- Percentages: "45%", "0.3" in a column labeled "rate" or "%". Interpret contextually.
+- Mixed content: A column might have "Q1 2026" (quarter), "Week 12" (week number), "FY2025" (fiscal year). Infer meaning from context.
+- Empty cells: Treat as blank/null. Do not include them in averages or counts unless the user explicitly asks.
+When the user asks about patterns, trends, or comparisons, interpret these data types naturally — e.g. "which month had the highest sales" requires recognizing date columns and correlating with numeric columns.
+
+MULTILINGUAL CONTENT — cells may contain text in ANY language (Chinese, English, Japanese, Korean, Spanish, etc.) or mixed languages within the same sheet. Read and understand all of them. Headers like "日期", "名稱", "金額" are column labels just like "Date", "Name", "Amount". Respond in the language the user asked in, but reference cell content as-is regardless of its language.`;
 
 // Helper: serialize current content as readable text for LLM
 function getCurrentContentText(){
@@ -469,8 +494,12 @@ function getCurrentContentText(){
     const serialized=window.shSerializeForAI ? window.shSerializeForAI() : '';
     if(serialized){
       const lines=serialized.split('\n');
-      const preview=lines.slice(0,25).join('\n')+(lines.length>25?'\n... (truncated)':'');
-      return `Sheet "${sh.title||'Untitled'}" (${sh.rows.length} rows × ${sh.columns.length} cols):\n\n`+preview;
+      const preview=lines.slice(0,60).join('\n')+(lines.length>60?'\n... (truncated)':'');
+      let result=`Sheet "${sh.title||'Untitled'}" (${sh.rows.length} rows × ${sh.columns.length} cols):\n\n`+preview;
+      // Add selection context
+      const selCtx=window.shGetSelectionContext ? window.shGetSelectionContext() : '';
+      if(selCtx) result+='\n\n'+selCtx;
+      return result;
     }
   }
   return '';
@@ -1251,14 +1280,9 @@ async function sendMessage(){
     if(S.currentMode==='sheet'&&S.sheet&&S.sheet.current){
       const sh=S.sheet.current;
       ctx.push(`User is in Sheet mode editing "${sh.title}" with ${sh.rows.length} rows × ${sh.columns.length} cols.`);
-      if(S.sheet.selectedCell){
-        const rowIdx=sh.rows.findIndex(r=>r.id===S.sheet.selectedCell.rowId);
-        const colIdx=sh.columns.findIndex(c=>c.id===S.sheet.selectedCell.colId);
-        if(rowIdx>=0&&colIdx>=0){
-          const cellVal=sh.rows[rowIdx].cells[S.sheet.selectedCell.colId]||'';
-          ctx.push(`Selected cell: ${window.colIndexToLetter(colIdx)}${rowIdx+1} = "${cellVal.substring(0,100)}".`);
-        }
-      }
+      // Selection context
+      const selCtx=window.shGetSelectionContext ? window.shGetSelectionContext() : '';
+      if(selCtx) ctx.push(selCtx);
       ctx.push('Available functions: SUM, AVERAGE, COUNT, MIN, MAX, STDEV, MEDIAN. Formulas start with =.');
     }
     if(S.currentMode==='slide'&&S.currentDeck) ctx.push('User has a deck loaded with '+S.currentDeck.slides.length+' slides.');

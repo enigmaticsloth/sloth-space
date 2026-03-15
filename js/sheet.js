@@ -1980,23 +1980,107 @@ export function shToggleFreezeCol() {
 // ═══════════════════════════════════════════
 
 /**
- * Serialize sheet as tab-separated text for LLM context injection.
+ * Serialize sheet as structured text for LLM context injection.
+ * Includes both raw formulas and evaluated values so the LLM can understand the sheet.
  */
 export function shSerializeForAI() {
   const sh = S.sheet.current;
   if (!sh) return '';
-  const header = sh.columns.map(c => c.name).join('\t');
-  const rows = sh.rows.map(row =>
-    sh.columns.map(col => {
+
+  // Build a rich representation
+  const lines = [];
+
+  // Header row with column letters
+  const colNames = sh.columns.map(c => c.name);
+  lines.push('| Row | ' + colNames.join(' | ') + ' |');
+  lines.push('|' + colNames.map(() => '---').join('|') + '|');
+
+  // Data rows
+  for (let r = 0; r < sh.rows.length; r++) {
+    const row = sh.rows[r];
+    const cells = sh.columns.map(col => {
       const raw = row.cells[col.id] || '';
+      if (!raw) return '';
       if (raw.startsWith('=')) {
         const v = shEvalFormula(raw, sh);
-        return typeof v === 'object' ? raw : String(v);
+        const display = (typeof v === 'object') ? '#ERR' : String(v);
+        return `${raw} → ${display}`;
       }
       return raw;
-    }).join('\t')
-  );
-  return header + '\n' + rows.join('\n');
+    });
+    lines.push(`| ${r + 1} | ` + cells.join(' | ') + ' |');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Get info about the current selection (cell, range) for AI context.
+ */
+export function shGetSelectionContext() {
+  const sh = S.sheet.current;
+  if (!sh) return '';
+
+  const parts = [];
+
+  // Selected cell
+  if (S.sheet.selectedCell) {
+    const { rowId, colId } = S.sheet.selectedCell;
+    const rIdx = sh.rows.findIndex(r => r.id === rowId);
+    const cIdx = sh.columns.findIndex(c => c.id === colId);
+    if (rIdx >= 0 && cIdx >= 0) {
+      const raw = sh.rows[rIdx].cells[colId] || '';
+      const label = colIndexToLetter(cIdx) + (rIdx + 1);
+      if (raw.startsWith('=')) {
+        const v = shEvalFormula(raw, sh);
+        const display = (typeof v === 'object') ? '#ERR' : String(v);
+        parts.push(`Selected cell: ${label} contains formula "${raw}" which evaluates to ${display}`);
+      } else {
+        parts.push(`Selected cell: ${label} = "${raw}"`);
+      }
+    }
+  }
+
+  // Selected range
+  if (S.sheet.selectedRange) {
+    const { start, end } = S.sheet.selectedRange;
+    const r1 = sh.rows.findIndex(r => r.id === start.rowId);
+    const c1 = sh.columns.findIndex(c => c.id === start.colId);
+    const r2 = sh.rows.findIndex(r => r.id === end.rowId);
+    const c2 = sh.columns.findIndex(c => c.id === end.colId);
+    if (r1 >= 0 && c1 >= 0 && r2 >= 0 && c2 >= 0) {
+      const minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
+      const minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+      const rangeLabel = colIndexToLetter(minC) + (minR + 1) + ':' + colIndexToLetter(maxC) + (maxR + 1);
+      parts.push(`Selected range: ${rangeLabel}`);
+
+      // Collect values in range for context
+      const vals = [];
+      for (let r = minR; r <= maxR; r++) {
+        for (let c = minC; c <= maxC; c++) {
+          const raw = sh.rows[r].cells[sh.columns[c].id] || '';
+          if (raw) {
+            const label = colIndexToLetter(c) + (r + 1);
+            if (raw.startsWith('=')) {
+              const v = shEvalFormula(raw, sh);
+              vals.push(`${label}: ${raw} → ${typeof v === 'object' ? '#ERR' : v}`);
+            } else {
+              vals.push(`${label}: ${raw}`);
+            }
+          }
+        }
+      }
+      if (vals.length > 0 && vals.length <= 50) {
+        parts.push('Range contents: ' + vals.join(', '));
+      }
+    }
+  }
+
+  // Frozen state
+  if (sh.frozenRows > 1) parts.push('First row is frozen');
+  if (sh.frozenCols > 0) parts.push('First column is frozen');
+
+  return parts.join('. ');
 }
 
 // ═══════════════════════════════════════════
