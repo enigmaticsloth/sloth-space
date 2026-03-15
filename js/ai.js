@@ -390,6 +390,12 @@ MODE-SPECIFIC:
 - NEVER choose "chat" when user wants content created, edited, or deleted.
 - NEVER choose "chat" if the message contains a topic/subject. Always prefer "generate" or "about".
 
+CONTEXT MEMORY:
+- The [Context] may include "Recent AI actions" showing what was just done (e.g. created projects, generated files).
+- Use this to resolve references like "that file", "the report", "open it", "the one I just made".
+- Example: if recent actions say [Generated doc: "Q2 Budget Report"] and user says "open that report" → ui_action openWorkspaceItem("Q2 Budget Report").
+- Example: if recent actions say [UI action: Created project Q2] and user says "open that project" → ui_action wsOpenProject("Q2").
+
 Output ONLY the JSON object.`;
 
 // ── Pass 2a: conversation mode ──
@@ -1486,6 +1492,11 @@ async function sendMessage(){
       }
     }
     if(S.currentMode==='slide'&&!S.currentDeck) ctx.push('No deck loaded yet.');
+    // Recent action memory — so router can resolve "that file", "the report I just made", etc.
+    const recentActions=S.chatHistory.slice(-8).filter(m=>m.role==='assistant'&&m.content.startsWith('['));
+    if(recentActions.length>0){
+      ctx.push('Recent AI actions: '+recentActions.map(m=>m.content).join(' | ')+'.');
+    }
     if(ctx.length>0) routerMsgs.push({role:'system',content:'[Context: '+ctx.join(' ')+']'});
 
     statusDiv.textContent='Routing...';
@@ -2101,6 +2112,7 @@ async function doGenerate(statusDiv,wsContext){
   S.currentPreset=deck.preset||S.currentPreset;
   S.currentSlide=0;
   addMessage(`✓ Generated ${deck.slides.length} slides (${S.currentPreset})`,'ai');
+  S.chatHistory.push({role:'assistant',content:`[Generated slides: "${deck.title||'Untitled'}" (${deck.slides.length} slides)]`});
   window.renderApp();
 }
 
@@ -2187,6 +2199,8 @@ async function doDocGenerate(statusDiv,userText,wsContext){
 
   statusDiv.remove();
   addMessage(`✓ Generated document "${S.currentDoc.title}" (${newBlocks.length} blocks)`,'ai');
+  // Track in chat history for router context memory
+  S.chatHistory.push({role:'assistant',content:`[Generated doc: "${S.currentDoc.title}"]`});
   window.renderDocMode();
   window.docSaveNow(); // immediate save, not debounced — survives quick refresh
   // Ensure workspace file ID is tracked so _autoLinkToProject can find it
