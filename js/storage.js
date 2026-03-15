@@ -406,19 +406,31 @@ export function loadSlothFile(file){
 
 export function initAuth(){
   if(!SUPABASE_URL||!SUPABASE_ANON_KEY){
-    // Auth not configured — hide sign in button or show it as disabled
-    // Users can still use the app without auth
     return;
   }
   try{
     S.supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+    // Handle OAuth PKCE callback — if URL has ?code=, exchange it for a session
+    const params=new URLSearchParams(window.location.search);
+    if(params.has('code')){
+      S.supabaseClient.auth.exchangeCodeForSession(params.get('code')).then(({data,error})=>{
+        if(error){
+          console.warn('OAuth code exchange failed:',error.message);
+          window.addMessage&&window.addMessage('Login failed: '+error.message,'system');
+        }
+        // Clean URL — remove ?code=... so it doesn't re-trigger on refresh
+        window.history.replaceState({},'',window.location.pathname+window.location.hash);
+      });
+    }
+
     // Check for existing session
     S.supabaseClient.auth.getSession().then(({data:{session}})=>{
       if(session){
         setAuthUser(session.user);
       }
     });
-    // Listen for auth changes
+    // Listen for auth changes (fires after code exchange completes too)
     S.supabaseClient.auth.onAuthStateChange((event,session)=>{
       if(session){
         setAuthUser(session.user);

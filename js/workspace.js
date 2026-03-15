@@ -646,10 +646,10 @@ export function renderWorkspaceMode() {
 
   // Build navigation tabs
   const tabs = [
-    { id: 'recent', label: 'Recent', icon: '🕐' },
-    { id: 'projects', label: 'Projects', icon: '📁' },
-    { id: 'all', label: 'All Files', icon: '📄' },
-    { id: 'unlinked', label: 'Unlinked', icon: '📎' }
+    { id: 'recent', label: 'Recent', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
+    { id: 'projects', label: 'Projects', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' },
+    { id: 'all', label: 'All Files', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
+    { id: 'unlinked', label: 'Unlinked', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M5.16 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="2" y1="8" x2="5" y2="8"/><line x1="16" y1="19" x2="16" y2="22"/><line x1="19" y1="16" x2="22" y2="16"/></svg>' }
   ];
   const navHtml = `<div class="ws-nav">
     ${tabs.map(t => `<button class="ws-nav-tab${view === t.id ? ' active' : ''}" onclick="wsSetView('${t.id}')">${t.icon} ${t.label}</button>`).join('')}
@@ -704,9 +704,9 @@ export function renderWorkspaceMode() {
               New File ▾
             </button>
             <div class="ws-new-menu" id="wsNewMenu">
-              <button class="ws-new-menu-item" onclick="wsNewFile('slide')"><span class="ws-nm-icon">🖥</span> Slide Deck</button>
-              <button class="ws-new-menu-item" onclick="wsNewFile('doc')"><span class="ws-nm-icon">📝</span> Document</button>
-              <button class="ws-new-menu-item" onclick="wsNewFile('sheet')"><span class="ws-nm-icon">📊</span> Spreadsheet</button>
+              <button class="ws-new-menu-item" onclick="wsNewFile('slide')"><span class="ws-nm-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span> Slide Deck</button>
+              <button class="ws-new-menu-item" onclick="wsNewFile('doc')"><span class="ws-nm-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span> Document</button>
+              <button class="ws-new-menu-item" onclick="wsNewFile('sheet')"><span class="ws-nm-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span> Spreadsheet</button>
             </div>
           </div>
           <button class="ws-new-btn project" onclick="showWsNewProject()" style="font-size:13px;">
@@ -862,7 +862,7 @@ function renderProjectsListView() {
       <div class="ws-project-actions">
         <button class="ws-color-btn" onclick="event.stopPropagation();wsCycleProjectColor('${p.id}')" title="Change color"><span class="ws-color-dot" style="background:${c.dot}"></span></button>
         <button class="ws-ctx-btn${isActive ? ' active' : ''}" onclick="event.stopPropagation();${isActive ? 'wsClearActiveProject()' : `wsSetActiveProject('${p.id}')`}" title="${isActive ? 'Clear AI context' : 'Set as AI context'}">
-          ${isActive ? '🧠 Active' : '🧠'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4c0 1.1-.5 2.1-1.2 2.8A6 6 0 0 1 18 14v1a3 3 0 0 1-3 3h-1v3h-4v-3H9a3 3 0 0 1-3-3v-1a6 6 0 0 1 3.2-5.2A4 4 0 0 1 8 6a4 4 0 0 1 4-4z"/></svg>${isActive ? ' Active' : ''}
         </button>
       </div>
     </div>`;
@@ -884,7 +884,7 @@ function renderProjectDetailView() {
   if (files.length === 0) {
     filesHtml = `<div class="ws-empty">
       <div class="ws-empty-text">No files linked yet</div>
-      <div class="ws-empty-hint">Use the 🔗 button on any file to link it here, or create a new file.</div>
+      <div class="ws-empty-hint">Use the link button on any file to link it here, or create a new file.</div>
     </div>`;
   } else {
     filesHtml = `<div class="ws-file-list">${files.map(f => renderProjectFileCard(f, project.id)).join('')}</div>`;
@@ -901,7 +901,7 @@ function renderProjectDetailView() {
       </div>
       <div class="ws-pd-actions-row">
         <button class="ws-ctx-btn${isActive ? ' active' : ''}" onclick="${isActive ? 'wsClearActiveProject()' : `wsSetActiveProject('${project.id}')`}">
-          ${isActive ? '🧠 AI Context Active' : '🧠 Use as AI Context'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4c0 1.1-.5 2.1-1.2 2.8A6 6 0 0 1 18 14v1a3 3 0 0 1-3 3h-1v3h-4v-3H9a3 3 0 0 1-3-3v-1a6 6 0 0 1 3.2-5.2A4 4 0 0 1 8 6a4 4 0 0 1 4-4z"/></svg> ${isActive ? 'AI Context Active' : 'Use as AI Context'}
         </button>
         <div class="ws-pd-status-group">
           <button class="ws-status-pill${project.status==='active'?' selected':''}" onclick="wsUpdateProject('${project.id}',{status:'active'});renderWorkspaceMode()">Active</button>
@@ -963,7 +963,7 @@ export function wsGetCurrentFileId() {
  */
 export function wsRenderTopbarProjectInfo() {
   const fileId = wsGetCurrentFileId();
-  if (!fileId) return '<button class="topbar-project-link-btn" onclick="wsShowLinkPicker()" title="Link to project" style="opacity:0.5;cursor:default" disabled>🔗 No file</button>';
+  if (!fileId) return '<button class="topbar-project-link-btn" onclick="wsShowLinkPicker()" title="Link to project" style="opacity:0.5;cursor:default" disabled><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> No file</button>';
 
   const fileProjects = wsGetFileProjects(fileId);
   let html = '';
