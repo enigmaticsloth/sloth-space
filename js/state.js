@@ -169,7 +169,9 @@ export const S = {
   wsSelectedIds: new Set(),
   wsModalType: 'doc',
   wsActiveProjectId: null,   // currently viewing/working in this project
+  _wsCurrentFileId: null,    // workspace file ID of file currently being edited
   wsView: 'recent',          // 'recent' | 'projects' | 'all' | 'unlinked' | 'project-detail'
+  wsTypeFilters: { slide: true, doc: true, sheet: true },  // file type filter checkboxes
 
   // ── File Nav ──
   fileNavTab: 'all',

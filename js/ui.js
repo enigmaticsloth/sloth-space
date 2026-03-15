@@ -788,6 +788,28 @@ function updateTopbarForMode(mode){
   exArea.innerHTML=exports.map(e=>
     `<button class="export-btn" onclick="${e.action}">${e.label}</button>`
   ).join('');
+
+  // Project badge in topbar: show for editing modes (slide/doc/sheet), hide for workspace
+  let projArea=document.getElementById('topbarProjectArea');
+  if(!projArea){
+    // Create the project area in topbar-left after mode badge
+    const topLeft=document.querySelector('.topbar-left');
+    if(topLeft){
+      projArea=document.createElement('div');
+      projArea.id='topbarProjectArea';
+      projArea.style.cssText='display:inline-flex;align-items:center;gap:4px;margin-left:4px;';
+      topLeft.appendChild(projArea);
+    }
+  }
+  if(projArea){
+    if(mode==='workspace'||!window.wsRenderTopbarProjectInfo){
+      projArea.style.display='none';
+      projArea.innerHTML='';
+    } else {
+      projArea.style.display='inline-flex';
+      projArea.innerHTML=window.wsRenderTopbarProjectInfo();
+    }
+  }
 }
 
 function modeExportPDF(){

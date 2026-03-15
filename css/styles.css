@@ -529,10 +529,37 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .ws-empty-hint { font-size:11px; color:#555; line-height:1.5; }
 
 /* File card updates */
-.ws-file-actions { display:flex; gap:4px; flex-shrink:0; opacity:0; transition:opacity 0.15s; }
-.ws-file-card:hover .ws-file-actions { opacity:1; }
-.ws-link-btn { background:none; border:none; font-size:14px; cursor:pointer; padding:4px 6px; border-radius:4px; transition:background 0.15s; }
-.ws-link-btn:hover { background:rgba(255,255,255,0.08); }
+.ws-file-actions { display:flex; gap:4px; flex-shrink:0; opacity:1; }
+.ws-link-btn { background:none; border:none; font-size:14px; cursor:pointer; padding:4px 6px; border-radius:4px; transition:background 0.15s; color:#666; }
+.ws-link-btn:hover { background:rgba(255,255,255,0.08); color:#aaa; }
+.ws-link-btn.has-links { color:#A899C4; }
+
+/* New file dropdown */
+.ws-new-dropdown { position:relative; display:inline-block; }
+.ws-new-menu { position:absolute; top:calc(100% + 4px); right:0; background:#222; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:4px; min-width:140px; box-shadow:0 8px 24px rgba(0,0,0,0.5); z-index:50; display:none; }
+.ws-new-menu.show { display:block; }
+.ws-new-menu-item { display:flex; align-items:center; gap:8px; padding:8px 12px; border:none; background:none; color:#ccc; font-size:12px; font-family:Arial; cursor:pointer; border-radius:6px; width:100%; transition:background 0.15s; white-space:nowrap; }
+.ws-new-menu-item:hover { background:rgba(255,255,255,0.08); color:#fff; }
+.ws-new-menu-item .ws-nm-icon { width:20px; text-align:center; }
+
+/* File type filter bar */
+.ws-filters { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.ws-filter-label { font-size:10px; color:#666; font-family:Arial; }
+.ws-filter-check { display:flex; align-items:center; gap:4px; cursor:pointer; font-size:11px; color:#888; font-family:Arial; transition:color 0.15s; user-select:none; }
+.ws-filter-check:hover { color:#bbb; }
+.ws-filter-check input[type="checkbox"] { accent-color:#A899C4; width:13px; height:13px; cursor:pointer; }
+.ws-filter-check.active { color:#ccc; }
+
+/* Topbar project badge */
+.topbar-project-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(120,134,165,0.12); border:1px solid rgba(120,134,165,0.25); border-radius:6px; font-size:10px; color:#9BA8C4; cursor:pointer; transition:all 0.2s; font-family:Arial; margin-left:8px; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.topbar-project-badge:hover { border-color:rgba(120,134,165,0.5); background:rgba(120,134,165,0.2); }
+.topbar-project-badge .tpb-name { font-weight:600; color:#B8C4D8; overflow:hidden; text-overflow:ellipsis; }
+.topbar-project-link-btn { background:none; border:1px solid rgba(139,123,168,0.25); color:#A899C4; font-size:10px; padding:3px 8px; border-radius:5px; cursor:pointer; font-family:Arial; transition:all 0.2s; margin-left:4px; white-space:nowrap; }
+.topbar-project-link-btn:hover { background:rgba(139,123,168,0.15); border-color:rgba(139,123,168,0.45); }
+
+/* Unlink button in project detail */
+.ws-unlink-btn { background:none; border:none; font-size:12px; color:#666; cursor:pointer; padding:2px 6px; border-radius:4px; transition:all 0.15s; }
+.ws-unlink-btn:hover { background:rgba(228,116,116,0.12); color:#e47474; }
 .ws-file-tags { display:flex; gap:4px; flex-wrap:wrap; margin-top:3px; }
 .ws-file-tag { font-size:9px; padding:1px 6px; background:rgba(139,123,168,0.12); border:1px solid rgba(139,123,168,0.2); border-radius:4px; color:#A899C4; cursor:pointer; transition:all 0.15s; }
 .ws-file-tag:hover { background:rgba(139,123,168,0.2); border-color:rgba(139,123,168,0.35); }

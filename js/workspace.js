@@ -511,6 +511,35 @@ export function showWsNewProject() {
   wsOpenProject(proj.id);
 }
 
+/** Toggle "New File" dropdown */
+export function wsToggleNewMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('wsNewMenu');
+  if (!menu) return;
+  const isOpen = menu.classList.contains('show');
+  menu.classList.toggle('show', !isOpen);
+  if (!isOpen) {
+    // Close on next click anywhere
+    const close = () => { menu.classList.remove('show'); document.removeEventListener('click', close); };
+    setTimeout(() => document.addEventListener('click', close), 0);
+  }
+}
+
+/** Create a new file of specific type and open it */
+export function wsNewFile(type) {
+  // Close menu
+  const menu = document.getElementById('wsNewMenu');
+  if (menu) menu.classList.remove('show');
+
+  if (type === 'slide') {
+    window.enterSlideMode();
+  } else if (type === 'doc') {
+    window.enterDocMode();
+  } else if (type === 'sheet') {
+    window.enterSheetMode ? window.enterSheetMode() : window.addMessage('Sheet mode coming soon!', 'system');
+  }
+}
+
 /**
  * Show link-file-to-project picker.
  */
@@ -561,7 +590,16 @@ export function wsShowLinkPicker(fileId) {
 export function closeLinkPicker() {
   const overlay = document.getElementById('wsLinkPickerOverlay');
   if (overlay) overlay.style.display = 'none';
-  renderWorkspaceMode(); // refresh to show updated links
+  // Refresh: workspace view or topbar project info
+  if (S.currentMode === 'workspace') {
+    renderWorkspaceMode();
+  } else {
+    // Refresh topbar project badge
+    const projArea = document.getElementById('topbarProjectArea');
+    if (projArea && window.wsRenderTopbarProjectInfo) {
+      projArea.innerHTML = window.wsRenderTopbarProjectInfo();
+    }
+  }
 }
 
 export function wsToggleFileLink(fileId, projectId, checked) {
@@ -637,11 +675,21 @@ export function renderWorkspaceMode() {
       <div class="ws-header">
         <div class="ws-title">Workspace</div>
         <div class="ws-header-actions">
-          <button class="ws-new-btn" onclick="showModePicker()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New File
+          <div class="ws-new-dropdown">
+            <button class="ws-new-btn" onclick="wsToggleNewMenu(event)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New File ▾
+            </button>
+            <div class="ws-new-menu" id="wsNewMenu">
+              <button class="ws-new-menu-item" onclick="wsNewFile('slide')"><span class="ws-nm-icon">🖥</span> Slide Deck</button>
+              <button class="ws-new-menu-item" onclick="wsNewFile('doc')"><span class="ws-nm-icon">📝</span> Document</button>
+              <button class="ws-new-menu-item" onclick="wsNewFile('sheet')"><span class="ws-nm-icon">📊</span> Spreadsheet</button>
+            </div>
+          </div>
+          <button class="ws-new-btn project" onclick="showWsNewProject()" style="font-size:13px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            New Project
           </button>
-          <button class="ws-new-btn project" onclick="showWsNewProject()">+ Project</button>
         </div>
       </div>
       ${projectBadge}
@@ -652,6 +700,33 @@ export function renderWorkspaceMode() {
   `;
 }
 
+/** Toggle file type filter */
+export function wsToggleTypeFilter(type) {
+  S.wsTypeFilters[type] = !S.wsTypeFilters[type];
+  // Ensure at least one is checked
+  if (!S.wsTypeFilters.slide && !S.wsTypeFilters.doc && !S.wsTypeFilters.sheet) {
+    S.wsTypeFilters[type] = true; // revert — can't uncheck all
+  }
+  renderWorkspaceMode();
+}
+
+/** Render file type filter checkboxes */
+function renderTypeFilters() {
+  const f = S.wsTypeFilters;
+  return `<div class="ws-filters">
+    <span class="ws-filter-label">Show:</span>
+    <label class="ws-filter-check${f.slide ? ' active' : ''}">
+      <input type="checkbox" ${f.slide ? 'checked' : ''} onchange="wsToggleTypeFilter('slide')"> Slides
+    </label>
+    <label class="ws-filter-check${f.doc ? ' active' : ''}">
+      <input type="checkbox" ${f.doc ? 'checked' : ''} onchange="wsToggleTypeFilter('doc')"> Docs
+    </label>
+    <label class="ws-filter-check${f.sheet ? ' active' : ''}">
+      <input type="checkbox" ${f.sheet ? 'checked' : ''} onchange="wsToggleTypeFilter('sheet')"> Sheets
+    </label>
+  </div>`;
+}
+
 /** Render file list for recent / all / unlinked views */
 function renderFileListView(view) {
   let files;
@@ -660,6 +735,13 @@ function renderFileListView(view) {
   } else {
     files = wsLoad();
   }
+
+  // Apply type filters
+  const f = S.wsTypeFilters;
+  files = files.filter(item => {
+    const t = item.type || 'slide';
+    return f[t] !== false;
+  });
 
   // Sort by updated (recent first)
   files.sort((a, b) => {
@@ -673,14 +755,16 @@ function renderFileListView(view) {
     files = files.slice(0, 20);
   }
 
+  const filtersHtml = renderTypeFilters();
+
   if (files.length === 0) {
     const msg = view === 'unlinked'
       ? 'All files are linked to projects. Nice!'
       : 'No files yet. Create one to get started.';
-    return `<div class="ws-empty"><div class="ws-empty-text">${msg}</div></div>`;
+    return `${filtersHtml}<div class="ws-empty"><div class="ws-empty-text">${msg}</div></div>`;
   }
 
-  return `<div class="ws-file-list">${files.map(f => renderFileCard(f)).join('')}</div>`;
+  return `${filtersHtml}<div class="ws-file-list">${files.map(f => renderFileCard(f)).join('')}</div>`;
 }
 
 /** Render a single file card */
@@ -717,7 +801,7 @@ function renderFileCard(item) {
       </div>
     </div>
     <div class="ws-file-actions">
-      <button class="ws-link-btn" onclick="event.stopPropagation();wsShowLinkPicker('${item.id}')" title="Link to project">🔗</button>
+      <button class="ws-link-btn${fileProjects.length > 0 ? ' has-links' : ''}" onclick="event.stopPropagation();wsShowLinkPicker('${item.id}')" title="${fileProjects.length > 0 ? 'Linked to ' + fileProjects.length + ' project(s) — click to manage' : 'Link to project'}">🔗</button>
     </div>
   </div>`;
 }
@@ -774,7 +858,7 @@ function renderProjectDetailView() {
       <div class="ws-empty-hint">Use the 🔗 button on any file to link it here, or create a new file.</div>
     </div>`;
   } else {
-    filesHtml = `<div class="ws-file-list">${files.map(f => renderFileCard(f)).join('')}</div>`;
+    filesHtml = `<div class="ws-file-list">${files.map(f => renderProjectFileCard(f, project.id)).join('')}</div>`;
   }
 
   return `<div class="ws-project-detail">
@@ -799,6 +883,70 @@ function renderProjectDetailView() {
     </div>
     ${filesHtml}
   </div>`;
+}
+
+/** Render a file card inside project detail (with unlink button) */
+function renderProjectFileCard(item, projectId) {
+  const allFiles = wsLoad();
+  const idx = allFiles.findIndex(f => f.id === item.id);
+  const type = item.type || 'slide';
+  const date = item.updated ? new Date(item.updated).toLocaleDateString() : '';
+  const preview = wsRenderFilePreview(item);
+  const status = item.status || 'draft';
+
+  return `<div class="ws-file-card" data-ws-id="${item.id}">
+    <div onclick="openWorkspaceItem(${idx})" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer;">
+      ${preview}
+      <div class="ws-file-info">
+        <div class="ws-file-name">${escapeHtml(item.title || 'Untitled')}</div>
+        <div class="ws-file-meta">
+          <span class="ws-status-dot ${status}"></span>
+          ${type.charAt(0).toUpperCase() + type.slice(1)} · ${date}
+        </div>
+      </div>
+    </div>
+    <div class="ws-file-actions">
+      <button class="ws-unlink-btn" onclick="event.stopPropagation();wsUnlinkAndRefresh('${item.id}','${projectId}')" title="Unlink from project">✕</button>
+    </div>
+  </div>`;
+}
+
+/** Unlink a file from project and refresh the view */
+export function wsUnlinkAndRefresh(fileId, projectId) {
+  wsUnlinkFile(fileId, projectId);
+  renderWorkspaceMode();
+}
+
+/**
+ * Get current file's ID (the file being edited in slide/doc/sheet mode).
+ * Returns null if not editing a saved workspace file.
+ */
+export function wsGetCurrentFileId() {
+  return S._wsCurrentFileId || null;
+}
+
+/**
+ * Render topbar project badge HTML (called from ui.js).
+ * Shows the file's linked project(s) and a link button.
+ */
+export function wsRenderTopbarProjectInfo() {
+  const fileId = wsGetCurrentFileId();
+  if (!fileId) return '<button class="topbar-project-link-btn" onclick="wsShowLinkPicker()" title="Link to project" style="opacity:0.5;cursor:default" disabled>🔗 No file</button>';
+
+  const fileProjects = wsGetFileProjects(fileId);
+  let html = '';
+
+  // Show project badges
+  if (fileProjects.length > 0) {
+    html += fileProjects.map(p =>
+      `<span class="topbar-project-badge" onclick="wsOpenProject('${p.id}')" title="${escapeHtml(p.name)}">📁 <span class="tpb-name">${escapeHtml(p.name)}</span></span>`
+    ).join('');
+  }
+
+  // Link button
+  html += `<button class="topbar-project-link-btn" onclick="wsShowLinkPicker('${fileId}')" title="Link to project">🔗 ${fileProjects.length > 0 ? 'Edit' : 'Link'}</button>`;
+
+  return html;
 }
 
 /**
@@ -940,6 +1088,9 @@ export function openWorkspaceItem(index) {
 
   // Save current state before loading new item
   window.modeSaveCurrent();
+
+  // Track the workspace file ID for project linking from topbar
+  S._wsCurrentFileId = item.id;
 
   // Load item data via dispatch table
   const loader = wsItemLoaders[mode] || wsItemLoaders[targetMode];
