@@ -64,12 +64,12 @@ export function wsSave(files) {
  * Upload workspace files to cloud (Supabase).
  */
 export async function syncWorkspaceToCloud() {
-  if (!window.supabaseClient || !S.currentUser) return;
+  if (!S.supabaseClient || !S.currentUser) return;
   try {
     const files = wsLoad();
     const blob = new Blob([JSON.stringify(files)], { type: 'application/json' });
     const path = S.currentUser.id + '/workspace.json';
-    await window.supabaseClient.storage.from('decks').upload(path, blob, { upsert: true });
+    await S.supabaseClient.storage.from('decks').upload(path, blob, { upsert: true });
   } catch (e) {
     console.warn('Workspace cloud sync failed:', e);
   }
@@ -79,10 +79,10 @@ export async function syncWorkspaceToCloud() {
  * Download workspace files from cloud and merge with local files.
  */
 export async function syncWorkspaceFromCloud() {
-  if (!window.supabaseClient || !S.currentUser) return;
+  if (!S.supabaseClient || !S.currentUser) return;
   try {
     const path = S.currentUser.id + '/workspace.json';
-    const { data, error } = await window.supabaseClient.storage.from('decks').download(path);
+    const { data, error } = await S.supabaseClient.storage.from('decks').download(path);
     if (error || !data) return; // no cloud workspace yet
     const text = await data.text();
     const cloudFiles = JSON.parse(text);

@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PptxGenJS/3.12.0/pptxgen.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<link rel="stylesheet" href="css/styles.css?v=20260315y">
+<link rel="stylesheet" href="css/styles.css?v=20260315aa">
 </head>
 <body>
 
@@ -25,25 +25,54 @@
   <div style="font-size:11px;color:#333;margin-top:8px;">Switch back to Slides to keep working.</div>
 </div>
 
-<!-- File Navigation Sidebar -->
+<!-- File Navigation Popup -->
 <div class="file-nav-overlay" id="fileNavOverlay" onclick="closeFileNav()"></div>
 <div class="file-nav" id="fileNav">
   <div class="fn-header">
-    <h3>Workspace</h3>
+    <h3>My Files</h3>
     <button class="fn-close" onclick="closeFileNav()">&times;</button>
   </div>
-  <div class="fn-tabs">
-    <button class="fn-tab active" data-tab="all" onclick="setFileTab('all')">All</button>
-    <button class="fn-tab" data-tab="slides" onclick="setFileTab('slides')">Slides</button>
-    <button class="fn-tab" data-tab="docs" onclick="setFileTab('docs')">Docs</button>
-    <button class="fn-tab" data-tab="sheets" onclick="setFileTab('sheets')">Sheets</button>
-    <button class="fn-tab" data-tab="cloud" onclick="setFileTab('cloud')">Cloud</button>
+  <!-- Source tabs: order set by JS based on default storage pref -->
+  <div class="fn-source-tabs" id="fnSourceTabs">
+    <button class="fn-src-tab active" data-src="cloud" onclick="setFileSource('cloud')">Cloud</button>
+    <button class="fn-src-tab" data-src="local" onclick="setFileSource('local')">Local</button>
+    <button class="fn-src-tab" data-src="all" onclick="setFileSource('all')">All</button>
   </div>
+  <!-- Type filters (checkboxes) -->
+  <div class="fn-type-filters" id="fnTypeFilters">
+    <label class="fn-type-chk"><input type="checkbox" checked data-type="slides" onchange="applyFileFilters()"><span>Slides</span></label>
+    <label class="fn-type-chk"><input type="checkbox" checked data-type="doc" onchange="applyFileFilters()"><span>Doc</span></label>
+    <label class="fn-type-chk"><input type="checkbox" checked data-type="sheet" onchange="applyFileFilters()"><span>Sheet</span></label>
+  </div>
+  <!-- Project selector -->
+  <div class="fn-project-row">
+    <select class="fn-project-select" id="fnProjectSelect" onchange="applyFileFilters()">
+      <option value="all">All Projects</option>
+    </select>
+  </div>
+  <!-- File list -->
   <div class="fn-list" id="fileNavList"></div>
-  <div class="fn-actions">
-    <button class="fn-action-btn" onclick="showWsNewDoc()">+ Doc</button>
-    <button class="fn-action-btn" onclick="showWsNewSheet()">+ Sheet</button>
-    <button class="fn-action-btn primary" onclick="newDeck()">+ Slides</button>
+  <!-- Multi-select bar (hidden by default) -->
+  <div class="fn-select-bar" id="fnSelectBar" style="display:none;">
+    <span id="fnSelectCount">0 selected</span>
+    <button class="fn-sel-btn" onclick="fnCopySelected()">Copy</button>
+    <button class="fn-sel-btn danger" onclick="fnDeleteSelected()">Delete</button>
+  </div>
+  <!-- Bottom action bar -->
+  <div class="fn-bottom-bar">
+    <div class="fn-bottom-row">
+      <span class="fn-bottom-label">Create</span>
+      <button class="fn-action-btn primary" onclick="newDeck()">+ Slide</button>
+      <button class="fn-action-btn" onclick="showWsNewDoc()">+ Doc</button>
+      <button class="fn-action-btn" onclick="showWsNewSheet()">+ Sheet</button>
+    </div>
+    <div class="fn-bottom-row">
+      <span class="fn-bottom-label">Import</span>
+      <button class="fn-action-btn" onclick="modeImport()">Files</button>
+      <button class="fn-action-btn" onclick="fnImportImages()">Images</button>
+      <div style="flex:1"></div>
+      <button class="fn-action-btn fn-select-toggle" id="fnSelectToggle" onclick="toggleFileSelect()">Select</button>
+    </div>
   </div>
 </div>
 
@@ -146,6 +175,14 @@
     <h3>User</h3>
     <label>Display Name</label>
     <input type="text" id="settingsDisplayName" placeholder="Your name">
+
+    <h3>Storage</h3>
+    <label>Default save location</label>
+    <div class="fn-source-tabs" style="margin-bottom:8px;">
+      <button class="fn-src-tab" data-pref="cloud" id="prefCloud" onclick="setStoragePref('cloud')">Cloud</button>
+      <button class="fn-src-tab" data-pref="local" id="prefLocal" onclick="setStoragePref('local')">Local</button>
+    </div>
+    <div style="font-size:10px;color:var(--text2);margin-top:2px;">Cloud syncs across devices. Local saves to this browser only.</div>
 
     <div id="settingsTestStatus" class="settings-status"></div>
 
@@ -637,6 +674,6 @@ if(location.protocol==='file:'){
   document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
 }
 </script>
-<script type="module" src="js/app.js?v=20260315y"></script>
+<script type="module" src="js/app.js?v=20260315aa"></script>
 </body>
 </html>

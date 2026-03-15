@@ -130,6 +130,10 @@ function openSettings() {
     document.getElementById('settingsCustomRouter').value=S.llmConfig.router||'';
   }
   document.getElementById('settingsDisplayName').value = S.llmConfig.displayName || '';
+  // Storage pref
+  const sPref=getStoragePref();
+  document.getElementById('prefCloud')?.classList.toggle('active',sPref==='cloud');
+  document.getElementById('prefLocal')?.classList.toggle('active',sPref==='local');
   document.getElementById('settingsTestStatus').className = 'settings-status';
   document.getElementById('settingsTestStatus').style.display = 'none';
   updateSettingsProviderUI();
@@ -1113,12 +1117,34 @@ function switchProduct(product){
   if(isSlides)renderApp();
 }
 
-let fileNavTab='all';
+let fileNavSource='cloud';
+let fileSelectMode=false;
+let fileSelectedIds=new Set();
+let _allFilesCached=[];
 const CLOUD_BUCKET='decks'; // Supabase Storage bucket name
 
+function getStoragePref(){ return localStorage.getItem('sloth_storage_pref')||'cloud'; }
+function setStoragePref(pref){
+  localStorage.setItem('sloth_storage_pref',pref);
+  document.getElementById('prefCloud')?.classList.toggle('active',pref==='cloud');
+  document.getElementById('prefLocal')?.classList.toggle('active',pref==='local');
+}
+
 function openFileNav(){
+  // Set source tab order based on storage pref
+  const pref=getStoragePref();
+  fileNavSource=pref;
+  const tabs=document.getElementById('fnSourceTabs');
+  if(tabs){
+    const order=pref==='local'?['local','cloud','all']:['cloud','local','all'];
+    tabs.innerHTML=order.map(s=>
+      `<button class="fn-src-tab${s===fileNavSource?' active':''}" data-src="${s}" onclick="setFileSource('${s}')">${s.charAt(0).toUpperCase()+s.slice(1)}</button>`
+    ).join('');
+  }
   document.getElementById('fileNav').classList.add('open');
   document.getElementById('fileNavOverlay').classList.add('open');
+  // Exit select mode on reopen
+  if(fileSelectMode) toggleFileSelect();
   window.refreshFileList();
 }
 
@@ -1127,10 +1153,74 @@ function closeFileNav(){
   document.getElementById('fileNavOverlay').classList.remove('open');
 }
 
-function setFileTab(tab){
-  fileNavTab=tab;
-  document.querySelectorAll('.fn-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+function setFileSource(src){
+  fileNavSource=src;
+  document.querySelectorAll('.fn-src-tab').forEach(t=>t.classList.toggle('active',t.dataset.src===src));
   window.refreshFileList();
+}
+
+function applyFileFilters(){
+  _renderFilteredFiles();
+}
+
+function toggleFileSelect(){
+  fileSelectMode=!fileSelectMode;
+  fileSelectedIds.clear();
+  const nav=document.getElementById('fileNav');
+  const btn=document.getElementById('fnSelectToggle');
+  const bar=document.getElementById('fnSelectBar');
+  nav.classList.toggle('selecting',fileSelectMode);
+  btn.classList.toggle('active',fileSelectMode);
+  btn.textContent=fileSelectMode?'Cancel':'Select';
+  bar.style.display=fileSelectMode?'flex':'none';
+  _updateSelectCount();
+  // Re-render to show/hide checkboxes
+  _renderFilteredFiles();
+}
+
+function _updateSelectCount(){
+  const el=document.getElementById('fnSelectCount');
+  if(el) el.textContent=fileSelectedIds.size+' selected';
+}
+
+function _toggleFileItem(id,ev){
+  ev.stopPropagation();
+  if(fileSelectedIds.has(id)) fileSelectedIds.delete(id); else fileSelectedIds.add(id);
+  _updateSelectCount();
+  // Toggle visual
+  const item=document.querySelector(`.fn-item[data-fid="${id}"]`);
+  if(item) item.classList.toggle('selected',fileSelectedIds.has(id));
+}
+
+function fnCopySelected(){
+  // Copy selected files to the other storage (cloud↔local)
+  window.addMessage(`Copy ${fileSelectedIds.size} files — coming soon!`,'system');
+  toggleFileSelect();
+}
+
+async function fnDeleteSelected(){
+  if(fileSelectedIds.size===0)return;
+  if(!confirm(`Delete ${fileSelectedIds.size} file(s)?`))return;
+  for(const fid of fileSelectedIds){
+    const f=_allFilesCached.find(x=>x.id===fid);
+    if(!f)continue;
+    const deleteId=f.wsId||f.key||f.path||'';
+    await window.deleteFileFromNav(f.id,f.source,deleteId);
+  }
+  fileSelectedIds.clear();
+  toggleFileSelect();
+  window.refreshFileList();
+}
+
+function fnImportImages(){
+  // Trigger the existing image import — create a temp file input
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+  inp.onchange=()=>{
+    if(inp.files.length) window.handleImageFiles(inp.files);
+    closeFileNav();
+  };
+  inp.click();
 }
 
 function getLocalFiles(){
@@ -1181,59 +1271,88 @@ async function refreshFileList(){
 
   let files=[];
 
-  // Workspace docs & sheets
-  if(fileNavTab==='all'||fileNavTab==='docs'||fileNavTab==='sheets'){
-    const wsFiles=window.wsListFiles();
-    for(const wf of wsFiles){
-      if(fileNavTab==='docs'&&wf.type!=='doc')continue;
-      if(fileNavTab==='sheets'&&wf.type!=='sheet')continue;
-      files.push({
-        id:'ws_'+wf.id,
-        wsId:wf.id,
-        title:wf.title,
-        type:wf.type,
-        source:'workspace',
-        updated:new Date(wf.updated).getTime(),
-        meta: wf.type==='doc'? `${(wf.content.blocks||[]).length} blocks` :
-              wf.type==='sheet'? `${(wf.content.rows||[]).length} rows` : ''
-      });
-    }
+  // Workspace docs & sheets (always available locally)
+  const wsFiles=window.wsListFiles?window.wsListFiles():[];
+  for(const wf of wsFiles){
+    files.push({
+      id:'ws_'+wf.id,
+      wsId:wf.id,
+      title:wf.title,
+      type:wf.type,
+      source:'local',
+      updated:new Date(wf.updated).getTime(),
+      meta: wf.type==='doc'? `${(wf.content.blocks||[]).length} blocks` :
+            wf.type==='sheet'? `${(wf.content.rows||[]).length} rows` : ''
+    });
   }
 
   // Local slides
-  if(fileNavTab==='all'||fileNavTab==='slides'){
-    files.push(...getLocalFiles().map(f=>({...f,type:'slides'})));
-  }
+  const localSlides=getLocalFiles().map(f=>({...f,type:'slides'}));
+  files.push(...localSlides);
 
   // Cloud files
-  if(fileNavTab==='cloud'||fileNavTab==='all'){
-    const cloud=await getCloudFiles();
-    files.push(...cloud.map(f=>({...f,type:'slides'})));
-  }
+  const cloud=await getCloudFiles();
+  files.push(...cloud.map(f=>({...f,type:'slides'})));
+
+  // Build project list from all files
+  _buildProjectSelect(files);
+
+  // Cache all files
+  _allFilesCached=files;
+
+  // Render with current filters
+  _renderFilteredFiles();
+}
+
+function _buildProjectSelect(files){
+  // For now, projects are not yet implemented — just show "All Projects"
+  const sel=document.getElementById('fnProjectSelect');
+  if(!sel)return;
+  sel.innerHTML='<option value="all">All Projects</option>';
+}
+
+function _renderFilteredFiles(){
+  const list=document.getElementById('fileNavList');
+  if(!list)return;
+
+  // Get active type filters
+  const typeChecks=document.querySelectorAll('.fn-type-chk input');
+  const activeTypes=new Set();
+  typeChecks.forEach(c=>{ if(c.checked) activeTypes.add(c.dataset.type); });
+
+  // Filter by source
+  let files=_allFilesCached.filter(f=>{
+    if(fileNavSource!=='all'&&f.source!==fileNavSource)return false;
+    // Map type for filter matching
+    const t=f.type==='slides'?'slides':f.type;
+    if(!activeTypes.has(t))return false;
+    return true;
+  });
 
   // Sort by updated descending
   files.sort((a,b)=>b.updated-a.updated);
 
   if(files.length===0){
-    list.innerHTML='<div class="fn-empty">No files yet.<br>Use the buttons below to create docs, sheets, or slides!</div>';
+    list.innerHTML='<div class="fn-empty">No files found.</div>';
     return;
   }
 
   list.innerHTML=files.map(f=>{
-    const icons={doc:'&#128196;',sheet:'&#128202;',slides:'&#128197;',cloud:'&#9729;'};
-    const icon=f.source==='cloud'?icons.cloud:(icons[f.type]||'&#128196;');
-    const typeBadge=f.source==='workspace'?
-      `<span class="fn-type-badge fn-type-${f.type}">${f.type}</span>`:
-      (f.source==='cloud'?'<span class="fn-cloud-badge">cloud</span>':'<span class="fn-type-badge fn-type-slides">slides</span>');
+    const icons={doc:'\u{1F4C4}',sheet:'\u{1F4CA}',slides:'\u{1F4C5}'};
+    const icon=icons[f.type]||'\u{1F4C4}';
+    const sourceBadge=f.source==='cloud'?'<span class="fn-cloud-badge">cloud</span>':'<span class="fn-local-badge">local</span>';
+    const typeBadge=`<span class="fn-type-badge fn-type-${f.type}">${f.type}</span>`;
     const date=new Date(f.updated);
     const timeStr=date.toLocaleDateString()+' '+date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     const metaInfo=f.meta?` · ${f.meta}`:(f.slides?` · ${f.slides} slides`:'');
     const deleteId=f.wsId||f.key||f.path||'';
     const deleteSource=f.source;
-    return `<div class="fn-item" onclick="window.loadFileFromNav('${f.id}')" title="${f.title}">
+    const isSelected=fileSelectedIds.has(f.id);
+    return `<div class="fn-item${isSelected?' selected':''}" data-fid="${f.id}" onclick="${fileSelectMode?`window._toggleFileItem('${f.id}',event)`:`window.loadFileFromNav('${f.id}')`}" title="${f.title}">
+      <div class="fn-item-check"></div>
       <div class="fn-item-icon">${icon}</div>
       <div class="fn-item-info">
-        <div class="fn-item-title">${f.title}${typeBadge}</div>
+        <div class="fn-item-title">${f.title} ${typeBadge}${sourceBadge}</div>
         <div class="fn-item-meta">${timeStr}${metaInfo}</div>
       </div>
       <div class="fn-item-actions">
@@ -1342,7 +1461,15 @@ export {
   switchProduct,
   openFileNav,
   closeFileNav,
-  setFileTab,
+  setFileSource,
+  applyFileFilters,
+  toggleFileSelect,
+  fnCopySelected,
+  fnDeleteSelected,
+  fnImportImages,
+  _toggleFileItem,
+  getStoragePref,
+  setStoragePref,
   getLocalFiles,
   getCloudFiles,
   refreshFileList,

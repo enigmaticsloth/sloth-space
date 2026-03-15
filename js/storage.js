@@ -1,6 +1,129 @@
 import { S, PRESETS, LAYOUTS, STORAGE_KEY, STORAGE_HISTORY_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, CLOUD_BUCKET, WS_STORAGE_KEY, LLM_DEFAULTS, CLOUD_PROVIDERS, CONFIG_KEY } from './state.js';
 
 // ═══════════════════════════════════════════
+// CLOUD AUTO-SYNC
+// ═══════════════════════════════════════════
+// When logged in, all data auto-syncs to Supabase cloud.
+// Per-user quota: 20MB. Warns at 16MB, stops uploading at 20MB.
+
+const CLOUD_QUOTA_BYTES = 20 * 1024 * 1024;  // 20MB
+const CLOUD_WARN_BYTES  = 16 * 1024 * 1024;  // 16MB warning
+let _cloudSyncTimer = null;
+let _cloudQuotaCache = { bytes: 0, checkedAt: 0 };  // cache for 60s
+
+// Debounced cloud sync for the current slide deck (5s after last change)
+function _scheduleCloudSync(){
+  if(!S.supabaseClient||!S.currentUser) return;
+  clearTimeout(_cloudSyncTimer);
+  _cloudSyncTimer = setTimeout(_doCloudSyncDeck, 5000);
+}
+
+async function _doCloudSyncDeck(){
+  if(!S.supabaseClient||!S.currentUser||!S.currentDeck) return;
+  // Check quota before uploading
+  const usage = await getCloudQuota();
+  if(usage >= CLOUD_QUOTA_BYTES){
+    // Over quota — don't upload, show warning once
+    if(!S._cloudQuotaWarned){
+      S._cloudQuotaWarned = true;
+      window.addMessage&&window.addMessage('⚠️ Cloud storage full (20MB). New changes are saved locally only. Delete some cloud files to resume sync.','system');
+    }
+    return;
+  }
+  if(usage >= CLOUD_WARN_BYTES && !S._cloudQuotaWarned){
+    S._cloudQuotaWarned = true;
+    const usedMB = (usage / 1024 / 1024).toFixed(1);
+    window.addMessage&&window.addMessage(`⚠️ Cloud storage ${usedMB}/20MB. Consider deleting unused files.`,'system');
+  }
+  try{
+    const fname = (S.currentDeck.title||'Untitled').replace(/[^a-zA-Z0-9\u4e00-\u9fff\s-]/g,'').replace(/\s+/g,'_') + '.json';
+    const path = S.currentUser.id + '/' + fname;
+    const payload = JSON.stringify({
+      deck: S.currentDeck,
+      preset: S.currentPreset,
+      chat: S.chatHistory.slice(-20),
+      savedAt: new Date().toISOString()
+    });
+    const blob = new Blob([payload], {type:'application/json'});
+    await S.supabaseClient.storage.from(CLOUD_BUCKET).upload(path, blob, {upsert:true});
+  }catch(e){
+    console.warn('[CloudSync] Deck sync failed:', e.message);
+  }
+}
+
+// Doc cloud sync — debounced, triggered after docSaveNow writes to workspace
+// (workspace.js wsSave already syncs workspace.json to cloud with 2s debounce)
+// So doc data flows: docSaveNow → wsSave → syncWorkspaceToCloud ✓
+
+// Check per-user cloud storage usage
+export async function getCloudQuota(){
+  // Cache for 60 seconds to avoid spamming
+  if(Date.now() - _cloudQuotaCache.checkedAt < 60000) return _cloudQuotaCache.bytes;
+  if(!S.supabaseClient||!S.currentUser) return 0;
+  try{
+    const { data, error } = await S.supabaseClient.storage.from(CLOUD_BUCKET).list(S.currentUser.id, { limit: 200 });
+    if(error||!data) return _cloudQuotaCache.bytes;
+    let total = 0;
+    for(const f of data) total += (f.metadata?.size || 0);
+    _cloudQuotaCache = { bytes: total, checkedAt: Date.now() };
+    return total;
+  }catch(e){
+    return _cloudQuotaCache.bytes;
+  }
+}
+
+// Pull latest data from cloud (called once on login)
+export async function cloudAutoLoad(){
+  if(!S.supabaseClient||!S.currentUser) return;
+  try{
+    // List user's files in cloud
+    const { data: files, error } = await S.supabaseClient.storage.from(CLOUD_BUCKET).list(S.currentUser.id, { limit: 200, sortBy: { column: 'updated_at', order: 'desc' } });
+    if(error||!files||files.length===0) return;
+
+    // Find the most recent .json deck file (not workspace.json, chat_tabs.json, config.json)
+    const deckFile = files.find(f => f.name.endsWith('.json') && f.name !== 'workspace.json' && f.name !== 'chat_tabs.json' && f.name !== 'config.json');
+    if(!deckFile) return;
+
+    // Compare: cloud deck vs local deck — load cloud if it's newer
+    const cloudTime = new Date(deckFile.updated_at||deckFile.created_at||0).getTime();
+    const localSaved = localStorage.getItem(STORAGE_KEY);
+    let localTime = 0;
+    if(localSaved){
+      try{
+        const ld = JSON.parse(localSaved);
+        // Use savedAt from local if available, otherwise assume old
+        localTime = ld.savedAt ? new Date(ld.savedAt).getTime() : 0;
+      }catch(e){}
+    }
+
+    // Only override local if cloud is significantly newer (>10s to avoid race)
+    if(cloudTime > localTime + 10000){
+      const path = S.currentUser.id + '/' + deckFile.name;
+      const { data: blob, error: dlErr } = await S.supabaseClient.storage.from(CLOUD_BUCKET).download(path);
+      if(dlErr||!blob) return;
+      const text = await blob.text();
+      const parsed = JSON.parse(text);
+      if(parsed.deck&&parsed.deck.slides){
+        S.currentDeck = parsed.deck;
+        S.currentPreset = parsed.preset || 'clean-white';
+        S.currentSlide = Math.min(parsed.slide||0, parsed.deck.slides.length-1);
+        // Also save locally so next refresh is fast
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          deck: S.currentDeck,
+          preset: S.currentPreset,
+          slide: S.currentSlide,
+          savedAt: parsed.savedAt
+        }));
+        window.addMessage&&window.addMessage(`☁️ Synced from cloud: "${S.currentDeck.title||'Untitled'}"`,'system');
+        if(window.renderApp) window.renderApp();
+      }
+    }
+  }catch(e){
+    console.warn('[CloudSync] Auto-load failed:', e.message);
+  }
+}
+
+// ═══════════════════════════════════════════
 // AUTO-SAVE / AUTO-LOAD (localStorage)
 // ═══════════════════════════════════════════
 
@@ -10,7 +133,8 @@ export function autoSave(){
     localStorage.setItem(STORAGE_KEY,JSON.stringify({
       deck:S.currentDeck,
       preset:S.currentPreset,
-      slide:S.currentSlide
+      slide:S.currentSlide,
+      savedAt:new Date().toISOString()
     }));
     localStorage.setItem(STORAGE_HISTORY_KEY,JSON.stringify(S.chatHistory.slice(-20)));
     // Also save to the named saves list for file nav
@@ -20,6 +144,8 @@ export function autoSave(){
     saves[saveKey]=JSON.stringify({deck:S.currentDeck,preset:S.currentPreset});
     localStorage.setItem('sloth_space_saves',JSON.stringify(saves));
   }catch(e){console.warn('Auto-save failed:',e);}
+  // Trigger cloud sync (debounced)
+  _scheduleCloudSync();
 }
 
 // Persist current mode to localStorage (survives tab close, not just refresh)
@@ -543,6 +669,8 @@ export function setAuthUser(user){
       }
       if(window.syncWorkspaceFromCloud) window.syncWorkspaceFromCloud();
       if(window.loadChatTabsFromCloud) window.loadChatTabsFromCloud();
+      // Auto-load latest deck from cloud
+      cloudAutoLoad();
     }
   }catch(e){
     console.warn('[Auth] setAuthUser error (non-fatal):',e.message);
@@ -749,6 +877,7 @@ export async function saveCurrentToCloud(){
     const blob=new Blob([payload],{type:'application/json'});
     const{error}=await S.supabaseClient.storage.from(CLOUD_BUCKET).upload(path,blob,{upsert:true});
     if(error)throw error;
+    _cloudQuotaCache.checkedAt=0; // invalidate quota cache
     window.addMessage(`✓ Saved to cloud: "${S.currentDeck.title||'Untitled'}"`,'system');
     window.refreshFileList();
   }catch(e){window.addMessage('Cloud save error: '+e.message,'system');}
@@ -758,7 +887,7 @@ export async function deleteFileFromNav(id,source,keyOrPath){
   const name=id.replace('local_','').replace('cloud_','').replace('ws_','').replace(/_\d+$/,'').replace(/_/g,' ');
   if(!confirm(`Delete "${name}"?`))return;
 
-  if(source==='workspace'){
+  if(source==='workspace'||id.startsWith('ws_')){
     window.wsDeleteFile(keyOrPath);
   }else if(source==='local'){
     try{
