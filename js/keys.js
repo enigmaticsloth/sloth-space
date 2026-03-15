@@ -112,6 +112,17 @@ export function initKeys(){
     // Using early-return pattern here to avoid touching stable slide/doc logic. Can refactor
     // to formal dispatch table once all three modes' handlers are finalized.
     if(S.currentMode==='sheet'){
+      // ── Copy / Cut / Paste ──
+      if((e.ctrlKey||e.metaKey)&&(e.key==='c'||e.key==='C')&&!S.sheet.editingCell){
+        e.preventDefault(); window.shCopy(); return;
+      }
+      if((e.ctrlKey||e.metaKey)&&(e.key==='x'||e.key==='X')&&!S.sheet.editingCell){
+        e.preventDefault(); window.shCut(); return;
+      }
+      if((e.ctrlKey||e.metaKey)&&(e.key==='v'||e.key==='V')&&!S.sheet.editingCell){
+        e.preventDefault(); window.shPaste(); return;
+      }
+
       if(e.key==='Escape'){
         e.preventDefault();
         if(S.sheet.editingCell) window.shCancelEdit();
@@ -134,11 +145,9 @@ export function initKeys(){
         window.shTabNavigate(e.shiftKey);
         return;
       }
-      if((e.key==='Delete'||e.key==='Backspace')&&!S.sheet.editingCell&&S.sheet.selectedCell){
+      if((e.key==='Delete'||e.key==='Backspace')&&!S.sheet.editingCell&&(S.sheet.selectedCell||S.sheet.selectedRange)){
         e.preventDefault();
-        window.shPushUndo();
-        window.shSetCellValue(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId, '');
-        window.renderSheetMode();
+        window.shDeleteSelection();
         return;
       }
       // Arrow keys in sheet (only when not editing)

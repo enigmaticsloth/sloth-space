@@ -104,8 +104,15 @@ export function renderSheetMode() {
       ondblclick="window.shAutoFitCol('${col.id}')">${col.name}</div>`;
   }
 
-  // Add-column button (in header row, rightmost)
-  html += `<div class="sh-add-col-btn" onclick="window.shPushUndo(); window.shAddCol()" title="Add column">+</div>`;
+  // Add-column button with batch input (in header row, rightmost)
+  html += `<div class="sh-add-col-btn" title="Add columns">
+    <input type="number" class="sh-batch-input" id="shBatchColInput" value="1" min="1" max="50"
+      onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();window.shBatchAddCols();}">
+    <span class="sh-batch-add" onclick="window.shBatchAddCols()">+Col</span>
+  </div>`;
+
+  // Build range set for highlighting
+  const rangeSet = _getRangeSet();
 
   // Rows
   for (let r = 0; r < totalRows; r++) {
@@ -122,8 +129,10 @@ export function renderSheetMode() {
         S.sheet.selectedCell.rowId === row.id && S.sheet.selectedCell.colId === col.id;
       const isEditing = S.sheet.editingCell &&
         S.sheet.editingCell.rowId === row.id && S.sheet.editingCell.colId === col.id;
+      const isInRange = rangeSet && rangeSet.has(`${row.id}:${col.id}`);
       const cls = ['sh-cell'];
-      if (isSelected) cls.push('selected');
+      if (isSelected && !isInRange) cls.push('selected');
+      if (isInRange) cls.push('in-range');
       if (isEditing) cls.push('editing');
       if (typeof display === 'object' && display.error) cls.push('error');
 
@@ -131,6 +140,7 @@ export function renderSheetMode() {
 
       html += `<div class="${cls.join(' ')}" data-row-id="${row.id}" data-col-id="${col.id}"
         data-row-idx="${r}" data-col-idx="${c}"
+        onmousedown="window.shCellMouseDown(event, '${row.id}', '${col.id}')"
         onclick="window.shCellClick(event, '${row.id}', '${col.id}')"
         ondblclick="window.shCellDblClick(event, '${row.id}', '${col.id}')"
         oncontextmenu="event.preventDefault(); window.shCellCtx(event, '${row.id}', '${col.id}')"
@@ -140,10 +150,12 @@ export function renderSheetMode() {
     html += `<div class="sh-add-col-spacer"></div>`;
   }
 
-  // Add-row button row (spans full width below data)
-  const lastRowId = rows.length > 0 ? rows[rows.length - 1].id : null;
-  html += `<div class="sh-add-row-btn" onclick="window.shPushUndo(); window.shAddRow('${lastRowId}')" title="Add row"
-    style="grid-column: 1 / -1;">+ Add row</div>`;
+  // Add-row button row with batch input (spans full width below data)
+  html += `<div class="sh-add-row-btn" style="grid-column: 1 / -1;" title="Add rows">
+    <input type="number" class="sh-batch-input" id="shBatchRowInput" value="1" min="1" max="100"
+      onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();window.shBatchAddRows();}">
+    <span class="sh-batch-add" onclick="window.shBatchAddRows()">+ Add row</span>
+  </div>`;
 
   const grid = document.getElementById('shGrid') || canvas;
   // If shGrid doesn't exist yet, create it
@@ -165,10 +177,18 @@ function escHtml(s) {
 }
 
 // ═══════════════════════════════════════════
-// CELL SELECTION
+// CELL SELECTION + MOUSE DRAG RANGE SELECT
 // ═══════════════════════════════════════════
 
+let _dragState = null; // { anchorRowId, anchorColId, active }
+
 export function shCellClick(event, rowId, colId) {
+  // Drag-select handles its own logic; ignore plain click if drag just ended
+  if (_dragState && _dragState.justFinished) {
+    _dragState.justFinished = false;
+    return;
+  }
+
   // If clicking a different cell while editing, commit first
   if (S.sheet.editingCell) {
     if (S.sheet.editingCell.rowId !== rowId || S.sheet.editingCell.colId !== colId) {
@@ -184,6 +204,75 @@ export function shCellClick(event, rowId, colId) {
   }
 }
 
+/**
+ * Mousedown on a cell — start drag-select.
+ */
+export function shCellMouseDown(event, rowId, colId) {
+  // Only left-click; ignore if editing the same cell
+  if (event.button !== 0) return;
+  if (S.sheet.editingCell &&
+      S.sheet.editingCell.rowId === rowId && S.sheet.editingCell.colId === colId) return;
+
+  // Commit any current edit
+  if (S.sheet.editingCell) shCommitEdit();
+
+  _dragState = { anchorRowId: rowId, anchorColId: colId, active: true, moved: false };
+  S.sheet.selectedCell = { rowId, colId };
+  S.sheet.selectedRange = null;
+
+  // Prevent text selection during drag
+  event.preventDefault();
+
+  // Bind move/up on document (captured once per drag)
+  document.addEventListener('mousemove', _onDragMove);
+  document.addEventListener('mouseup', _onDragEnd);
+}
+
+function _cellFromPoint(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  const cell = el.closest('.sh-cell');
+  if (!cell) return null;
+  return { rowId: cell.dataset.rowId, colId: cell.dataset.colId };
+}
+
+function _onDragMove(e) {
+  if (!_dragState || !_dragState.active) return;
+  const hit = _cellFromPoint(e.clientX, e.clientY);
+  if (!hit) return;
+
+  _dragState.moved = true;
+  const anchor = { rowId: _dragState.anchorRowId, colId: _dragState.anchorColId };
+
+  // If same cell as anchor, just single-select
+  if (hit.rowId === anchor.rowId && hit.colId === anchor.colId) {
+    S.sheet.selectedRange = null;
+    S.sheet.selectedCell = anchor;
+    renderSheetMode();
+    _reattachDragListeners();
+    return;
+  }
+
+  S.sheet.selectedCell = anchor;
+  S.sheet.selectedRange = { start: anchor, end: hit };
+  renderSheetMode();
+  _reattachDragListeners();
+}
+
+function _onDragEnd(e) {
+  document.removeEventListener('mousemove', _onDragMove);
+  document.removeEventListener('mouseup', _onDragEnd);
+  if (_dragState && _dragState.moved) {
+    _dragState.justFinished = true; // suppress the click event that follows mouseup
+  }
+  if (_dragState) _dragState.active = false;
+}
+
+/** After re-render, re-attach document listeners if drag is still active */
+function _reattachDragListeners() {
+  // mousemove/mouseup are on document, so they survive re-renders
+}
+
 export function shSelectCell(rowId, colId) {
   S.sheet.selectedCell = { rowId, colId };
   S.sheet.selectedRange = null;
@@ -191,7 +280,7 @@ export function shSelectCell(rowId, colId) {
 }
 
 export function shSelectRange(start, end) {
-  // TODO: implement range selection with overlay in Step 3
+  S.sheet.selectedCell = start;
   S.sheet.selectedRange = { start, end };
   renderSheetMode();
 }
@@ -201,6 +290,33 @@ export function shClearSelection() {
   S.sheet.selectedRange = null;
   S.sheet.editingCell = null;
   renderSheetMode();
+}
+
+/**
+ * Helper: get the set of "rowId:colId" keys that are in the current selected range.
+ */
+function _getRangeSet() {
+  const range = S.sheet.selectedRange;
+  if (!range) return null;
+  const sh = S.sheet.current;
+  if (!sh) return null;
+
+  const r1 = sh.rows.findIndex(r => r.id === range.start.rowId);
+  const r2 = sh.rows.findIndex(r => r.id === range.end.rowId);
+  const c1 = sh.columns.findIndex(c => c.id === range.start.colId);
+  const c2 = sh.columns.findIndex(c => c.id === range.end.colId);
+  if (r1 < 0 || r2 < 0 || c1 < 0 || c2 < 0) return null;
+
+  const minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
+  const minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+
+  const set = new Set();
+  for (let r = minR; r <= maxR; r++) {
+    for (let c = minC; c <= maxC; c++) {
+      set.add(`${sh.rows[r].id}:${sh.columns[c].id}`);
+    }
+  }
+  return set;
 }
 
 // ═══════════════════════════════════════════
@@ -836,6 +952,196 @@ export function shAutoFitCol(colId) {
   // For now, toggle between default and max
   col.width = col.width === DEFAULT_COL_WIDTH ? MAX_COL_WIDTH : DEFAULT_COL_WIDTH;
   renderSheetMode();
+}
+
+// ── Batch add rows/cols ──
+
+export function shBatchAddRows() {
+  const input = document.getElementById('shBatchRowInput');
+  const count = Math.max(1, Math.min(100, parseInt(input?.value) || 1));
+  const sh = S.sheet.current;
+  if (!sh) return;
+  shPushUndo();
+  for (let i = 0; i < count; i++) {
+    const cells = {};
+    sh.columns.forEach(col => { cells[col.id] = ''; });
+    sh.rows.push({ id: shId('row'), cells });
+  }
+  renderSheetMode();
+}
+
+export function shBatchAddCols() {
+  const input = document.getElementById('shBatchColInput');
+  const count = Math.max(1, Math.min(50, parseInt(input?.value) || 1));
+  const sh = S.sheet.current;
+  if (!sh) return;
+  shPushUndo();
+  for (let i = 0; i < count; i++) {
+    const newCol = { id: shId('col'), name: '', width: DEFAULT_COL_WIDTH };
+    sh.columns.push(newCol);
+    sh.rows.forEach(row => { row.cells[newCol.id] = ''; });
+  }
+  // Re-letter all columns
+  sh.columns.forEach((c, idx) => { c.name = colIndexToLetter(idx); });
+  renderSheetMode();
+}
+
+// ═══════════════════════════════════════════
+// CLIPBOARD — Copy / Paste / Cut
+// ═══════════════════════════════════════════
+
+/**
+ * Copy selected cell or range to clipboard as tab-separated text.
+ */
+export function shCopy() {
+  const sh = S.sheet.current;
+  if (!sh) return;
+
+  const { text } = _getSelectionText(sh);
+  if (!text) return;
+
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+/**
+ * Cut = copy + clear.
+ */
+export function shCut() {
+  const sh = S.sheet.current;
+  if (!sh) return;
+
+  const { text, cells } = _getSelectionText(sh);
+  if (!text) return;
+
+  navigator.clipboard.writeText(text).catch(() => {});
+  shPushUndo();
+  for (const { rowId, colId } of cells) {
+    const row = sh.rows.find(r => r.id === rowId);
+    if (row) row.cells[colId] = '';
+  }
+  shAutoSave();
+  renderSheetMode();
+}
+
+/**
+ * Paste from clipboard into sheet starting at selected cell.
+ */
+export async function shPaste() {
+  const sh = S.sheet.current;
+  if (!sh || !S.sheet.selectedCell) return;
+
+  let clipText;
+  try { clipText = await navigator.clipboard.readText(); } catch { return; }
+  if (!clipText) return;
+
+  shPushUndo();
+
+  const lines = clipText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  // Remove trailing empty line if present
+  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+
+  const startRowIdx = sh.rows.findIndex(r => r.id === S.sheet.selectedCell.rowId);
+  const startColIdx = sh.columns.findIndex(c => c.id === S.sheet.selectedCell.colId);
+  if (startRowIdx < 0 || startColIdx < 0) return;
+
+  for (let r = 0; r < lines.length; r++) {
+    const rowIdx = startRowIdx + r;
+    // Auto-expand rows if needed
+    while (rowIdx >= sh.rows.length) {
+      const cells = {};
+      sh.columns.forEach(col => { cells[col.id] = ''; });
+      sh.rows.push({ id: shId('row'), cells });
+    }
+    const cols = lines[r].split('\t');
+    for (let c = 0; c < cols.length; c++) {
+      const colIdx = startColIdx + c;
+      // Auto-expand columns if needed
+      while (colIdx >= sh.columns.length) {
+        const newCol = { id: shId('col'), name: '', width: DEFAULT_COL_WIDTH };
+        sh.columns.push(newCol);
+        sh.rows.forEach(row => { row.cells[newCol.id] = ''; });
+      }
+      sh.rows[rowIdx].cells[sh.columns[colIdx].id] = cols[c];
+    }
+  }
+  // Re-letter columns if expanded
+  sh.columns.forEach((col, i) => { col.name = colIndexToLetter(i); });
+
+  shAutoSave();
+  renderSheetMode();
+}
+
+/**
+ * Delete content in selected range.
+ */
+export function shDeleteSelection() {
+  const sh = S.sheet.current;
+  if (!sh) return;
+
+  const rangeSet = _getRangeSet();
+  if (rangeSet) {
+    shPushUndo();
+    for (const key of rangeSet) {
+      const [rowId, colId] = key.split(':');
+      const row = sh.rows.find(r => r.id === rowId);
+      if (row) row.cells[colId] = '';
+    }
+    shAutoSave();
+    renderSheetMode();
+    return true;
+  }
+  // Single cell
+  if (S.sheet.selectedCell) {
+    shPushUndo();
+    shSetCellValue(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId, '');
+    renderSheetMode();
+    return true;
+  }
+  return false;
+}
+
+/** Internal: build TSV text from selection */
+function _getSelectionText(sh) {
+  const rangeSet = _getRangeSet();
+  const range = S.sheet.selectedRange;
+
+  if (rangeSet && range) {
+    const r1 = sh.rows.findIndex(r => r.id === range.start.rowId);
+    const r2 = sh.rows.findIndex(r => r.id === range.end.rowId);
+    const c1 = sh.columns.findIndex(c => c.id === range.start.colId);
+    const c2 = sh.columns.findIndex(c => c.id === range.end.colId);
+    const minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
+    const minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+
+    const lines = [];
+    const cells = [];
+    for (let r = minR; r <= maxR; r++) {
+      const row = sh.rows[r];
+      const vals = [];
+      for (let c = minC; c <= maxC; c++) {
+        const colId = sh.columns[c].id;
+        const raw = row.cells[colId] || '';
+        const display = raw.startsWith('=') ? shEvalFormula(raw, sh) : raw;
+        vals.push(typeof display === 'object' ? '' : String(display));
+        cells.push({ rowId: row.id, colId });
+      }
+      lines.push(vals.join('\t'));
+    }
+    return { text: lines.join('\n'), cells };
+  }
+
+  // Single cell
+  if (S.sheet.selectedCell) {
+    const { rowId, colId } = S.sheet.selectedCell;
+    const row = sh.rows.find(r => r.id === rowId);
+    if (!row) return { text: '', cells: [] };
+    const raw = row.cells[colId] || '';
+    const display = raw.startsWith('=') ? shEvalFormula(raw, sh) : raw;
+    const text = typeof display === 'object' ? '' : String(display);
+    return { text, cells: [{ rowId, colId }] };
+  }
+
+  return { text: '', cells: [] };
 }
 
 // ═══════════════════════════════════════════

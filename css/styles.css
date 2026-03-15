@@ -366,9 +366,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mc-sheet-row.header .mc-sheet-cell { color:rgba(255,255,255,0.5); font-weight:600; }
 
 /* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop, centered */
-.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin:16px auto 0; }
-.mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:140px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
-.mode-card-wide .mode-card-info { text-align:left; padding:14px 18px; display:flex; flex-direction:column; gap:4px; }
+.mode-card-wide { max-width:880px !important; flex-direction:row; display:flex; margin:20px auto 0; }
+.mode-card-wide .mode-card-demo { height:auto; min-height:140px; width:200px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
+.mode-card-wide .mode-card-info { text-align:left; padding:20px 24px; display:flex; flex-direction:column; gap:6px; justify-content:center; }
 .mode-card-wide .mode-card-icon { margin:0; flex-shrink:0; }
 .mode-card-wide .mode-card-name { margin-bottom:0; }
 .mode-card-wide .mode-card-desc { margin-top:2px; }
@@ -624,7 +624,15 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   overflow:visible;
   z-index:2;
 }
+.sh-cell.in-range {
+  background:rgba(120,134,165,0.15);
+  outline:1px solid rgba(120,134,165,0.35);
+  outline-offset:-1px;
+  z-index:1;
+}
 .sh-cell.error { color:#e55; font-style:italic; font-size:11px; }
+.sh-grid { user-select:none; -webkit-user-select:none; }
+.sh-cell.editing { user-select:text; -webkit-user-select:text; }
 
 /* Add row/col buttons */
 .sh-add-col-btn {
@@ -647,6 +655,18 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   font-family:Arial,sans-serif;
 }
 .sh-add-row-btn:hover { background:#252525; color:#7886A5; }
+
+/* Batch add input */
+.sh-batch-input {
+  width:32px; height:18px; background:#151515; border:1px solid #333; border-radius:4px;
+  color:#aaa; font-size:10px; text-align:center; outline:none; padding:0 2px;
+  -moz-appearance:textfield;
+}
+.sh-batch-input::-webkit-inner-spin-button,
+.sh-batch-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.sh-batch-input:focus { border-color:#7886A5; color:#ddd; }
+.sh-batch-add { cursor:pointer; transition:color 0.15s; }
+.sh-batch-add:hover { color:#7886A5; }
 
 /* Function picker dropdown */
 .sh-func-picker {

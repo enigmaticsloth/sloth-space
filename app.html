@@ -315,9 +315,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mc-sheet-row.header .mc-sheet-cell { color:rgba(255,255,255,0.5); font-weight:600; }
 
 /* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop, centered */
-.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin:16px auto 0; }
-.mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:140px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
-.mode-card-wide .mode-card-info { text-align:left; padding:14px 18px; display:flex; flex-direction:column; gap:4px; }
+.mode-card-wide { max-width:880px !important; flex-direction:row; display:flex; margin:20px auto 0; }
+.mode-card-wide .mode-card-demo { height:auto; min-height:140px; width:200px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
+.mode-card-wide .mode-card-info { text-align:left; padding:20px 24px; display:flex; flex-direction:column; gap:6px; justify-content:center; }
 .mode-card-wide .mode-card-icon { margin:0; flex-shrink:0; }
 .mode-card-wide .mode-card-name { margin-bottom:0; }
 .mode-card-wide .mode-card-desc { margin-top:2px; }
@@ -1296,7 +1296,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       <!-- Doc (Monet Blue) -->
       <div class="mode-card" onclick="pickMode('doc')">
         <div class="mode-card-demo">
-          <span class="mode-card-badge ready">Ready</span>
           <div class="mc-doc-preview">
             <div class="mc-dh"></div>
             <div class="mc-dp w90"></div>
@@ -1320,7 +1319,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       <!-- Slide (Monet Orange) -->
       <div class="mode-card" onclick="pickMode('slide')">
         <div class="mode-card-demo">
-          <span class="mode-card-badge ready">Ready</span>
           <div class="mc-slide-preview">
             <div class="mc-title"></div>
             <div class="mc-subtitle"></div>
@@ -1339,7 +1337,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
       <!-- Sheet (Monet Green) -->
       <div class="mode-card" onclick="pickMode('sheet')">
         <div class="mode-card-demo">
-          <span class="mode-card-badge ready">Ready</span>
           <div class="mc-sheet-preview">
             <div class="mc-sheet-row header"><div class="mc-sheet-cell">A</div><div class="mc-sheet-cell">B</div><div class="mc-sheet-cell">C</div><div class="mc-sheet-cell">D</div></div>
             <div class="mc-sheet-row"><div class="mc-sheet-cell">12.4</div><div class="mc-sheet-cell">8.7</div><div class="mc-sheet-cell">15.2</div><div class="mc-sheet-cell">9.1</div></div>
