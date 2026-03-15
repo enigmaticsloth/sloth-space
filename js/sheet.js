@@ -154,13 +154,17 @@ export function renderSheetMode() {
       const cellBg = row.cellStyles && row.cellStyles[col.id] && row.cellStyles[col.id].bg;
       const bgStyle = cellBg ? ` style="background:${cellBg}"` : '';
 
+      // Add fill handle to the selected cell (bottom-right corner drag square)
+      const fillHandle = (isSelected && !isEditing && !isInRange)
+        ? `<div class="sh-fill-handle" onmousedown="event.stopPropagation(); window.shFillHandleDown(event, '${row.id}', '${col.id}')"></div>`
+        : '';
       html += `<div class="${cls.join(' ')}" data-row-id="${row.id}" data-col-id="${col.id}"
         data-row-idx="${r}" data-col-idx="${c}"${bgStyle}
         onmousedown="window.shCellMouseDown(event, '${row.id}', '${col.id}')"
         onclick="window.shCellClick(event, '${row.id}', '${col.id}')"
         ondblclick="window.shCellDblClick(event, '${row.id}', '${col.id}')"
         oncontextmenu="event.preventDefault(); window.shCellCtx(event, '${row.id}', '${col.id}')"
-        >${escHtml(String(displayText))}</div>`;
+        >${escHtml(String(displayText))}${fillHandle}</div>`;
     }
     // Empty spacer for add-col column on each data row
     html += `<div class="sh-add-col-spacer"></div>`;
@@ -368,20 +372,18 @@ function _onFormulaRefDragEnd(e) {
   _formulaRefAnchor = null;
 }
 
-/** Find where to insert/replace a cell reference in formula text */
+/** Find where to insert/replace a cell reference in formula text.
+ *  Scans backward to find last ( or , separator — returns the position right after it.
+ *  Skips past ), :, and ref characters (A-Z, 0-9) so that existing refs get replaced.
+ */
 function _findRefInsertPos(text) {
-  // Find last occurrence of ( , or : — insert after it
-  let pos = text.length;
   for (let i = text.length - 1; i >= 0; i--) {
     const ch = text[i];
-    if (ch === '(' || ch === ',' || ch === ':') {
-      pos = i + 1;
-      break;
+    if (ch === '(' || ch === ',') {
+      return i + 1;
     }
-    // If we hit a letter/digit that's part of a ref, continue scanning back
-    if (ch === ')') { pos = i; break; }
   }
-  return pos;
+  return text.length;
 }
 
 /** Set cursor position in a contenteditable element */
@@ -441,6 +443,108 @@ function _onDragEnd(e) {
 /** After re-render, re-attach document listeners if drag is still active */
 function _reattachDragListeners() {
   // mousemove/mouseup are on document, so they survive re-renders
+}
+
+// ═══════════════════════════════════════════
+// FILL HANDLE — drag to extend formulas/values
+// ═══════════════════════════════════════════
+
+let _fillState = null; // { srcRowId, srcColId, srcRowIdx, srcColIdx }
+
+export function shFillHandleDown(event, rowId, colId) {
+  event.preventDefault();
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const rIdx = sh.rows.findIndex(r => r.id === rowId);
+  const cIdx = sh.columns.findIndex(c => c.id === colId);
+  _fillState = { srcRowId: rowId, srcColId: colId, srcRowIdx: rIdx, srcColIdx: cIdx, lastRowIdx: rIdx, lastColIdx: cIdx };
+
+  document.addEventListener('mousemove', _onFillMove);
+  document.addEventListener('mouseup', _onFillEnd);
+  document.addEventListener('selectstart', _blockSelect);
+}
+
+function _onFillMove(e) {
+  if (!_fillState) return;
+  const hit = _cellFromPoint(e.clientX, e.clientY);
+  if (!hit) return;
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const rIdx = sh.rows.findIndex(r => r.id === hit.rowId);
+  const cIdx = sh.columns.findIndex(c => c.id === hit.colId);
+
+  // Show preview: highlight the fill range
+  // Determine fill direction: vertical (same col) or horizontal (same row)
+  _fillState.lastRowIdx = rIdx;
+  _fillState.lastColIdx = cIdx;
+
+  // Use selectedRange to show preview highlight
+  S.sheet.selectedRange = {
+    start: { rowId: _fillState.srcRowId, colId: _fillState.srcColId },
+    end: hit
+  };
+  renderSheetMode();
+}
+
+function _onFillEnd(e) {
+  document.removeEventListener('mousemove', _onFillMove);
+  document.removeEventListener('mouseup', _onFillEnd);
+  document.removeEventListener('selectstart', _blockSelect);
+
+  if (!_fillState) return;
+  const sh = S.sheet.current;
+  if (!sh) { _fillState = null; return; }
+
+  const { srcRowIdx, srcColIdx } = _fillState;
+  const endRowIdx = _fillState.lastRowIdx;
+  const endColIdx = _fillState.lastColIdx;
+
+  // Nothing to fill if same cell
+  if (srcRowIdx === endRowIdx && srcColIdx === endColIdx) {
+    _fillState = null;
+    S.sheet.selectedRange = null;
+    renderSheetMode();
+    return;
+  }
+
+  const srcRow = sh.rows[srcRowIdx];
+  const srcColId = sh.columns[srcColIdx].id;
+  const srcVal = srcRow.cells[srcColId] || '';
+
+  shPushUndo();
+
+  const minR = Math.min(srcRowIdx, endRowIdx), maxR = Math.max(srcRowIdx, endRowIdx);
+  const minC = Math.min(srcColIdx, endColIdx), maxC = Math.max(srcColIdx, endColIdx);
+
+  for (let r = minR; r <= maxR; r++) {
+    for (let c = minC; c <= maxC; c++) {
+      if (r === srcRowIdx && c === srcColIdx) continue; // skip source cell
+      const rowDelta = r - srcRowIdx;
+      const colDelta = c - srcColIdx;
+      let val = srcVal;
+      if (val.startsWith('=')) {
+        val = _adjustFormulaRefs(val, rowDelta, colDelta);
+      }
+      // Auto-expand rows if needed
+      while (r >= sh.rows.length) {
+        const cells = {};
+        sh.columns.forEach(col => { cells[col.id] = ''; });
+        sh.rows.push({ id: shId('row'), cells });
+      }
+      sh.rows[r].cells[sh.columns[c].id] = val;
+    }
+  }
+
+  _fillState = null;
+  S.sheet.selectedRange = null;
+  // Select the fill range
+  S.sheet.selectedCell = { rowId: sh.rows[srcRowIdx].id, colId: sh.columns[srcColIdx].id };
+  S.sheet.selectedRange = {
+    start: { rowId: sh.rows[minR].id, colId: sh.columns[minC].id },
+    end: { rowId: sh.rows[maxR].id, colId: sh.columns[maxC].id }
+  };
+  shAutoSave();
+  renderSheetMode();
 }
 
 export function shSelectCell(rowId, colId) {
@@ -1202,13 +1306,26 @@ async function _readFromClipboard() {
 /**
  * Copy selected cell or range to clipboard as tab-separated text.
  */
+// Internal clipboard metadata for formula-aware paste
+let _shCopyMeta = null; // { srcRowIdx, srcColIdx } — origin of copy for ref adjustment
+
 export function shCopy() {
   const sh = S.sheet.current;
   if (!sh) return;
 
-  const { text } = _getSelectionText(sh);
+  const { text, startRowIdx, startColIdx } = _getSelectionText(sh, false);
   if (!text) return;
 
+  // Remember source position for relative formula adjustment on paste
+  let srcRow, srcCol;
+  if (startRowIdx !== undefined) {
+    srcRow = startRowIdx;
+    srcCol = startColIdx;
+  } else if (S.sheet.selectedCell) {
+    srcRow = sh.rows.findIndex(r => r.id === S.sheet.selectedCell.rowId);
+    srcCol = sh.columns.findIndex(c => c.id === S.sheet.selectedCell.colId);
+  }
+  _shCopyMeta = { srcRowIdx: srcRow, srcColIdx: srcCol };
   _copyToClipboard(text);
 }
 
@@ -1219,9 +1336,18 @@ export function shCut() {
   const sh = S.sheet.current;
   if (!sh) return;
 
-  const { text, cells } = _getSelectionText(sh);
+  const { text, cells, startRowIdx, startColIdx } = _getSelectionText(sh, false);
   if (!text) return;
 
+  let srcRow, srcCol;
+  if (startRowIdx !== undefined) {
+    srcRow = startRowIdx;
+    srcCol = startColIdx;
+  } else if (S.sheet.selectedCell) {
+    srcRow = sh.rows.findIndex(r => r.id === S.sheet.selectedCell.rowId);
+    srcCol = sh.columns.findIndex(c => c.id === S.sheet.selectedCell.colId);
+  }
+  _shCopyMeta = { srcRowIdx: srcRow, srcColIdx: srcCol };
   _copyToClipboard(text);
   shPushUndo();
   for (const { rowId, colId } of cells) {
@@ -1233,7 +1359,29 @@ export function shCut() {
 }
 
 /**
+ * Adjust cell references in a formula by a row/col offset.
+ * e.g. "=SUM(B2:C2)" with rowDelta=1 → "=SUM(B3:C3)"
+ */
+function _adjustFormulaRefs(formula, rowDelta, colDelta) {
+  // Match cell references like A1, AB12, etc.
+  return formula.replace(/([A-Z]+)(\d+)/g, (match, colLetters, rowNum) => {
+    // Convert column letters to index
+    let colIdx = 0;
+    for (let i = 0; i < colLetters.length; i++) {
+      colIdx = colIdx * 26 + (colLetters.charCodeAt(i) - 64);
+    }
+    colIdx -= 1; // 0-based
+    const rowIdx = parseInt(rowNum) - 1; // 0-based
+
+    const newCol = Math.max(0, colIdx + colDelta);
+    const newRow = Math.max(0, rowIdx + rowDelta);
+    return colIndexToLetter(newCol) + (newRow + 1);
+  });
+}
+
+/**
  * Paste from clipboard into sheet starting at selected cell.
+ * Formulas are adjusted relative to source position.
  */
 export async function shPaste() {
   const sh = S.sheet.current;
@@ -1245,16 +1393,19 @@ export async function shPaste() {
   shPushUndo();
 
   const lines = clipText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-  // Remove trailing empty line if present
   if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
 
   const startRowIdx = sh.rows.findIndex(r => r.id === S.sheet.selectedCell.rowId);
   const startColIdx = sh.columns.findIndex(c => c.id === S.sheet.selectedCell.colId);
   if (startRowIdx < 0 || startColIdx < 0) return;
 
+  // Calculate offset from source position for formula adjustment
+  const meta = _shCopyMeta;
+  const rowDelta = meta ? startRowIdx - meta.srcRowIdx : 0;
+  const colDelta = meta ? startColIdx - meta.srcColIdx : 0;
+
   for (let r = 0; r < lines.length; r++) {
     const rowIdx = startRowIdx + r;
-    // Auto-expand rows if needed
     while (rowIdx >= sh.rows.length) {
       const cells = {};
       sh.columns.forEach(col => { cells[col.id] = ''; });
@@ -1263,18 +1414,72 @@ export async function shPaste() {
     const cols = lines[r].split('\t');
     for (let c = 0; c < cols.length; c++) {
       const colIdx = startColIdx + c;
-      // Auto-expand columns if needed
       while (colIdx >= sh.columns.length) {
         const newCol = { id: shId('col'), name: '', width: DEFAULT_COL_WIDTH };
         sh.columns.push(newCol);
         sh.rows.forEach(row => { row.cells[newCol.id] = ''; });
       }
-      sh.rows[rowIdx].cells[sh.columns[colIdx].id] = cols[c];
+      let val = cols[c];
+      // Adjust formula references relative to source→destination offset
+      if (val.startsWith('=') && meta && (rowDelta !== 0 || colDelta !== 0)) {
+        val = _adjustFormulaRefs(val, rowDelta, colDelta);
+      }
+      sh.rows[rowIdx].cells[sh.columns[colIdx].id] = val;
     }
   }
-  // Re-letter columns if expanded
   sh.columns.forEach((col, i) => { col.name = colIndexToLetter(i); });
 
+  shAutoSave();
+  renderSheetMode();
+}
+
+/**
+ * Paste values only (Ctrl+Shift+V) — evaluates formulas before pasting.
+ */
+export async function shPasteValues() {
+  const sh = S.sheet.current;
+  if (!sh || !S.sheet.selectedCell) return;
+
+  // If we have internal copy meta, re-read as values
+  const { text } = _getSelectionText(sh, true);
+  // But we use clipboard since it's already there
+  const clipText = await _readFromClipboard();
+  if (!clipText) return;
+
+  shPushUndo();
+
+  const lines = clipText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+
+  const startRowIdx = sh.rows.findIndex(r => r.id === S.sheet.selectedCell.rowId);
+  const startColIdx = sh.columns.findIndex(c => c.id === S.sheet.selectedCell.colId);
+  if (startRowIdx < 0 || startColIdx < 0) return;
+
+  for (let r = 0; r < lines.length; r++) {
+    const rowIdx = startRowIdx + r;
+    while (rowIdx >= sh.rows.length) {
+      const cells = {};
+      sh.columns.forEach(col => { cells[col.id] = ''; });
+      sh.rows.push({ id: shId('row'), cells });
+    }
+    const cols = lines[r].split('\t');
+    for (let c = 0; c < cols.length; c++) {
+      const colIdx = startColIdx + c;
+      while (colIdx >= sh.columns.length) {
+        const newCol = { id: shId('col'), name: '', width: DEFAULT_COL_WIDTH };
+        sh.columns.push(newCol);
+        sh.rows.forEach(row => { row.cells[newCol.id] = ''; });
+      }
+      let val = cols[c];
+      // Evaluate formula to get value
+      if (val.startsWith('=')) {
+        const evaled = shEvalFormula(val, sh);
+        val = (typeof evaled === 'object') ? '' : String(evaled);
+      }
+      sh.rows[rowIdx].cells[sh.columns[colIdx].id] = val;
+    }
+  }
+  sh.columns.forEach((col, i) => { col.name = colIndexToLetter(i); });
   shAutoSave();
   renderSheetMode();
 }
@@ -1309,7 +1514,11 @@ export function shDeleteSelection() {
 }
 
 /** Internal: build TSV text from selection */
-function _getSelectionText(sh) {
+/**
+ * Get selection text. When valuesOnly=false (default), copies raw cell content
+ * including formulas. When valuesOnly=true, copies evaluated values.
+ */
+function _getSelectionText(sh, valuesOnly) {
   const rangeSet = _getRangeSet();
   const range = S.sheet.selectedRange;
 
@@ -1329,13 +1538,17 @@ function _getSelectionText(sh) {
       for (let c = minC; c <= maxC; c++) {
         const colId = sh.columns[c].id;
         const raw = row.cells[colId] || '';
-        const display = raw.startsWith('=') ? shEvalFormula(raw, sh) : raw;
-        vals.push(typeof display === 'object' ? '' : String(display));
+        if (valuesOnly && raw.startsWith('=')) {
+          const display = shEvalFormula(raw, sh);
+          vals.push(typeof display === 'object' ? '' : String(display));
+        } else {
+          vals.push(raw);
+        }
         cells.push({ rowId: row.id, colId });
       }
       lines.push(vals.join('\t'));
     }
-    return { text: lines.join('\n'), cells };
+    return { text: lines.join('\n'), cells, startRowIdx: minR, startColIdx: minC };
   }
 
   // Single cell
@@ -1344,9 +1557,12 @@ function _getSelectionText(sh) {
     const row = sh.rows.find(r => r.id === rowId);
     if (!row) return { text: '', cells: [] };
     const raw = row.cells[colId] || '';
-    const display = raw.startsWith('=') ? shEvalFormula(raw, sh) : raw;
-    const text = typeof display === 'object' ? '' : String(display);
-    return { text, cells: [{ rowId, colId }] };
+    if (valuesOnly && raw.startsWith('=')) {
+      const display = shEvalFormula(raw, sh);
+      const text = typeof display === 'object' ? '' : String(display);
+      return { text, cells: [{ rowId, colId }] };
+    }
+    return { text: raw, cells: [{ rowId, colId }] };
   }
 
   return { text: '', cells: [] };
@@ -1553,12 +1769,13 @@ export function shToggleBgPicker() {
   ).join('');
 
   const btn = document.getElementById('shBgColorBtn');
+  _shBgPickerEl.style.display = 'block';
   if (btn) {
     const r = btn.getBoundingClientRect();
+    const pickerH = _shBgPickerEl.offsetHeight;
     _shBgPickerEl.style.left = r.left + 'px';
-    _shBgPickerEl.style.top = (r.bottom + 4) + 'px';
+    _shBgPickerEl.style.top = (r.top - pickerH - 6) + 'px';
   }
-  _shBgPickerEl.style.display = 'block';
 
   setTimeout(() => {
     document.addEventListener('click', function _c(ev) {

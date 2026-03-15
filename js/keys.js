@@ -125,6 +125,9 @@ export function initKeys(){
         if((e.ctrlKey||e.metaKey)&&(e.key==='x'||e.key==='X')&&!S.sheet.editingCell){
           e.preventDefault(); window.shCut(); return;
         }
+        if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='v'||e.key==='V')&&!S.sheet.editingCell){
+          e.preventDefault(); window.shPasteValues(); return;
+        }
         if((e.ctrlKey||e.metaKey)&&(e.key==='v'||e.key==='V')&&!S.sheet.editingCell){
           e.preventDefault(); window.shPaste(); return;
         }
