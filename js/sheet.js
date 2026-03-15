@@ -1175,7 +1175,7 @@ function shAutoSave() {
 }
 
 // Sync current sheet data back to workspace file list
-function shSaveToWorkspace() {
+export function shSaveToWorkspace() {
   const sh = S.sheet.current;
   if (!sh) return;
   const fileId = S._wsCurrentFileId;
@@ -2118,5 +2118,23 @@ export function enterSheetMode() {
   S.sheet.selectedCell = null;
   S.sheet.editingCell = null;
   S.sheet.selectedRange = null;
+
+  // Auto-register in workspace so auto-save works from the start
+  if (window.wsLoad && window.wsSave) {
+    const files = window.wsLoad();
+    const wsId = 'ws_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+    const { title, ...content } = S.sheet.current;
+    files.push({
+      id: wsId,
+      type: 'sheet',
+      title: title || 'Untitled Sheet',
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      content
+    });
+    window.wsSave(files);
+    S._wsCurrentFileId = wsId;
+  }
+
   window.modeEnter('sheet');
 }

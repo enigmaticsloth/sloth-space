@@ -106,10 +106,15 @@ export function initKeys(){
       return;
     }
 
-    // ── Ctrl+S — save (block browser "Save Page" dialog) ──
+    // ── Ctrl+S — save current work (block browser "Save Page" dialog) ──
     if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')&&!e.altKey){
       e.preventDefault();
-      window.saveSloth();
+      if(window.modeSave){
+        window.modeSave();
+        const modeLabel={sheet:'Sheet',doc:'Document',slide:'Slides'}[S.currentMode];
+        if(modeLabel) window.addMessage(`✓ ${modeLabel} saved`,'system');
+        else window.addMessage('Nothing to save in this mode.','system');
+      }
       return;
     }
 
@@ -122,8 +127,11 @@ export function initKeys(){
       // Determine if focus is inside a non-sheet input (chat textarea, batch inputs, etc.)
       const isSheetCell=isCE&&e.target.closest&&e.target.closest('.sh-cell');
       const isNonSheetInput=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')&&!e.target.closest('.sh-grid');
-      // If user is in a non-sheet input, let browser handle everything normally
-      if(isNonSheetInput) {/* fall through to slide/doc handlers or browser default */}
+      // Check if user has selected text anywhere (e.g. in chat messages) — let browser handle copy
+      const hasTextSelection=window.getSelection&&window.getSelection().toString().length>0;
+      const isInChatArea=e.target.closest&&e.target.closest('.chat-messages,.chat-panel,#chatMessages');
+      // If user is in a non-sheet input or has text selected outside sheet, let browser handle
+      if(isNonSheetInput || (hasTextSelection && !isSheetCell) || isInChatArea) {/* fall through to browser default */}
       else {
         // ── Copy / Cut / Paste ──
         if((e.ctrlKey||e.metaKey)&&(e.key==='c'||e.key==='C')&&!S.sheet.editingCell){

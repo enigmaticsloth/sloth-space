@@ -296,6 +296,8 @@ INTENTS:
   Confirmations like "yes", "OK", "let's do it", "go", "sure", "yes", "right" → generate.
   TYPO TOLERANCE: Users may have typos! When in doubt between chat and generate, choose generate.
   IMPORTANT: If the user wants to CREATE/GENERATE/WRITE content about ANY topic (including Sloth Space), this is "generate" NOT "about".
+  WORKSPACE MODE: If the user asks to CREATE/WRITE/GENERATE a document, report, article, presentation, or slide deck based on project data, this is ALWAYS "generate" NOT "describe". The key distinction: "summarize project X" → describe, but "write a document about project X" / "make a report for project X" / "create slides for project X" → generate.
+  Output {"intent":"generate","target":"doc"} for document/report/article requests, or {"intent":"generate","target":"slide"} for presentation/slide requests.
 
 "chat" — ONLY for pure greetings with NO topic and NOT asking about Sloth Space.
   "hello", "hi", "hey"
@@ -316,6 +318,7 @@ PRIORITY RULES (follow in order):
 MODE-SPECIFIC:
 - "style" and "image" intents ONLY in slide mode. In doc mode use content_edit or generate.
 - In DOC mode: insert table/divider, position image → content_edit. Topic creation → generate.
+- In WORKSPACE mode: if user asks to CREATE/WRITE/MAKE a document/report/slides about a project → "generate" with target. "describe" is ONLY for read-only questions.
 - NEVER choose "chat" when user wants content created, edited, or deleted.
 - NEVER choose "chat" if the message contains a topic/subject. Always prefer "generate" or "about".
 
@@ -1389,7 +1392,7 @@ async function sendMessage(){
     if(intent==='chat'){
       const hasSubject=text.length>4&&!/^(hi|hello|hey|what|how|why|who|when|where|help|sup|yo)$/i.test(text.trim());
       const hasGenerateHint=/create|make|write|about|build|draft|pitch|deck|report|article|content|generate/i.test(text);
-      const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2));
+      const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2))||(S.currentMode==='workspace');
       if(hasSubject&&(hasGenerateHint||noDeckOrDoc)){
         console.log('Smart fallback: chat → generate (message has topic substance)');
         intent='generate';
@@ -1633,13 +1636,21 @@ async function sendMessage(){
         S.chatHistory.push({role:'assistant',content:'Please click the region on the slide you want to edit, or tell me which page and section to modify.'});
       }
 
-    }else if(intent==='generate'&&S.currentMode==='doc'){
-      // ── DOC GENERATE: create doc blocks instead of slides ──
+    }else if(intent==='generate'&&(S.currentMode==='doc'||(S.currentMode==='workspace'&&routerData.target!=='slide'))){
+      // ── DOC GENERATE: create doc blocks (also from workspace when user asks for doc/report) ──
+      if(S.currentMode==='workspace'){
+        // Auto-switch to doc mode so the generated document renders
+        window.modeEnter('doc');
+      }
       await doDocGenerate(statusDiv,text,wsContext);
       _autoLinkToProject(_resolvedProjectId);
 
     }else if(intent==='generate'){
       // ── GENERATE: create/modify slides ──
+      if(S.currentMode==='workspace'){
+        // Auto-switch to slide mode so the generated slides render
+        window.modeEnter('slide');
+      }
       await doGenerate(statusDiv,wsContext);
       _autoLinkToProject(_resolvedProjectId);
 
@@ -1682,7 +1693,7 @@ async function sendMessage(){
   }finally{
     sendBtn.disabled=false;
     sendBtn.innerHTML=SEND_ARROW_SVG;
-    window.autoSave(); // Save chat history after every message
+    if(window.modeSave) window.modeSave(); // Unified save for current mode
     saveChatTabs(); // Persist chat tabs
     scheduleTabTitleGen(); // AI-generate tab title if needed
   }

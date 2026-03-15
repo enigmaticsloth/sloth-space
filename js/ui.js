@@ -522,12 +522,8 @@ function enterSlides(){
 // Note: S.currentMode is the main state store
 
 function modeSaveCurrent(){
-  // Flush-save whatever mode we're leaving
-  if(S.currentMode==='doc'&&S.currentDoc) window.docSaveNow();
-  if(S.currentMode==='sheet'&&S.sheet.current){
-    try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){}
-  }
-  // (slide auto-saves via autoSave() on every renderApp)
+  // Flush-save whatever mode we're leaving — unified via modeSave()
+  if(window.modeSave) window.modeSave();
 }
 
 function modeShowUI(mode){

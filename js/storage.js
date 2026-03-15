@@ -148,6 +148,35 @@ export function autoSave(){
   _scheduleCloudSync();
 }
 
+// ═══════════════════════════════════════════
+// UNIFIED SAVE — one function for all modes
+// ═══════════════════════════════════════════
+// modeSave() is the single entry point for saving. It dispatches to the
+// correct per-mode save logic (slide/doc/sheet) so callers don't need
+// to know which mode is active.
+export function modeSave(){
+  const mode=S.currentMode;
+  if(mode==='sheet'){
+    // 1. Commit any active cell edit
+    if(S.sheet.editingCell && window.shCommitEdit) window.shCommitEdit();
+    // 2. Persist to localStorage
+    if(S.sheet.current){
+      try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){}
+    }
+    // 3. Save to workspace (→ cloud sync via wsSave debounce)
+    if(window.shSaveToWorkspace) window.shSaveToWorkspace();
+  }else if(mode==='doc'){
+    // 1. Flush any contentEditable → data model
+    if(window.docFlushEditing) window.docFlushEditing();
+    // 2. Full save (localStorage + workspace + cloud)
+    if(window.docSaveNow) window.docSaveNow();
+  }else if(mode==='slide'){
+    // Existing autoSave handles localStorage + cloud
+    autoSave();
+  }
+  // else: workspace mode has nothing to save
+}
+
 // Persist current mode to localStorage (survives tab close, not just refresh)
 export function saveCurrentMode(){
   try{ localStorage.setItem('sloth_last_mode', S.currentMode); }catch(e){}
@@ -490,6 +519,17 @@ export function saveSloth(){
       created:new Date().toISOString()
     },null,2));
     fname=(S.currentDoc.title||'document').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
+  } else if(S.currentMode==='sheet'){
+    if(!S.sheet||!S.sheet.current){window.addMessage('Nothing to save yet.','system');return;}
+    const sh=S.sheet.current;
+    zip.file('manifest.json',JSON.stringify(sh,null,2));
+    zip.file('meta.json',JSON.stringify({
+      sloth_version:'0.1.0',
+      app:'Sloth Space',
+      type:'sheet',
+      created:new Date().toISOString()
+    },null,2));
+    fname=(sh.title||'sheet').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_');
   } else {
     window.addMessage('Nothing to export in this mode.','system');
     return;
