@@ -586,18 +586,18 @@ function modeShowUI(mode){
   // Move input area into chat panel for workspace mode (chat-app feel)
   const inputArea=document.getElementById('inputArea');
   const chatPanel=document.getElementById('chatPanel');
-  const bottomPanel=document.querySelector('.bottom-panel');
-  if(inputArea && chatPanel && bottomPanel){
+  const bottomInner=document.querySelector('.bottom-panel-inner');
+  if(inputArea && chatPanel && bottomInner){
     if(mode==='workspace'){
       // Move input + img staging into chat panel
       const imgStaging=document.getElementById('imgStaging');
       if(imgStaging) chatPanel.appendChild(imgStaging);
       chatPanel.appendChild(inputArea);
     } else {
-      // Restore input back to bottom-panel
+      // Restore input back to bottom-panel-inner (imgStaging and inputArea are its children)
       const imgStaging=document.getElementById('imgStaging');
-      if(imgStaging) bottomPanel.insertBefore(imgStaging, bottomPanel.querySelector('.input-area')||null);
-      bottomPanel.appendChild(inputArea);
+      if(imgStaging) bottomInner.appendChild(imgStaging);
+      bottomInner.appendChild(inputArea);
     }
   }
 }
