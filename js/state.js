@@ -46,12 +46,30 @@ export const CONFIG_KEY = 'sloth_space_config';
 
 // ── LLM Provider Defaults ──
 export const LLM_DEFAULTS = {
-  groq:   { url:'https://api.groq.com/openai/v1/chat/completions',     model:'llama-3.3-70b-versatile',       router:'llama-3.1-8b-instant' },
-  openai: { url:'https://api.openai.com/v1/chat/completions',           model:'gpt-4o',                        router:'gpt-4o-mini' },
-  claude: { url:'https://api.anthropic.com/v1/messages',                model:'claude-sonnet-4-20250514',    router:'claude-haiku-4-20250414' },
-  grok:   { url:'https://api.x.ai/v1/chat/completions',                model:'grok-3-latest',                 router:'grok-2-latest' },
-  ollama: { url:'http://localhost:11434/v1/chat/completions',           model:'llama3.2',                      router:'llama3.2' },
-  custom: { url:'',                                                      model:'',                              router:'' }
+  groq: {
+    url:'https://api.groq.com/openai/v1/chat/completions', model:'llama-3.3-70b-versatile', router:'llama-3.1-8b-instant',
+    keyPrefix:'gsk_', label:'Groq', desc:'Free · Fast inference', color:'#F55036', keyUrl:'console.groq.com'
+  },
+  openai: {
+    url:'https://api.openai.com/v1/chat/completions', model:'gpt-4o', router:'gpt-4o-mini',
+    keyPrefix:'sk-', label:'OpenAI', desc:'GPT-4o · Most popular', color:'#10A37F', keyUrl:'platform.openai.com/api-keys'
+  },
+  claude: {
+    url:'https://api.anthropic.com/v1/messages', model:'claude-sonnet-4-20250514', router:'claude-haiku-3-20240307',
+    keyPrefix:'sk-ant-', label:'Claude', desc:'Anthropic · Smart reasoning', color:'#D97757', keyUrl:'console.anthropic.com'
+  },
+  grok: {
+    url:'https://api.x.ai/v1/chat/completions', model:'grok-3', router:'grok-3-mini',
+    keyPrefix:'xai-', label:'Grok', desc:'xAI · Real-time knowledge', color:'#1DA1F2', keyUrl:'console.x.ai'
+  },
+  ollama: {
+    url:'http://localhost:11434/v1/chat/completions', model:'llama3.1:8b', router:'llama3.1:8b',
+    keyPrefix:'', label:'Ollama', desc:'Local · Offline · Private', color:'#999', keyUrl:''
+  },
+  custom: {
+    url:'', model:'', router:'',
+    keyPrefix:'', label:'Custom', desc:'Your own endpoint', color:'#666', keyUrl:''
+  }
 };
 
 export const CLOUD_PROVIDERS = ['groq','openai','claude','grok'];
