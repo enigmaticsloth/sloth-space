@@ -13,6 +13,11 @@ function renderApp(){
     const sb=document.querySelector('.slide-bar'); if(sb) sb.style.display='none';
     window.renderDocMode(); return;
   }
+  if(S.currentMode==='sheet'){
+    document.getElementById('slideCanvas').style.display='none';
+    const sb2=document.querySelector('.slide-bar'); if(sb2) sb2.style.display='none';
+    window.renderSheetMode(); return;
+  }
   if(S.currentMode==='workspace'){
     document.getElementById('slideCanvas').style.display='none';
     const sb=document.querySelector('.slide-bar'); if(sb) sb.style.display='none';
@@ -519,6 +524,9 @@ function enterSlides(){
 function modeSaveCurrent(){
   // Flush-save whatever mode we're leaving
   if(S.currentMode==='doc'&&S.currentDoc) window.docSaveNow();
+  if(S.currentMode==='sheet'&&S.sheet.current){
+    try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){}
+  }
   // (slide auto-saves via autoSave() on every renderApp)
 }
 
@@ -542,6 +550,10 @@ function modeShowUI(mode){
   // Name bar always visible
   if(nameBar) nameBar.style.display='';
 
+  // Also hide sheet canvas
+  const sheetCanvas=document.getElementById('sheetCanvas');
+  if(sheetCanvas) sheetCanvas.style.display='none';
+
   // Show mode-specific panels
   if(mode==='slide'){
     // Move name bar back into slide-panel
@@ -549,6 +561,26 @@ function modeShowUI(mode){
     if(nameBar&&spForName) spForName.prepend(nameBar);
     if(slideCanvas) slideCanvas.style.display='';
     if(slideBar) slideBar.style.display='';
+  } else if(mode==='sheet'){
+    let sc=sheetCanvas;
+    if(!sc){
+      sc=document.createElement('div');
+      sc.id='sheetCanvas';
+      sc.className='sheet-canvas';
+      // Click on canvas padding → deselect
+      sc.addEventListener('click',function(ev){
+        if(ev.target===sc) window.shClearSelection();
+      });
+      const middle=document.querySelector('.middle');
+      const chatPanel=document.getElementById('chatPanel');
+      middle.insertBefore(sc, chatPanel);
+    }
+    // Move name bar into sheet-canvas
+    if(nameBar) sc.prepend(nameBar);
+    // Hide slide-panel
+    const spSheet=document.querySelector('.slide-panel');
+    if(spSheet) spSheet.style.display='none';
+    sc.style.display='';
   } else if(mode==='doc'){
     let dc=docCanvas;
     if(!dc){
@@ -640,6 +672,20 @@ function modeEnter(mode){
     updateModeNameBar('doc');
     window.docUpdateUndoUI();
     window.renderDocMode();
+  } else if(mode==='sheet'){
+    // Restore sheet: memory → localStorage → new
+    if(!S.sheet.current){
+      try{
+        const saved=localStorage.getItem('sloth_current_sheet');
+        if(saved){
+          const parsed=JSON.parse(saved);
+          if(parsed&&parsed.columns&&parsed.rows) S.sheet.current=parsed;
+        }
+      }catch(e){}
+      if(!S.sheet.current) S.sheet.current=window.shCreateNew('Untitled Sheet');
+    }
+    updateModeNameBar('sheet');
+    window.renderSheetMode();
   } else if(mode==='workspace'){
     updateModeNameBar('workspace');
     window.renderWorkspaceMode();
@@ -647,7 +693,6 @@ function modeEnter(mode){
 }
 
 function pickMode(mode){
-  if(mode==='sheet') return; // not yet implemented
   modeEnter(mode);
 }
 
@@ -693,7 +738,6 @@ function toggleModeSwitchMenu(e){
 function switchToMode(mode){
   document.getElementById('modeSwitchMenu').style.display='none';
   if(mode===S.currentMode) return;
-  if(mode==='sheet'){ window.addMessage('Sheet mode coming soon!','system'); return; }
   modeEnter(mode);
 }
 
@@ -708,6 +752,10 @@ function updateModeNameBar(mode){
     nameInput.placeholder='Untitled Document';
     nameInput.value=S.currentDoc?.title||'';
     nameInput.oninput=function(){ if(S.currentDoc){ S.currentDoc.title=this.value; S.currentDoc.updated=new Date().toISOString(); window.docAutoSave(); }};
+  } else if(mode==='sheet'){
+    nameInput.placeholder='Untitled Sheet';
+    nameInput.value=S.sheet.current?.title||'';
+    nameInput.oninput=function(){ if(S.sheet.current){ S.sheet.current.title=this.value.trim()||'Untitled Sheet'; S.sheet.current.updated=new Date().toISOString(); try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){} }};
   } else if(mode==='workspace'){
     nameInput.placeholder='Workspace';
     nameInput.value='Workspace';
@@ -773,6 +821,9 @@ function updateToolbarForMode(mode){
   });
   toolbar.querySelectorAll('.tb-doc-only').forEach(el=>{
     el.style.display=(mode==='doc')?'':'none';
+  });
+  toolbar.querySelectorAll('.tb-sheet-only').forEach(el=>{
+    el.style.display=(mode==='sheet')?'':'none';
   });
   // Update undo/redo button state for current mode
   modeUpdateUndoUI();
@@ -853,11 +904,14 @@ function modeUndo(){
   if(S.currentMode==='doc'){
     window.docFlushEditing();
     window.docUndo();
+  } else if(S.currentMode==='sheet'){
+    window.shUndo();
   } else { window.undo(); }
 }
 
 function modeRedo(){
   if(S.currentMode==='doc') window.docRedo();
+  else if(S.currentMode==='sheet') window.shRedo();
   else window.redo();
 }
 
@@ -908,6 +962,8 @@ function modeToolbarBgColor(color){
 function modeUpdateUndoUI(){
   if(S.currentMode==='doc'){
     window.docUpdateUndoUI();
+  } else if(S.currentMode==='sheet'){
+    window.shUpdateUndoUI();
   } else {
     window.updateUndoRedoUI();
   }

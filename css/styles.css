@@ -120,6 +120,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; position:relative; touch-action:none; }
 .slide-panel, .slide-panel *, .slide-frame *, #slideCanvas, #slideCanvas * { touch-action:none; /* lock ALL elements inside slide — no zoom/scroll/resize */ }
 .doc-canvas, .doc-canvas *, .workspace-canvas, .workspace-canvas * { touch-action:pan-y; /* re-enable vertical scroll for doc & workspace modes */ }
+.sheet-canvas, .sheet-canvas * { touch-action:pan-x pan-y; /* enable both scrolling directions for sheet */ }
 /* Slide transition animations (swipe/navigate) */
 .slide-enter-left { animation:slideInLeft 0.28s ease forwards; }
 .slide-enter-right { animation:slideInRight 0.28s ease forwards; }
@@ -529,6 +530,105 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-ctx-input:focus { border-color:#7886A5; }
 .doc-ctx-go { background:#7886A5; color:#fff; border:none; border-radius:5px; padding:6px 10px; font-size:11px; cursor:pointer; font-family:Arial; font-weight:600; }
 .doc-ctx-go:hover { background:#6775A0; }
+
+/* ─── Sheet Canvas ─── */
+.sheet-canvas { flex:1; overflow:auto; -webkit-overflow-scrolling:touch; background:#141414; padding:0; touch-action:pan-x pan-y; display:flex; flex-direction:column; }
+.sheet-canvas, .sheet-canvas * { touch-action:pan-x pan-y; }
+
+.sh-grid {
+  display:grid;
+  gap:0;
+  background:#1a1a1a;
+  width:max-content;
+  min-width:100%;
+}
+
+/* Corner cell (top-left) */
+.sh-corner {
+  background:#1e1e1e;
+  border-right:1px solid #2a2a2a;
+  border-bottom:1px solid #2a2a2a;
+  position:sticky;
+  top:0; left:0;
+  z-index:3;
+  min-width:40px;
+}
+
+/* Column headers */
+.sh-col-header {
+  background:#1e1e1e;
+  border-right:1px solid #252525;
+  border-bottom:1px solid #2a2a2a;
+  padding:4px 8px;
+  font-size:11px;
+  font-weight:600;
+  color:#888;
+  text-align:center;
+  user-select:none;
+  cursor:default;
+  position:sticky;
+  top:0;
+  z-index:2;
+  font-family:Arial,sans-serif;
+}
+.sh-col-header:hover { background:#252525; color:#bbb; }
+
+/* Row headers */
+.sh-row-header {
+  background:#1e1e1e;
+  border-right:1px solid #2a2a2a;
+  border-bottom:1px solid #1f1f1f;
+  padding:4px 6px;
+  font-size:10px;
+  font-weight:500;
+  color:#666;
+  text-align:center;
+  user-select:none;
+  cursor:default;
+  position:sticky;
+  left:0;
+  z-index:1;
+  min-width:40px;
+  font-family:Arial,sans-serif;
+}
+.sh-row-header:hover { background:#252525; color:#999; }
+
+/* Cells */
+.sh-cell {
+  border-right:1px solid #1f1f1f;
+  border-bottom:1px solid #1f1f1f;
+  padding:4px 8px;
+  font-size:13px;
+  font-family:Arial,sans-serif;
+  color:var(--text);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  min-height:28px;
+  cursor:cell;
+  outline:none;
+  word-wrap:break-word;
+}
+.sh-cell:hover { background:rgba(120,134,165,0.04); }
+.sh-cell.selected {
+  outline:2px solid #7886A5;
+  outline-offset:-1px;
+  background:rgba(120,134,165,0.08);
+  z-index:1;
+}
+.sh-cell.editing {
+  outline:2px solid #7886A5;
+  outline-offset:-1px;
+  background:#1a1e2a;
+  white-space:pre-wrap;
+  overflow:visible;
+  z-index:2;
+}
+.sh-cell.error { color:#e55; font-style:italic; font-size:11px; }
+
+/* Frozen row/col sticky support (will be activated in Step 5) */
+/* .sh-grid .sh-cell.frozen-row { position:sticky; top:32px; z-index:1; } */
+/* .sh-grid .sh-cell.frozen-col { position:sticky; left:40px; z-index:1; } */
 
 /* ─── Workspace Canvas ─── */
 .workspace-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; }
@@ -1049,8 +1149,17 @@ body.mode-workspace .chat-panel .input-area textarea::placeholder { color:#4A557
     padding:16px 8px;
     scrollbar-width:none; /* Firefox */
   }
+  body.mode-sheet .sheet-canvas {
+    flex:1 1 0 !important; min-height:0;
+    overflow:auto !important;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x pan-y !important;
+    padding:0;
+    scrollbar-width:none;
+  }
   body.mode-doc .doc-canvas::-webkit-scrollbar,
-  body.mode-workspace .workspace-canvas::-webkit-scrollbar { display:none; /* Chrome/Safari */ }
+  body.mode-workspace .workspace-canvas::-webkit-scrollbar,
+  body.mode-sheet .sheet-canvas::-webkit-scrollbar { display:none; /* Chrome/Safari */ }
   /* Drag handle: always visible on mobile (no hover), and allow touch drag */
   body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }

@@ -13,12 +13,14 @@ import * as ai from './ai.js?v=20260315aa';
 import * as ui from './ui.js?v=20260315aa';
 import * as storage from './storage.js?v=20260315aa';
 import * as keys from './keys.js?v=20260315aa';
+import * as sheet from './sheet.js?v=20260316aa';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
 const allExports = {
   ...slide,
   ...doc,
+  ...sheet,
   ...workspace,
   ...ai,
   ...ui,

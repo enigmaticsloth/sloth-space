@@ -1,0 +1,871 @@
+// ═══════════════════════════════════════════════════════════════════
+// sheet.js: Sheet mode — grid renderer, cell editing, formula engine
+// ═══════════════════════════════════════════════════════════════════
+
+import { S } from './state.js';
+
+// ── Constants ──
+const SHEET_MAX_UNDO = 50;
+const DEFAULT_COL_WIDTH = 120;
+const MAX_COL_WIDTH = 280;
+const DEFAULT_ROWS = 10;
+const DEFAULT_COLS = 8;
+
+// ── ID Generator ──
+let _shIdCounter = 0;
+function shId(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${(++_shIdCounter).toString(36)}`;
+}
+
+// ═══════════════════════════════════════════
+// SHEET DATA MODEL
+// ═══════════════════════════════════════════
+
+/**
+ * Create a blank sheet with default rows/cols.
+ */
+export function shCreateNew(title) {
+  const columns = [];
+  for (let c = 0; c < DEFAULT_COLS; c++) {
+    columns.push({ id: shId('col'), name: colIndexToLetter(c), width: DEFAULT_COL_WIDTH });
+  }
+  const rows = [];
+  for (let r = 0; r < DEFAULT_ROWS; r++) {
+    const cells = {};
+    columns.forEach(col => { cells[col.id] = ''; });
+    rows.push({ id: shId('row'), cells });
+  }
+  return {
+    title: title || 'Untitled Sheet',
+    columns,
+    rows,
+    frozenRows: 1,
+    frozenCols: 0,
+  };
+}
+
+/**
+ * Convert column index to letter (0=A, 1=B, ..., 25=Z, 26=AA).
+ */
+export function colIndexToLetter(idx) {
+  let s = '';
+  idx++;
+  while (idx > 0) {
+    idx--;
+    s = String.fromCharCode(65 + (idx % 26)) + s;
+    idx = Math.floor(idx / 26);
+  }
+  return s;
+}
+
+/**
+ * Convert column letter to index (A=0, B=1, ..., Z=25, AA=26).
+ */
+export function letterToColIndex(letter) {
+  let idx = 0;
+  for (let i = 0; i < letter.length; i++) {
+    idx = idx * 26 + (letter.charCodeAt(i) - 64);
+  }
+  return idx - 1;
+}
+
+// ═══════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════
+
+/**
+ * Main sheet renderer — called by modeEnter('sheet') and after edits.
+ */
+export function renderSheetMode() {
+  const sh = S.sheet.current;
+  if (!sh) return;
+
+  let canvas = document.getElementById('sheetCanvas');
+  if (!canvas) return;
+
+  const { columns, rows } = sh;
+  const totalCols = columns.length;
+  const totalRows = rows.length;
+
+  // Build grid template: row-header-width + col widths
+  const colWidths = columns.map(c => `${c.width || DEFAULT_COL_WIDTH}px`).join(' ');
+  const gridCols = `40px ${colWidths}`; // 40px for row header
+
+  let html = '';
+
+  // Corner cell
+  html += `<div class="sh-corner"></div>`;
+
+  // Column headers
+  for (let c = 0; c < totalCols; c++) {
+    const col = columns[c];
+    html += `<div class="sh-col-header" data-col-id="${col.id}" data-col-idx="${c}"
+      oncontextmenu="event.preventDefault(); window.shColHeaderCtx(event, '${col.id}')"
+      ondblclick="window.shAutoFitCol('${col.id}')">${col.name}</div>`;
+  }
+
+  // Rows
+  for (let r = 0; r < totalRows; r++) {
+    const row = rows[r];
+    // Row header
+    html += `<div class="sh-row-header" data-row-id="${row.id}" data-row-idx="${r}"
+      oncontextmenu="event.preventDefault(); window.shRowHeaderCtx(event, '${row.id}')">${r + 1}</div>`;
+    // Cells
+    for (let c = 0; c < totalCols; c++) {
+      const col = columns[c];
+      const rawVal = row.cells[col.id] || '';
+      const display = rawVal.startsWith('=') ? shEvalFormula(rawVal, sh) : rawVal;
+      const isSelected = S.sheet.selectedCell &&
+        S.sheet.selectedCell.rowId === row.id && S.sheet.selectedCell.colId === col.id;
+      const isEditing = S.sheet.editingCell &&
+        S.sheet.editingCell.rowId === row.id && S.sheet.editingCell.colId === col.id;
+      const cls = ['sh-cell'];
+      if (isSelected) cls.push('selected');
+      if (isEditing) cls.push('editing');
+      if (typeof display === 'object' && display.error) cls.push('error');
+
+      const displayText = (typeof display === 'object' && display.error) ? display.error : display;
+
+      html += `<div class="${cls.join(' ')}" data-row-id="${row.id}" data-col-id="${col.id}"
+        data-row-idx="${r}" data-col-idx="${c}"
+        onclick="window.shCellClick(event, '${row.id}', '${col.id}')"
+        ondblclick="window.shCellDblClick(event, '${row.id}', '${col.id}')"
+        oncontextmenu="event.preventDefault(); window.shCellCtx(event, '${row.id}', '${col.id}')"
+        >${escHtml(String(displayText))}</div>`;
+    }
+  }
+
+  const grid = document.getElementById('shGrid') || canvas;
+  // If shGrid doesn't exist yet, create it
+  if (!document.getElementById('shGrid')) {
+    const g = document.createElement('div');
+    g.id = 'shGrid';
+    g.className = 'sh-grid';
+    canvas.appendChild(g);
+  }
+
+  const shGrid = document.getElementById('shGrid');
+  shGrid.style.gridTemplateColumns = gridCols;
+  shGrid.style.gridTemplateRows = `32px repeat(${totalRows}, auto)`; // 32px header row
+  shGrid.innerHTML = html;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ═══════════════════════════════════════════
+// CELL SELECTION
+// ═══════════════════════════════════════════
+
+export function shCellClick(event, rowId, colId) {
+  // If clicking a different cell while editing, commit first
+  if (S.sheet.editingCell) {
+    if (S.sheet.editingCell.rowId !== rowId || S.sheet.editingCell.colId !== colId) {
+      shCommitEdit();
+    }
+  }
+
+  if (event.shiftKey && S.sheet.selectedCell) {
+    // Range select
+    shSelectRange(S.sheet.selectedCell, { rowId, colId });
+  } else {
+    shSelectCell(rowId, colId);
+  }
+}
+
+export function shSelectCell(rowId, colId) {
+  S.sheet.selectedCell = { rowId, colId };
+  S.sheet.selectedRange = null;
+  renderSheetMode();
+}
+
+export function shSelectRange(start, end) {
+  // TODO: implement range selection with overlay in Step 3
+  S.sheet.selectedRange = { start, end };
+  renderSheetMode();
+}
+
+export function shClearSelection() {
+  S.sheet.selectedCell = null;
+  S.sheet.selectedRange = null;
+  S.sheet.editingCell = null;
+  renderSheetMode();
+}
+
+// ═══════════════════════════════════════════
+// CELL EDITING
+// ═══════════════════════════════════════════
+
+export function shCellDblClick(event, rowId, colId) {
+  event.stopPropagation();
+  shStartEdit(rowId, colId);
+}
+
+export function shStartEdit(rowId, colId) {
+  // Commit any current edit first
+  if (S.sheet.editingCell) shCommitEdit();
+
+  S.sheet.selectedCell = { rowId, colId };
+  S.sheet.editingCell = { rowId, colId };
+
+  // Re-render to get the editing state
+  renderSheetMode();
+
+  // Find the cell and make it editable
+  const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
+  if (!cellEl) return;
+
+  const sh = S.sheet.current;
+  const row = sh.rows.find(r => r.id === rowId);
+  if (!row) return;
+  const rawVal = row.cells[colId] || '';
+
+  cellEl.contentEditable = 'true';
+  cellEl.textContent = rawVal; // Show raw value (including formula)
+  cellEl.focus();
+
+  // Select all text
+  const range = document.createRange();
+  range.selectNodeContents(cellEl);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+export function shCommitEdit() {
+  if (!S.sheet.editingCell) return;
+  const { rowId, colId } = S.sheet.editingCell;
+
+  const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
+  if (!cellEl) { S.sheet.editingCell = null; return; }
+
+  const newVal = cellEl.textContent.trim();
+  cellEl.contentEditable = 'false';
+
+  // Check if value actually changed before pushing undo
+  const sh = S.sheet.current;
+  const row = sh ? sh.rows.find(r => r.id === rowId) : null;
+  const oldVal = row ? (row.cells[colId] || '') : '';
+  if (oldVal !== newVal) shPushUndo();
+
+  shSetCellValue(rowId, colId, newVal);
+  S.sheet.editingCell = null;
+  renderSheetMode();
+}
+
+export function shCancelEdit() {
+  if (!S.sheet.editingCell) return;
+  const { rowId, colId } = S.sheet.editingCell;
+  const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
+  if (cellEl) cellEl.contentEditable = 'false';
+  S.sheet.editingCell = null;
+  renderSheetMode();
+}
+
+export function shSetCellValue(rowId, colId, val) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const row = sh.rows.find(r => r.id === rowId);
+  if (!row) return;
+
+  const oldVal = row.cells[colId] || '';
+  if (oldVal === val) return; // no change
+
+  row.cells[colId] = val;
+  sh.updated = new Date().toISOString();
+  shAutoSave();
+
+  // Rebuild deps if it's a formula
+  if (val.startsWith('=') || oldVal.startsWith('=')) {
+    shBuildDeps(shCellKey(rowId, colId));
+  }
+
+  // Recalc downstream
+  shRecalc(shCellKey(rowId, colId));
+}
+
+// ═══════════════════════════════════════════
+// KEYBOARD NAVIGATION
+// ═══════════════════════════════════════════
+
+/**
+ * Navigate selection in a direction. Called from keys.js dispatch table.
+ */
+export function shNavigate(dir) {
+  const sh = S.sheet.current;
+  if (!sh || !S.sheet.selectedCell) return;
+
+  const { rowId, colId } = S.sheet.selectedCell;
+  const rowIdx = sh.rows.findIndex(r => r.id === rowId);
+  const colIdx = sh.columns.findIndex(c => c.id === colId);
+  if (rowIdx < 0 || colIdx < 0) return;
+
+  let newRow = rowIdx, newCol = colIdx;
+  if (dir === 'up') newRow = Math.max(0, rowIdx - 1);
+  else if (dir === 'down') newRow = Math.min(sh.rows.length - 1, rowIdx + 1);
+  else if (dir === 'left') newCol = Math.max(0, colIdx - 1);
+  else if (dir === 'right') newCol = Math.min(sh.columns.length - 1, colIdx + 1);
+
+  if (newRow !== rowIdx || newCol !== colIdx) {
+    shSelectCell(sh.rows[newRow].id, sh.columns[newCol].id);
+  }
+}
+
+/**
+ * Tab: move right (or wrap to next row). Shift+Tab: move left.
+ */
+export function shTabNavigate(shift) {
+  const sh = S.sheet.current;
+  if (!sh || !S.sheet.selectedCell) return;
+
+  const { rowId, colId } = S.sheet.selectedCell;
+  const rowIdx = sh.rows.findIndex(r => r.id === rowId);
+  const colIdx = sh.columns.findIndex(c => c.id === colId);
+
+  if (shift) {
+    // Move left, wrap to previous row end
+    if (colIdx > 0) {
+      shSelectCell(sh.rows[rowIdx].id, sh.columns[colIdx - 1].id);
+    } else if (rowIdx > 0) {
+      shSelectCell(sh.rows[rowIdx - 1].id, sh.columns[sh.columns.length - 1].id);
+    }
+  } else {
+    // Move right, wrap to next row start
+    if (colIdx < sh.columns.length - 1) {
+      shSelectCell(sh.rows[rowIdx].id, sh.columns[colIdx + 1].id);
+    } else if (rowIdx < sh.rows.length - 1) {
+      shSelectCell(sh.rows[rowIdx + 1].id, sh.columns[0].id);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// FORMULA ENGINE — Dependency Graph + Kahn's
+// ═══════════════════════════════════════════
+
+// Two Maps: deps = "I reference these cells", dependents = "these cells reference me"
+const deps = new Map();       // Map<cellKey, Set<cellKey>>
+const dependents = new Map(); // Map<cellKey, Set<cellKey>>
+
+/** Cell key: "colIdx,rowIdx" for formula coord mapping */
+function shCellKey(rowId, colId) {
+  return `${rowId}:${colId}`;
+}
+
+function shCellKeyFromCoord(colIdx, rowIdx) {
+  const sh = S.sheet.current;
+  if (!sh || rowIdx < 0 || rowIdx >= sh.rows.length || colIdx < 0 || colIdx >= sh.columns.length) return null;
+  return shCellKey(sh.rows[rowIdx].id, sh.columns[colIdx].id);
+}
+
+/**
+ * Parse formula to extract cell references, build/update deps + dependents.
+ */
+export function shBuildDeps(cellKey) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+
+  const [rowId, colId] = cellKey.split(':');
+  const row = sh.rows.find(r => r.id === rowId);
+  if (!row) return;
+  const rawVal = row.cells[colId] || '';
+
+  // Remove old deps
+  const oldDeps = deps.get(cellKey) || new Set();
+  for (const dep of oldDeps) {
+    const revSet = dependents.get(dep);
+    if (revSet) revSet.delete(cellKey);
+  }
+
+  // Parse new deps
+  const newDeps = new Set();
+  if (rawVal.startsWith('=')) {
+    const refs = parseFormulaRefs(rawVal, sh);
+    for (const ref of refs) {
+      newDeps.add(ref);
+      if (!dependents.has(ref)) dependents.set(ref, new Set());
+      dependents.get(ref).add(cellKey);
+    }
+  }
+
+  if (newDeps.size > 0) {
+    deps.set(cellKey, newDeps);
+  } else {
+    deps.delete(cellKey);
+  }
+}
+
+/**
+ * Parse a formula string and return all cell keys it references.
+ */
+function parseFormulaRefs(formula, sh) {
+  const refs = new Set();
+  // Match cell references like A1, B23, AA5 and ranges like A1:B5
+  const refRegex = /([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?/g;
+  let match;
+  while ((match = refRegex.exec(formula)) !== null) {
+    const col1 = letterToColIndex(match[1]);
+    const row1 = parseInt(match[2], 10) - 1;
+
+    if (match[3] && match[4]) {
+      // Range: expand all cells
+      const col2 = letterToColIndex(match[3]);
+      const row2 = parseInt(match[4], 10) - 1;
+      const minCol = Math.min(col1, col2), maxCol = Math.max(col1, col2);
+      const minRow = Math.min(row1, row2), maxRow = Math.max(row1, row2);
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          const k = shCellKeyFromCoord(c, r);
+          if (k) refs.add(k);
+        }
+      }
+    } else {
+      // Single cell
+      const k = shCellKeyFromCoord(col1, row1);
+      if (k) refs.add(k);
+    }
+  }
+  return refs;
+}
+
+/**
+ * BFS from changedCellKey → collect all downstream dirty cells.
+ */
+export function shGetDirtyCells(startKey) {
+  const dirty = new Set();
+  const queue = [startKey];
+  while (queue.length > 0) {
+    const key = queue.shift();
+    for (const dep of (dependents.get(key) || [])) {
+      if (!dirty.has(dep)) {
+        dirty.add(dep);
+        queue.push(dep);
+      }
+    }
+  }
+  return dirty;
+}
+
+/**
+ * Kahn's algorithm — topological sort + cycle detection.
+ * Only runs on the dirty set.
+ */
+export function shTopoSort(dirtyCells) {
+  const inDegree = new Map();
+  for (const id of dirtyCells) {
+    let count = 0;
+    for (const d of (deps.get(id) || [])) {
+      if (dirtyCells.has(d)) count++;
+    }
+    inDegree.set(id, count);
+  }
+
+  const queue = [];
+  for (const [id, deg] of inDegree) {
+    if (deg === 0) queue.push(id);
+  }
+
+  const order = [];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    order.push(id);
+    for (const dep of (dependents.get(id) || [])) {
+      if (!inDegree.has(dep)) continue;
+      const newDeg = inDegree.get(dep) - 1;
+      inDegree.set(dep, newDeg);
+      if (newDeg === 0) queue.push(dep);
+    }
+  }
+
+  const circular = new Set();
+  for (const id of dirtyCells) {
+    if (!order.includes(id)) circular.add(id);
+  }
+
+  return { order, circular };
+}
+
+/**
+ * Full recalc pipeline: getDirty → topoSort → eval → mark circular.
+ */
+export function shRecalc(changedKey) {
+  const dirty = shGetDirtyCells(changedKey);
+  if (dirty.size === 0) return;
+
+  const { order, circular } = shTopoSort(dirty);
+  const sh = S.sheet.current;
+  if (!sh) return;
+
+  // Eval in topological order (deps already resolved)
+  for (const key of order) {
+    // We don't store computed values — rendering re-evals.
+    // But we do need to trigger re-render.
+  }
+
+  // Mark circular cells — store error marker in a transient cache
+  for (const key of circular) {
+    // Circular cells will be caught at render time by shEvalFormula
+    // since they'll recurse back to themselves.
+  }
+
+  // Note: actual evaluation happens at render time via shEvalFormula().
+  // The topo sort here is for future optimization where we cache computed values.
+  // For now, the dependency graph's main job is cycle detection.
+}
+
+/**
+ * Evaluate a formula string. Returns computed value or {error: string}.
+ */
+export function shEvalFormula(formula, sh, _visited) {
+  if (!formula || !formula.startsWith('=')) return formula;
+
+  // Circular reference detection
+  if (!_visited) _visited = new Set();
+
+  try {
+    const expr = formula.slice(1).trim().toUpperCase();
+
+    // Match function calls: SUM(A1:A10), AVG(B2:B5), etc.
+    const funcMatch = expr.match(/^(SUM|AVG|AVERAGE|COUNT|MIN|MAX|STDEV|MEDIAN)\((.+)\)$/);
+    if (funcMatch) {
+      const funcName = funcMatch[1];
+      const argStr = funcMatch[2];
+      const values = resolveRange(argStr, sh, _visited);
+      if (values.error) return values;
+      const nums = values.filter(v => typeof v === 'number' && !isNaN(v));
+
+      switch (funcName) {
+        case 'SUM': return nums.reduce((a, b) => a + b, 0);
+        case 'AVG':
+        case 'AVERAGE': return nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
+        case 'COUNT': return values.filter(v => v !== '' && v !== null && v !== undefined).length;
+        case 'MIN': return nums.length > 0 ? Math.min(...nums) : 0;
+        case 'MAX': return nums.length > 0 ? Math.max(...nums) : 0;
+        case 'STDEV': {
+          if (nums.length < 2) return 0;
+          const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+          const variance = nums.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (nums.length - 1);
+          return Math.round(Math.sqrt(variance) * 1000) / 1000;
+        }
+        case 'MEDIAN': {
+          if (nums.length === 0) return 0;
+          const sorted = [...nums].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+        default: return { error: '#ERROR!' };
+      }
+    }
+
+    // Simple arithmetic: =A1+B1, =A1*2, etc.
+    // Replace cell references with their values
+    const evaluated = expr.replace(/([A-Z]+)(\d+)/g, (_, colLetter, rowNum) => {
+      const colIdx = letterToColIndex(colLetter);
+      const rowIdx = parseInt(rowNum, 10) - 1;
+      if (rowIdx < 0 || rowIdx >= sh.rows.length || colIdx < 0 || colIdx >= sh.columns.length) {
+        return 'NaN';
+      }
+      const colId = sh.columns[colIdx].id;
+      const rowId = sh.rows[rowIdx].id;
+      const cellKey = shCellKey(rowId, colId);
+
+      // Circular check
+      if (_visited.has(cellKey)) return 'NaN'; // will produce NaN in eval
+      _visited.add(cellKey);
+
+      const raw = sh.rows[rowIdx].cells[colId] || '';
+      if (raw.startsWith('=')) {
+        const result = shEvalFormula(raw, sh, _visited);
+        if (typeof result === 'object' && result.error) return 'NaN';
+        return typeof result === 'number' ? result : (parseFloat(result) || 0);
+      }
+      const n = parseFloat(raw);
+      return isNaN(n) ? 0 : n;
+    });
+
+    // Safe eval of arithmetic expression
+    const result = safeEvalArith(evaluated);
+    if (result === null) return { error: '#ERROR!' };
+    if (!isFinite(result)) return { error: '#DIV/0!' };
+    return Math.round(result * 1000000) / 1000000; // avoid floating point noise
+
+  } catch (e) {
+    return { error: '#ERROR!' };
+  }
+}
+
+/**
+ * Resolve a range string (e.g., "A1:B5" or "A1") to an array of numeric values.
+ */
+function resolveRange(rangeStr, sh, visited) {
+  const values = [];
+  // Could be "A1:B5" or "A1,B2,C3" or "A1:A5,B1"
+  const parts = rangeStr.split(',');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    const rangeMatch = trimmed.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+    if (rangeMatch) {
+      const col1 = letterToColIndex(rangeMatch[1]), row1 = parseInt(rangeMatch[2], 10) - 1;
+      const col2 = letterToColIndex(rangeMatch[3]), row2 = parseInt(rangeMatch[4], 10) - 1;
+      const minCol = Math.min(col1, col2), maxCol = Math.max(col1, col2);
+      const minRow = Math.min(row1, row2), maxRow = Math.max(row1, row2);
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          if (r < 0 || r >= sh.rows.length || c < 0 || c >= sh.columns.length) continue;
+          const raw = sh.rows[r].cells[sh.columns[c].id] || '';
+          if (raw.startsWith('=')) {
+            const v = shEvalFormula(raw, sh, new Set(visited));
+            if (typeof v === 'object' && v.error) continue;
+            const n = parseFloat(v);
+            values.push(isNaN(n) ? v : n);
+          } else {
+            const n = parseFloat(raw);
+            values.push(isNaN(n) ? raw : n);
+          }
+        }
+      }
+    } else {
+      // Single cell
+      const cellMatch = trimmed.match(/^([A-Z]+)(\d+)$/);
+      if (cellMatch) {
+        const c = letterToColIndex(cellMatch[1]), r = parseInt(cellMatch[2], 10) - 1;
+        if (r >= 0 && r < sh.rows.length && c >= 0 && c < sh.columns.length) {
+          const raw = sh.rows[r].cells[sh.columns[c].id] || '';
+          if (raw.startsWith('=')) {
+            const v = shEvalFormula(raw, sh, new Set(visited));
+            if (typeof v === 'object' && v.error) continue;
+            const n = parseFloat(v);
+            values.push(isNaN(n) ? v : n);
+          } else {
+            const n = parseFloat(raw);
+            values.push(isNaN(n) ? raw : n);
+          }
+        }
+      }
+    }
+  }
+  return values;
+}
+
+/**
+ * Safe arithmetic evaluator. Only allows numbers and +-*\/().
+ */
+function safeEvalArith(expr) {
+  // Remove whitespace
+  const cleaned = expr.replace(/\s/g, '');
+  // Validate: only numbers, operators, parens, decimal points
+  if (!/^[\d+\-*/.() ]+$/.test(cleaned)) return null;
+  try {
+    return Function('"use strict"; return (' + cleaned + ')')();
+  } catch (e) {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════
+// UNDO / REDO — Snapshot-based (same pattern as doc.js)
+// ═══════════════════════════════════════════
+
+function shSnapshot() {
+  const sh = S.sheet.current;
+  if (!sh) return null;
+  return JSON.stringify({
+    columns: sh.columns,
+    rows: sh.rows,
+    frozenRows: sh.frozenRows,
+    frozenCols: sh.frozenCols,
+  });
+}
+
+function shRestore(snapshot) {
+  if (!snapshot) return;
+  const data = JSON.parse(snapshot);
+  const sh = S.sheet.current;
+  if (!sh) return;
+  sh.columns = data.columns;
+  sh.rows = data.rows;
+  sh.frozenRows = data.frozenRows;
+  sh.frozenCols = data.frozenCols;
+  sh.updated = new Date().toISOString();
+  // Clear editing state after restore
+  S.sheet.editingCell = null;
+  renderSheetMode();
+  shAutoSave();
+}
+
+export function shPushUndo() {
+  if (S.sheet.undoRedoInProgress) return;
+  const snap = shSnapshot();
+  if (!snap) return;
+  S.sheet.undoStack.push(snap);
+  if (S.sheet.undoStack.length > SHEET_MAX_UNDO) S.sheet.undoStack.shift();
+  S.sheet.redoStack = []; // clear redo on new action
+  shUpdateUndoUI();
+}
+
+export function shUndo() {
+  if (S.sheet.undoStack.length === 0) return;
+  S.sheet.undoRedoInProgress = true;
+  // Push current state to redo
+  const current = shSnapshot();
+  if (current) S.sheet.redoStack.push(current);
+  // Restore previous state
+  shRestore(S.sheet.undoStack.pop());
+  S.sheet.undoRedoInProgress = false;
+  shUpdateUndoUI();
+}
+
+export function shRedo() {
+  if (S.sheet.redoStack.length === 0) return;
+  S.sheet.undoRedoInProgress = true;
+  // Push current state to undo
+  const current = shSnapshot();
+  if (current) S.sheet.undoStack.push(current);
+  // Restore redo state
+  shRestore(S.sheet.redoStack.pop());
+  S.sheet.undoRedoInProgress = false;
+  shUpdateUndoUI();
+}
+
+export function shUpdateUndoUI() {
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  if (undoBtn) undoBtn.disabled = S.sheet.undoStack.length === 0;
+  if (redoBtn) redoBtn.disabled = S.sheet.redoStack.length === 0;
+}
+
+// Auto-save sheet to localStorage
+function shAutoSave() {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  clearTimeout(S.sheet.autoSaveTimer);
+  S.sheet.autoSaveTimer = setTimeout(() => {
+    try { localStorage.setItem('sloth_current_sheet', JSON.stringify(sh)); } catch(e) {}
+  }, 500);
+}
+
+// ═══════════════════════════════════════════
+// ROW / COLUMN OPERATIONS (placeholder for Step 7)
+// ═══════════════════════════════════════════
+
+export function shAddRow(afterRowId) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const cells = {};
+  sh.columns.forEach(col => { cells[col.id] = ''; });
+  const newRow = { id: shId('row'), cells };
+  if (afterRowId) {
+    const idx = sh.rows.findIndex(r => r.id === afterRowId);
+    sh.rows.splice(idx + 1, 0, newRow);
+  } else {
+    sh.rows.push(newRow);
+  }
+  renderSheetMode();
+}
+
+export function shAddCol(afterColId) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const newColIdx = afterColId
+    ? sh.columns.findIndex(c => c.id === afterColId) + 1
+    : sh.columns.length;
+  const newCol = { id: shId('col'), name: colIndexToLetter(newColIdx), width: DEFAULT_COL_WIDTH };
+  sh.columns.splice(newColIdx, 0, newCol);
+  // Re-letter all columns
+  sh.columns.forEach((c, i) => { c.name = colIndexToLetter(i); });
+  // Add empty cells in new column for all rows
+  sh.rows.forEach(row => { row.cells[newCol.id] = ''; });
+  renderSheetMode();
+}
+
+export function shDeleteRow(rowId) {
+  const sh = S.sheet.current;
+  if (!sh || sh.rows.length <= 1) return;
+  sh.rows = sh.rows.filter(r => r.id !== rowId);
+  if (S.sheet.selectedCell && S.sheet.selectedCell.rowId === rowId) {
+    S.sheet.selectedCell = null;
+  }
+  renderSheetMode();
+}
+
+export function shDeleteCol(colId) {
+  const sh = S.sheet.current;
+  if (!sh || sh.columns.length <= 1) return;
+  sh.columns = sh.columns.filter(c => c.id !== colId);
+  sh.columns.forEach((c, i) => { c.name = colIndexToLetter(i); });
+  sh.rows.forEach(row => { delete row.cells[colId]; });
+  if (S.sheet.selectedCell && S.sheet.selectedCell.colId === colId) {
+    S.sheet.selectedCell = null;
+  }
+  renderSheetMode();
+}
+
+export function shAutoFitCol(colId) {
+  // Will be properly implemented with DOM measurement in Step 7
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const col = sh.columns.find(c => c.id === colId);
+  if (!col) return;
+  // For now, toggle between default and max
+  col.width = col.width === DEFAULT_COL_WIDTH ? MAX_COL_WIDTH : DEFAULT_COL_WIDTH;
+  renderSheetMode();
+}
+
+// ═══════════════════════════════════════════
+// CONTEXT MENUS (placeholder — will use renderCtxMenuPopup in Step 7)
+// ═══════════════════════════════════════════
+
+export function shCellCtx(event, rowId, colId) {
+  // TODO: Step 7 — right-click context menu
+}
+
+export function shColHeaderCtx(event, colId) {
+  // TODO: Step 7
+}
+
+export function shRowHeaderCtx(event, rowId) {
+  // TODO: Step 7
+}
+
+// ═══════════════════════════════════════════
+// AI INTEGRATION (placeholder for Step 11)
+// ═══════════════════════════════════════════
+
+/**
+ * Serialize sheet as tab-separated text for LLM context injection.
+ */
+export function shSerializeForAI() {
+  const sh = S.sheet.current;
+  if (!sh) return '';
+  const header = sh.columns.map(c => c.name).join('\t');
+  const rows = sh.rows.map(row =>
+    sh.columns.map(col => {
+      const raw = row.cells[col.id] || '';
+      if (raw.startsWith('=')) {
+        const v = shEvalFormula(raw, sh);
+        return typeof v === 'object' ? raw : String(v);
+      }
+      return raw;
+    }).join('\t')
+  );
+  return header + '\n' + rows.join('\n');
+}
+
+// ═══════════════════════════════════════════
+// SHEET MODE ENTRY
+// ═══════════════════════════════════════════
+
+/**
+ * Enter sheet mode with a fresh sheet — called from wsNewFile('sheet').
+ */
+export function enterSheetMode() {
+  // Create a fresh sheet (modeEnter will also check, but we want a NEW one)
+  S.sheet.current = shCreateNew('Untitled Sheet');
+  S.sheet.undoStack = [];
+  S.sheet.redoStack = [];
+  S.sheet.selectedCell = null;
+  S.sheet.editingCell = null;
+  S.sheet.selectedRange = null;
+  window.modeEnter('sheet');
+}

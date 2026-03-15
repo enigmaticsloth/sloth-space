@@ -147,24 +147,44 @@ export function wsCreateDoc(title, text) {
  */
 export function wsCreateSheet(title, csvOrText) {
   const files = wsLoad();
-  // Parse simple CSV / tab-separated / line-separated table
-  const lines = csvOrText
-    .trim()
-    .split('\n')
-    .map(l => l.split(/[,\t]/).map(c => c.trim()));
-  const columns = lines[0] || [];
-  const rows = lines.slice(1);
+  // Use sheet.js ID-based schema
+  let content;
+  if (csvOrText && csvOrText.trim()) {
+    // Parse CSV/TSV into ID-based format
+    const lines = csvOrText.trim().split('\n').map(l => l.split(/[,\t]/).map(c => c.trim()));
+    const headerNames = lines[0] || [];
+    const columns = headerNames.map((name, i) => ({
+      id: 'col_' + Date.now().toString(36) + '_' + i.toString(36),
+      name: _colLetter(i),
+      width: 120
+    }));
+    const rows = lines.slice(1).map((cells, ri) => {
+      const cellMap = {};
+      columns.forEach((col, ci) => { cellMap[col.id] = cells[ci] || ''; });
+      return { id: 'row_' + Date.now().toString(36) + '_' + ri.toString(36), cells: cellMap };
+    });
+    content = { columns, rows, frozenRows: 1, frozenCols: 0 };
+  } else {
+    // Blank sheet — delegate to shCreateNew if available, else inline default
+    content = window.shCreateNew ? window.shCreateNew(title) : { columns: [], rows: [], frozenRows: 1, frozenCols: 0 };
+  }
   const sheet = {
     id: wsId(),
     type: 'sheet',
     title: title || 'Untitled Sheet',
     created: new Date().toISOString(),
     updated: new Date().toISOString(),
-    content: { columns, rows }
+    content
   };
   files.push(sheet);
   wsSave(files);
   return sheet;
+}
+
+function _colLetter(idx) {
+  let s = ''; idx++;
+  while (idx > 0) { idx--; s = String.fromCharCode(65 + (idx % 26)) + s; idx = Math.floor(idx / 26); }
+  return s;
 }
 
 /**
@@ -1542,10 +1562,20 @@ export const wsItemLoaders = {
     return wsItemLoaders.slides(item);
   },
   sheet(item) {
-    // Sheet: just enter workspace with the sheet selected
-    // TODO: full sheet editor
-    window.addMessage(`Sheet "${item.title}" — sheet editor coming soon!`, 'system');
-    return false;
+    if (!item.content || !item.content.columns || !item.content.rows) {
+      window.addMessage('This sheet has no content.', 'system');
+      return false;
+    }
+    S.sheet.current = item.content;
+    S.sheet.current.title = item.title || 'Untitled Sheet';
+    S.sheet.selectedCell = null;
+    S.sheet.editingCell = null;
+    S.sheet.selectedRange = null;
+    S.sheet.undoStack = [];
+    S.sheet.redoStack = [];
+    window.addMessage(`✓ Opened: "${item.title || 'Untitled Sheet'}" (${item.content.rows.length} rows, ${item.content.columns.length} cols)`, 'system');
+    try { localStorage.setItem('sloth_current_sheet', JSON.stringify(S.sheet.current)); } catch(e) {}
+    return true;
   },
   image(item) {
     // Open image viewer overlay
@@ -1580,6 +1610,7 @@ export function openWorkspaceItem(index) {
     window.updateModeNameBar(targetMode);
     if (targetMode === 'doc') window.renderDocMode();
     else if (targetMode === 'slide') window.renderApp();
+    else if (targetMode === 'sheet') window.renderSheetMode();
   } else {
     window.modeEnter(targetMode);
   }

@@ -78,7 +78,17 @@ export function initKeys(){
     if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z'||e.key==='y'||e.key==='Y')){
       // Regular inputs (chatInput, textarea, select) — NOT contenteditable → let browser handle
       const isPlainInput=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT');
-      if(isPlainInput) return;
+      if(isPlainInput&&S.currentMode!=='sheet') return;
+      // Sheet editing cell → our undo, not browser
+      if(S.currentMode==='sheet'){
+        e.preventDefault();
+        if(S.sheet.editingCell) window.shCommitEdit();
+        const isSheetUndo=(e.key==='z'||e.key==='Z')&&!e.shiftKey;
+        const isSheetRedo=(e.key==='y'||e.key==='Y')||((e.key==='z'||e.key==='Z')&&e.shiftKey);
+        if(isSheetUndo) window.shUndo();
+        else if(isSheetRedo) window.shRedo();
+        return;
+      }
       // Slide inline edit contenteditable → let browser handle (DOM isn't rebuilt)
       if(window.isInlineEditing()) return;
       // Doc block contenteditable OR no focus → use our undo system
@@ -96,6 +106,52 @@ export function initKeys(){
     }
 
     if(window.isInlineEditing()) return; // let browser handle other keys in slide inline edit
+
+    // ── Sheet-specific keys (early-return dispatch — functionally equivalent to dispatch table) ──
+    // NOTE: Spec calls for keyHandlers = { slide:{...}, doc:{...}, sheet:{...} } dispatch table.
+    // Using early-return pattern here to avoid touching stable slide/doc logic. Can refactor
+    // to formal dispatch table once all three modes' handlers are finalized.
+    if(S.currentMode==='sheet'){
+      if(e.key==='Escape'){
+        e.preventDefault();
+        if(S.sheet.editingCell) window.shCancelEdit();
+        else window.shClearSelection();
+        return;
+      }
+      if(e.key==='Enter'&&!isInput){
+        e.preventDefault();
+        if(S.sheet.editingCell){ window.shCommitEdit(); window.shNavigate('down'); }
+        else if(S.sheet.selectedCell) window.shStartEdit(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId);
+        return;
+      }
+      if(e.key==='Tab'){
+        e.preventDefault();
+        if(S.sheet.editingCell) window.shCommitEdit();
+        window.shTabNavigate(e.shiftKey);
+        return;
+      }
+      if((e.key==='Delete'||e.key==='Backspace')&&!S.sheet.editingCell&&S.sheet.selectedCell){
+        e.preventDefault();
+        window.shPushUndo();
+        window.shSetCellValue(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId, '');
+        window.renderSheetMode();
+        return;
+      }
+      // Arrow keys in sheet (only when not editing)
+      if(!S.sheet.editingCell&&(e.key==='ArrowUp'||e.key==='ArrowDown'||e.key==='ArrowLeft'||e.key==='ArrowRight')){
+        e.preventDefault();
+        const dir=e.key.replace('Arrow','').toLowerCase();
+        window.shNavigate(dir);
+        return;
+      }
+      // Type to start editing (printable chars, not editing, not in input)
+      if(!S.sheet.editingCell&&S.sheet.selectedCell&&!isInput&&e.key.length===1&&!e.ctrlKey&&!e.metaKey){
+        window.shStartEdit(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId);
+        // Let the keystroke flow into the contenteditable
+        return;
+      }
+      return; // sheet handled — don't fall through to slide/doc handlers
+    }
 
     // ── Escape — deselect in both modes ──
     if(e.key==='Escape'){
@@ -153,7 +209,7 @@ export function initKeys(){
     if(document.activeElement.isContentEditable||aTag==='INPUT'||aTag==='TEXTAREA'||aTag==='SELECT') return;
     // Don't hijack when Shift is held (text selection) or in doc mode (doc has its own arrow key handling)
     if(e.shiftKey) return;
-    if(S.currentMode==='doc') return;
+    if(S.currentMode==='doc'||S.currentMode==='sheet') return;
     if(e.key==='ArrowRight'&&S.currentDeck){window.goSlide(Math.min(S.currentSlide+1,S.currentDeck.slides.length-1));e.preventDefault();}
     if(e.key==='ArrowLeft'&&S.currentDeck){window.goSlide(Math.max(S.currentSlide-1,0));e.preventDefault();}
   });
@@ -274,6 +330,9 @@ export function initKeys(){
     if(S.currentMode==='slide'&&S.currentDeck){
       window.autoSave();
     }
+    if(S.currentMode==='sheet'&&S.sheet.current){
+      try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){}
+    }
     // Always save chat tabs on unload
     if(window.saveChatTabs) window.saveChatTabs();
   });
@@ -282,6 +341,9 @@ export function initKeys(){
     if(document.hidden){
       if(S.currentMode==='doc'&&S.currentDoc) window.docSaveNow();
       if(S.currentMode==='slide'&&S.currentDeck) window.autoSave();
+      if(S.currentMode==='sheet'&&S.sheet.current){
+        try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){}
+      }
     }
   });
 }

@@ -4325,7 +4325,7 @@ function toggleModeSwitchMenu(e){
 function switchToMode(mode){
   document.getElementById('modeSwitchMenu').style.display='none';
   if(mode===currentMode) return;
-  if(mode==='sheet'){ addMessage('Sheet mode coming soon!','system'); return; }
+  // Sheet mode now available via index.html (ES module version)
   modeEnter(mode);
 }
 

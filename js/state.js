@@ -218,6 +218,18 @@ export const S = {
   dragCounter: 0,
   imeComposing: false,
 
+  // ── Sheet Mode ──
+  sheet: {
+    current: null,           // current sheet data (SheetContent)
+    editingCell: null,       // { rowId, colId } currently being edited
+    selectedCell: null,      // { rowId, colId } currently selected
+    selectedRange: null,     // { startRow, startCol, endRow, endCol }
+    undoStack: [],
+    redoStack: [],
+    undoRedoInProgress: false,
+    autoSaveTimer: null,
+  },
+
   // ── Touch / Mobile ──
   touchStartX: 0,
   touchStartY: 0,
