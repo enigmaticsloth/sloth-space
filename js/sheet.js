@@ -222,11 +222,17 @@ export function shCellMouseDown(event, rowId, colId) {
 
   // Prevent text selection during drag
   event.preventDefault();
+  // Clear any existing browser text selection
+  window.getSelection().removeAllRanges();
+  // Block selectstart globally while dragging
+  document.addEventListener('selectstart', _blockSelect);
 
   // Bind move/up on document (captured once per drag)
   document.addEventListener('mousemove', _onDragMove);
   document.addEventListener('mouseup', _onDragEnd);
 }
+
+function _blockSelect(e) { e.preventDefault(); }
 
 function _cellFromPoint(x, y) {
   const el = document.elementFromPoint(x, y);
@@ -262,6 +268,7 @@ function _onDragMove(e) {
 function _onDragEnd(e) {
   document.removeEventListener('mousemove', _onDragMove);
   document.removeEventListener('mouseup', _onDragEnd);
+  document.removeEventListener('selectstart', _blockSelect);
   if (_dragState && _dragState.moved) {
     _dragState.justFinished = true; // suppress the click event that follows mouseup
   }
@@ -990,6 +997,35 @@ export function shBatchAddCols() {
 // CLIPBOARD — Copy / Paste / Cut
 // ═══════════════════════════════════════════
 
+// ── Clipboard helpers (fallback for file:// and non-HTTPS) ──
+let _shClipboard = ''; // internal fallback clipboard
+
+function _copyToClipboard(text) {
+  _shClipboard = text; // always store internally
+  // Try modern clipboard API
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    return;
+  }
+  // Fallback: hidden textarea + execCommand
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+}
+
+async function _readFromClipboard() {
+  // Try modern clipboard API
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    try { return await navigator.clipboard.readText(); } catch(e) {}
+  }
+  // Fallback: return internal clipboard
+  return _shClipboard;
+}
+
 /**
  * Copy selected cell or range to clipboard as tab-separated text.
  */
@@ -1000,7 +1036,7 @@ export function shCopy() {
   const { text } = _getSelectionText(sh);
   if (!text) return;
 
-  navigator.clipboard.writeText(text).catch(() => {});
+  _copyToClipboard(text);
 }
 
 /**
@@ -1013,7 +1049,7 @@ export function shCut() {
   const { text, cells } = _getSelectionText(sh);
   if (!text) return;
 
-  navigator.clipboard.writeText(text).catch(() => {});
+  _copyToClipboard(text);
   shPushUndo();
   for (const { rowId, colId } of cells) {
     const row = sh.rows.find(r => r.id === rowId);
@@ -1030,8 +1066,7 @@ export async function shPaste() {
   const sh = S.sheet.current;
   if (!sh || !S.sheet.selectedCell) return;
 
-  let clipText;
-  try { clipText = await navigator.clipboard.readText(); } catch { return; }
+  const clipText = await _readFromClipboard();
   if (!clipText) return;
 
   shPushUndo();

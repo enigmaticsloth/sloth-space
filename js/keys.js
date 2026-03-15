@@ -78,7 +78,8 @@ export function initKeys(){
     if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==='z'||e.key==='Z'||e.key==='y'||e.key==='Y')){
       // Regular inputs (chatInput, textarea, select) — NOT contenteditable → let browser handle
       const isPlainInput=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT');
-      if(isPlainInput&&S.currentMode!=='sheet') return;
+      const isNonSheetPlainInput=isPlainInput&&!(e.target.closest&&e.target.closest('.sh-grid'));
+      if(isNonSheetPlainInput) return; // Let browser handle undo in chat input, batch inputs, etc.
       // Sheet editing cell → our undo, not browser
       if(S.currentMode==='sheet'){
         e.preventDefault();
@@ -107,63 +108,66 @@ export function initKeys(){
 
     if(window.isInlineEditing()) return; // let browser handle other keys in slide inline edit
 
-    // ── Sheet-specific keys (early-return dispatch — functionally equivalent to dispatch table) ──
-    // NOTE: Spec calls for keyHandlers = { slide:{...}, doc:{...}, sheet:{...} } dispatch table.
-    // Using early-return pattern here to avoid touching stable slide/doc logic. Can refactor
-    // to formal dispatch table once all three modes' handlers are finalized.
+    // ── Sheet-specific keys (early-return dispatch) ──
+    // IMPORTANT: Only intercept keys when focus is on the sheet grid or a sheet cell,
+    // NOT when the user is typing in chat input, batch inputs, etc.
     if(S.currentMode==='sheet'){
-      // ── Copy / Cut / Paste ──
-      if((e.ctrlKey||e.metaKey)&&(e.key==='c'||e.key==='C')&&!S.sheet.editingCell){
-        e.preventDefault(); window.shCopy(); return;
-      }
-      if((e.ctrlKey||e.metaKey)&&(e.key==='x'||e.key==='X')&&!S.sheet.editingCell){
-        e.preventDefault(); window.shCut(); return;
-      }
-      if((e.ctrlKey||e.metaKey)&&(e.key==='v'||e.key==='V')&&!S.sheet.editingCell){
-        e.preventDefault(); window.shPaste(); return;
-      }
+      // Determine if focus is inside a non-sheet input (chat textarea, batch inputs, etc.)
+      const isSheetCell=isCE&&e.target.closest&&e.target.closest('.sh-cell');
+      const isNonSheetInput=(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')&&!e.target.closest('.sh-grid');
+      // If user is in a non-sheet input, let browser handle everything normally
+      if(isNonSheetInput) {/* fall through to slide/doc handlers or browser default */}
+      else {
+        // ── Copy / Cut / Paste ──
+        if((e.ctrlKey||e.metaKey)&&(e.key==='c'||e.key==='C')&&!S.sheet.editingCell){
+          e.preventDefault(); window.shCopy(); return;
+        }
+        if((e.ctrlKey||e.metaKey)&&(e.key==='x'||e.key==='X')&&!S.sheet.editingCell){
+          e.preventDefault(); window.shCut(); return;
+        }
+        if((e.ctrlKey||e.metaKey)&&(e.key==='v'||e.key==='V')&&!S.sheet.editingCell){
+          e.preventDefault(); window.shPaste(); return;
+        }
 
-      if(e.key==='Escape'){
-        e.preventDefault();
-        if(S.sheet.editingCell) window.shCancelEdit();
-        else window.shClearSelection();
-        return;
+        if(e.key==='Escape'){
+          e.preventDefault();
+          if(S.sheet.editingCell) window.shCancelEdit();
+          else window.shClearSelection();
+          return;
+        }
+        if(e.key==='Enter'){
+          // Shift+Enter while editing → insert newline (let browser handle contentEditable)
+          if(e.shiftKey&&S.sheet.editingCell) return;
+          // Enter while editing → commit + move down
+          if(S.sheet.editingCell){ e.preventDefault(); window.shCommitEdit(); window.shNavigate('down'); return; }
+          // Enter while selected → start editing
+          if(S.sheet.selectedCell){ e.preventDefault(); window.shStartEdit(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId); return; }
+        }
+        if(e.key==='Tab'){
+          e.preventDefault();
+          if(S.sheet.editingCell) window.shCommitEdit();
+          window.shTabNavigate(e.shiftKey);
+          return;
+        }
+        if((e.key==='Delete'||e.key==='Backspace')&&!S.sheet.editingCell&&(S.sheet.selectedCell||S.sheet.selectedRange)){
+          e.preventDefault();
+          window.shDeleteSelection();
+          return;
+        }
+        // Arrow keys in sheet (only when not editing)
+        if(!S.sheet.editingCell&&(e.key==='ArrowUp'||e.key==='ArrowDown'||e.key==='ArrowLeft'||e.key==='ArrowRight')){
+          e.preventDefault();
+          const dir=e.key.replace('Arrow','').toLowerCase();
+          window.shNavigate(dir);
+          return;
+        }
+        // Type to start editing (printable chars, not editing, not in input)
+        if(!S.sheet.editingCell&&S.sheet.selectedCell&&!isInput&&e.key.length===1&&!e.ctrlKey&&!e.metaKey){
+          window.shStartEdit(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId);
+          return;
+        }
+        return; // sheet handled — don't fall through to slide/doc handlers
       }
-      if(e.key==='Enter'){
-        // Shift+Enter while editing → insert newline (let browser handle contentEditable)
-        if(e.shiftKey&&S.sheet.editingCell) return;
-        // Enter while editing → commit + move down
-        e.preventDefault();
-        if(S.sheet.editingCell){ window.shCommitEdit(); window.shNavigate('down'); }
-        // Enter while selected → start editing
-        else if(S.sheet.selectedCell) window.shStartEdit(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId);
-        return;
-      }
-      if(e.key==='Tab'){
-        e.preventDefault();
-        if(S.sheet.editingCell) window.shCommitEdit();
-        window.shTabNavigate(e.shiftKey);
-        return;
-      }
-      if((e.key==='Delete'||e.key==='Backspace')&&!S.sheet.editingCell&&(S.sheet.selectedCell||S.sheet.selectedRange)){
-        e.preventDefault();
-        window.shDeleteSelection();
-        return;
-      }
-      // Arrow keys in sheet (only when not editing)
-      if(!S.sheet.editingCell&&(e.key==='ArrowUp'||e.key==='ArrowDown'||e.key==='ArrowLeft'||e.key==='ArrowRight')){
-        e.preventDefault();
-        const dir=e.key.replace('Arrow','').toLowerCase();
-        window.shNavigate(dir);
-        return;
-      }
-      // Type to start editing (printable chars, not editing, not in input)
-      if(!S.sheet.editingCell&&S.sheet.selectedCell&&!isInput&&e.key.length===1&&!e.ctrlKey&&!e.metaKey){
-        window.shStartEdit(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId);
-        // Let the keystroke flow into the contenteditable
-        return;
-      }
-      return; // sheet handled — don't fall through to slide/doc handlers
     }
 
     // ── Escape — deselect in both modes ──

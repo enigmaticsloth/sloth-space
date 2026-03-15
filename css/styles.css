@@ -608,6 +608,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   cursor:cell;
   outline:none;
   word-wrap:break-word;
+  user-select:none; -webkit-user-select:none;
 }
 .sh-cell:hover { background:rgba(120,134,165,0.04); }
 .sh-cell.selected {
@@ -623,6 +624,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   white-space:pre-wrap;
   overflow:visible;
   z-index:2;
+  user-select:text; -webkit-user-select:text;
+  cursor:text;
 }
 .sh-cell.in-range {
   background:rgba(120,134,165,0.15);
@@ -632,7 +635,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 }
 .sh-cell.error { color:#e55; font-style:italic; font-size:11px; }
 .sh-grid { user-select:none; -webkit-user-select:none; }
-.sh-cell.editing { user-select:text; -webkit-user-select:text; }
 
 /* Add row/col buttons */
 .sh-add-col-btn {
