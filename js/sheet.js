@@ -1161,14 +1161,34 @@ export function shUpdateUndoUI() {
   if (redoBtn) redoBtn.disabled = S.sheet.redoStack.length === 0;
 }
 
-// Auto-save sheet to localStorage
+// Auto-save sheet to localStorage + workspace
 function shAutoSave() {
   const sh = S.sheet.current;
   if (!sh) return;
   clearTimeout(S.sheet.autoSaveTimer);
   S.sheet.autoSaveTimer = setTimeout(() => {
+    // 1. Persist to localStorage (survives refresh)
     try { localStorage.setItem('sloth_current_sheet', JSON.stringify(sh)); } catch(e) {}
+    // 2. Sync back to workspace storage (like doc does)
+    shSaveToWorkspace();
   }, 500);
+}
+
+// Sync current sheet data back to workspace file list
+function shSaveToWorkspace() {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const fileId = S._wsCurrentFileId;
+  if (!fileId || !window.wsLoad || !window.wsSave) return;
+  const files = window.wsLoad();
+  const idx = files.findIndex(f => f.id === fileId && f.type === 'sheet');
+  if (idx < 0) return;
+  // Update content and metadata
+  const { title, ...content } = sh;
+  files[idx].title = title || files[idx].title;
+  files[idx].content = content;
+  files[idx].updated = new Date().toISOString();
+  window.wsSave(files);
 }
 
 // ═══════════════════════════════════════════

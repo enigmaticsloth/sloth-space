@@ -1,5 +1,23 @@
 import { S, LLM_DEFAULTS, CONFIG_KEY, CHAT_TABS_KEY, VALID_PRESETS, VALID_LAYOUTS, PRESETS, LAYOUTS } from './state.js';
 
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║  ⚠️  DIRECTIVE FOR ALL AI EDITORS (LLMs, Copilot, Cursor, etc.)  ⚠️       ║
+// ║                                                                            ║
+// ║  1. NEVER hardcode language-specific keywords in regex patterns for         ║
+// ║     intent detection, command matching, or content classification.          ║
+// ║     The LLM router exists precisely to handle multilingual input.           ║
+// ║     English-only shortcuts (undo, save, export...) are acceptable as       ║
+// ║     fast-path optimizations, but NEVER add translations — the router       ║
+// ║     handles every other language.                                          ║
+// ║                                                                            ║
+// ║  2. NEVER hardcode content parsing logic. All data interpretation          ║
+// ║     (dates, currencies, languages, data types, etc.) MUST be delegated     ║
+// ║     to the LLM via prompts. Hardcoded parsers break on edge cases.         ║
+// ║                                                                            ║
+// ║  3. When adding new features, ask: "Will this break if the user speaks     ║
+// ║     a language I didn't anticipate?" If yes, let the LLM handle it.        ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
 // Send button arrow SVG (shared constant)
 const SEND_ARROW_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 
@@ -43,7 +61,7 @@ Output ONLY a JSON object. Possible keys:
 - "region": region ID to target (e.g. "title", "subtitle", "body", "heading", "quote", "left", "right"). If the user specifies a specific part, use this.
 - "region_color": hex color for that specific region only (use WITH "region")
 - "region_font": font name for that specific region only (use WITH "region")
-- "region_font_size": number (px) for that specific region only (use WITH "region"). For "大一點"=+4~6px, "小一點"=-4~6px relative to defaults.
+- "region_font_size": number (px) for that specific region only (use WITH "region"). For "bigger"=+4~6px, "smaller"=-4~6px relative to defaults.
 - "underline": true/false — add/remove underline
 - "bold": true/false — add/remove bold
 - "italic": true/false — add/remove italic
@@ -52,45 +70,45 @@ Output ONLY a JSON object. Possible keys:
 - "slides": "all" or a number (default "all")
 
 If the message is NOT about visual style (colors, fonts, bold, underline, italic, background, size), output {"none":true}.
-IMPORTANT: Requests to change TEXT CONTENT (e.g. "改內容", "豐富一點", "rewrite this") are NOT style changes. Output {"none":true} for those.
+IMPORTANT: Requests to change TEXT CONTENT (e.g. "change content", "enrich", "rewrite this") are NOT style changes. Output {"none":true} for those.
 
 Region IDs in our system: title, subtitle, tagline, date, heading, body, footnote, left, right, left_label, right_label, quote, author, role, table, description, source, contact.
 
 Default font sizes per role: title=44px, heading/h1=32px, h2=24px, body=18px, caption=14px, small=12px.
-When user says "大一點"/"bigger"/"larger", increase by 4-6px from the region's default.
-When user says "小一點"/"smaller", decrease by 4-6px from the region's default.
+When user says "bigger"/"larger", increase by 4-6px from the region's default.
+When user says "smaller", decrease by 4-6px from the region's default.
 When user gives an explicit size like "24px" or "32", use that exact value.
 
 Color interpretation:
-- "莫內藍" / "像莫內那種藍" → muted dusty blue #5B7FA5
-- "莫內黃" → warm cream-gold #E8D5A3
-- "科技感的深藍" → dark tech blue #0A1628
-- "修拉金" → pointillist gold #C5943A
-- "紅色" → #CC0000, "綠色" → #2E8B57, "黃色" → #FFD700, "黑色" → #000000, "白色" → #FFFFFF
+- "Monet blue" / "dusty blue like Monet" → muted dusty blue #5B7FA5
+- "Monet gold" → warm cream-gold #E8D5A3
+- "dark tech blue" → dark tech blue #0A1628
+- "Seurat gold" → pointillist gold #C5943A
+- "red" → #CC0000, "green" → #2E8B57, "yellow" → #FFD700, "black" → #000000, "white" → #FFFFFF
 - Use your best judgment for artistic descriptions.
 
 Examples:
-"字的顏色改莫內藍 背景改莫內黃" → {"heading_color":"#5B7FA5","background":"#E8D5A3"}
-"title的字改綠色" → {"region":"title","region_color":"#2E8B57"}
-"標題改紅色" → {"region":"title","region_color":"#CC0000"}
-"副標題用白色" → {"region":"subtitle","region_color":"#FFFFFF"}
-"內容文字改藍色" → {"region":"body","region_color":"#1E90FF"}
-"背景用深海藍綠色" → {"background":"#0A4F5C"}
-"第三頁標題改紅色" → {"region":"heading","region_color":"#CC0000","slides":3}
-"字型改 Georgia" → {"font":"Georgia"}
-"字大一點" → {"font_size":22}
-"標題字大一點" → {"region":"heading","region_font_size":38}
-"body的字改小" → {"region":"body","region_font_size":14}
-"標題改成50px" → {"region":"heading","region_font_size":50}
-"加底線" → {"underline":true}
-"標題加粗" → {"region":"title","bold":true}
-"副標題加斜體底線" → {"region":"subtitle","italic":true,"underline":true}
-"取消底線" → {"underline":false}
-"把標題移到中間" → {"region":"title","region_bounds":{"x":200,"y":280,"w":736,"h":100}}
-"body放大一點寬一點" → {"region":"body","region_bounds":{"x":0,"y":64,"w":1136,"h":560}}
-"標題復位" → {"region":"title","reset_bounds":true}
-"內容豐富一點" → {"none":true}
-"改寫這段" → {"none":true}
+"text color Monet blue, background Monet gold" → {"heading_color":"#5B7FA5","background":"#E8D5A3"}
+"title text green" → {"region":"title","region_color":"#2E8B57"}
+"heading red" → {"region":"title","region_color":"#CC0000"}
+"subtitle white" → {"region":"subtitle","region_color":"#FFFFFF"}
+"body text blue" → {"region":"body","region_color":"#1E90FF"}
+"background dark teal" → {"background":"#0A4F5C"}
+"slide 3 heading red" → {"region":"heading","region_color":"#CC0000","slides":3}
+"font Georgia" → {"font":"Georgia"}
+"text bigger" → {"font_size":22}
+"heading text bigger" → {"region":"heading","region_font_size":38}
+"body text smaller" → {"region":"body","region_font_size":14}
+"heading 50px" → {"region":"heading","region_font_size":50}
+"add underline" → {"underline":true}
+"heading bold" → {"region":"title","bold":true}
+"subtitle italic and underline" → {"region":"subtitle","italic":true,"underline":true}
+"remove underline" → {"underline":false}
+"move heading to center" → {"region":"title","region_bounds":{"x":200,"y":280,"w":736,"h":100}}
+"body bigger and wider" → {"region":"body","region_bounds":{"x":0,"y":64,"w":1136,"h":560}}
+"heading reset" → {"region":"title","reset_bounds":true}
+"content enrich" → {"none":true}
+"rewrite this section" → {"none":true}
 
 Output ONLY the JSON object.`;
 
@@ -110,15 +128,15 @@ const CONTENT_EDIT_PROMPT=`You are an AI slide content editor. You will receive 
 
 CRITICAL RULES:
 - Your output will COMPLETELY REPLACE the old content. Do NOT include any of the old text unless it should remain.
-- If the user provides specific new text (e.g. "改成XXX"), output EXACTLY that text — nothing else.
+- If the user provides specific new text (e.g. "change to XXX"), output EXACTLY that text — nothing else.
 - If the input is a plain string, output a plain string.
 - If the input is a list object {"type":"list","items":[...]}, output the same structure.
 - If the input is a table object {"type":"table","headers":[...],"rows":[...]}, output the same structure.
-- Respect the user's language. If user says "用英文" or "in English", translate to English.
-- When asked to "enrich" / "豐富" / "增加" / "更多":
+- Respect the user's language. If user says "in English", translate to English.
+- When asked to "enrich" / "add more" / "expand":
   - Keep existing bullet points but expand them
   - Add 1-2 NEW bullet points if appropriate
-- When asked to "rewrite" / "改寫": restructure and improve, same amount or MORE.
+- When asked to "rewrite": restructure and improve, same amount or MORE.
 - Do NOT change the format/structure unless asked. If it's a list, keep it as a list.
 - Output ONLY the raw content. No explanation, no code fences, no markdown, no quotes around plain strings.`;
 
@@ -131,13 +149,13 @@ Rules:
 - Keep the EXACT same structure and format for each region (string stays string, list stays list, table stays table).
 - Apply the user's instruction to EVERY slide.
 - Common instructions:
-  - "改成英文" / "translate to English" → translate ALL text content to English. Keep structure.
-  - "改成中文" / "translate to Chinese" → translate ALL text content to Traditional Chinese.
-  - "豐富一點" / "enrich" → expand and add detail to ALL content regions across all slides.
-  - "精簡一點" / "simplify" → make all content more concise.
-  - "更專業" / "more professional" → rewrite all content in a more professional tone.
-- NEVER remove content unless explicitly asked (e.g. "刪掉" / "delete" / "remove" / "清掉"). Only transform it.
-- When asked to DELETE/刪掉/移除/清掉 the content of a region, output an EMPTY string "" — nothing else.
+  - "translate to English" → translate ALL text content to English. Keep structure.
+  - "translate to Chinese" → translate ALL text content to Traditional Chinese.
+  - "enrich" → expand and add detail to ALL content regions across all slides.
+  - "simplify" → make all content more concise.
+  - "more professional" → rewrite all content in a more professional tone.
+- NEVER remove content unless explicitly asked (e.g. "delete" / "remove" / "clear"). Only transform it.
+- When asked to DELETE/remove/clear the content of a region, output an EMPTY string "" — nothing else.
 - NEVER change the number of slides or layouts. Only change the text content within regions.
 - For tables, translate/update cell values but keep the same rows/columns structure.
 - For lists, keep the same number of items (or more if enriching), never fewer.
@@ -204,19 +222,19 @@ function applyStyleOverrides(styleObj){
     }
   });
 
-  if(styleObj.background)msgs.push(`背景 → ${styleObj.background}`);
-  if(styleObj.heading_color)msgs.push(`全部文字 → ${styleObj.heading_color}`);
-  if(styleObj.font)msgs.push(`字型 → ${styleObj.font}`);
-  if(regionId&&styleObj.region_color)msgs.push(`${regionId} 文字 → ${styleObj.region_color}`);
-  if(regionId&&styleObj.region_font)msgs.push(`${regionId} 字型 → ${styleObj.region_font}`);
-  if(styleObj.font_size)msgs.push(`全部字體 → ${styleObj.font_size}px`);
-  if(regionId&&styleObj.region_font_size)msgs.push(`${regionId} 字體 → ${styleObj.region_font_size}px`);
-  if(styleObj.underline===true)msgs.push(`${regionId||'全部'} +底線`);
-  if(styleObj.underline===false)msgs.push(`${regionId||'全部'} -底線`);
-  if(styleObj.bold===true)msgs.push(`${regionId||'全部'} +粗體`);
-  if(styleObj.italic===true)msgs.push(`${regionId||'全部'} +斜體`);
-  if(regionId&&styleObj.region_bounds)msgs.push(`${regionId} 移動/調整大小`);
-  if(regionId&&styleObj.reset_bounds)msgs.push(`${regionId} 復位`);
+  if(styleObj.background)msgs.push(`Background → ${styleObj.background}`);
+  if(styleObj.heading_color)msgs.push(`All text → ${styleObj.heading_color}`);
+  if(styleObj.font)msgs.push(`Font → ${styleObj.font}`);
+  if(regionId&&styleObj.region_color)msgs.push(`${regionId} text → ${styleObj.region_color}`);
+  if(regionId&&styleObj.region_font)msgs.push(`${regionId} font → ${styleObj.region_font}`);
+  if(styleObj.font_size)msgs.push(`All font size → ${styleObj.font_size}px`);
+  if(regionId&&styleObj.region_font_size)msgs.push(`${regionId} font size → ${styleObj.region_font_size}px`);
+  if(styleObj.underline===true)msgs.push(`${regionId||'all'} +underline`);
+  if(styleObj.underline===false)msgs.push(`${regionId||'all'} -underline`);
+  if(styleObj.bold===true)msgs.push(`${regionId||'all'} +bold`);
+  if(styleObj.italic===true)msgs.push(`${regionId||'all'} +italic`);
+  if(regionId&&styleObj.region_bounds)msgs.push(`${regionId} moved/resized`);
+  if(regionId&&styleObj.reset_bounds)msgs.push(`${regionId} reset`);
   return msgs;
 }
 
@@ -228,13 +246,13 @@ INTENTS:
 
 "undo" — undo, restore, revert, go back to previous state.
   Output: {"intent":"undo"}
-  CRITICAL RULE: 恢復, 復原, 還原, 回復, 撤銷, 取消, 上一步, 退回, undo, redo, ctrl+z ALL mean undo.
+  CRITICAL RULE: undo, redo, ctrl+z ALL mean undo.
   These words mean "go back" NOT "delete". NEVER confuse undo with delete/content_edit.
 
 "content_edit" — edit or delete specific content (a region on a slide, a doc block).
   Slides: {"intent":"content_edit","slide":N or null,"region":"regionId" or null,"delete":true/false}
   Docs: {"intent":"content_edit","delete":true/false}
-  delete:true when user wants to remove/clear/delete content: "刪除", "刪掉", "移除", "清除", "delete", "remove", "clear"
+  delete:true when user wants to remove/clear/delete content: "delete", "remove", "clear"
   Also: insert table, add divider, move image, change image position → content_edit in doc mode.
 
 "style" — visual changes only: colors, fonts, sizes, backgrounds, bold, italic, underline, spacing, region bounds. Slide mode only.
@@ -242,48 +260,50 @@ INTENTS:
 "image" — image operations on slides: place, move, resize, delete, scale, crop, fit. Slide mode only.
 
 "deck_edit" — batch edit ALL slides at once or restructure entire doc.
-  "全部翻成英文", "translate everything", "重新整理這篇文章"
+  "translate everything to English", "translate everything", "reorganize this article"
 
 "describe" — user is asking ABOUT THE CURRENT DOCUMENT/CONTENT: what it says, summarize it, what's in it, analyze data, calculate values, explain meaning.
   Output: {"intent":"describe"}
-  Examples: "這篇在寫什麼", "目前內容是什麼", "summarize this", "what does this say", "這份簡報講什麼", "幫我摘要", "內容簡介", "現在寫了什麼"
+  Examples: "what is this about", "what is the current content", "summarize this", "what does this say", "what does this presentation cover", "help me summarize", "content overview", "what have we written"
   SHEET-SPECIFIC examples (always "describe" when asking about existing sheet data):
-    "這欄的總和", "sum of column B", "average of this column", "這些數據的標準差", "這個表格在幹嘛", "這個表格屬於哪個專案",
-    "幫我算平均", "what's the total", "解釋這個表格", "這幾格是什麼意思", "這列的含義", "分析這個表格", "幫我看看這些數字"
+    "sum of this column", "sum of column B", "average of this column", "standard deviation of this data", "what does this sheet do", "which project does this sheet belong to",
+    "calculate the average for me", "what's the total", "explain this table", "what do these cells mean", "what does this row mean", "analyze this table", "review these numbers for me"
   IMPORTANT: This is about the EXISTING content the user has open, NOT about Sloth Space the app.
   IMPORTANT: In sheet mode, ANY question about the data, cells, columns, rows, formulas, or analysis → "describe".
+  PROJECT-LEVEL queries (always "describe"): "what is this project about", "summarize the project", "what conclusions does this project have", "what do the other files say", "how does this relate to the other docs", "cross-reference with the sheet data"
+  WORKSPACE MODE: If the user is in workspace mode and asks about a specific project by name (e.g. "what is project X about", "summarize project Y"), this is ALWAYS "describe" — NOT "about" or "chat".
 
 "about" — user is asking ABOUT Sloth Space THE APP itself: what it is, features, how to use it, a specific mode.
   Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
   topic guide:
-    "general" — asking about Sloth Space overall: "Sloth Space是什麼", "what is this app", "介紹一下", "有什麼功能"
-    "slides" — asking about slide/presentation mode: "簡報模式怎麼用", "how do slides work", "怎麼做簡報"
-    "doc" — asking about document mode: "文件模式是什麼", "how does doc mode work", "怎麼寫文章"
-    "sheet" — asking about sheet/data mode: "表格怎麼用", "how do sheets work", "怎麼建數據表"
-    "workspace" — asking about workspace/file management: "工作區是什麼", "how does workspace work", "怎麼管理檔案"
+    "general" — asking about Sloth Space overall: "what is Sloth Space", "what is this app", "tell me about it", "what features does it have"
+    "slides" — asking about slide/presentation mode: "how do I use slide mode", "how do slides work", "how to make a presentation"
+    "doc" — asking about document mode: "what is document mode", "how does doc mode work", "how to write an article"
+    "sheet" — asking about sheet/data mode: "how do I use sheets", "how do sheets work", "how to create a data table"
+    "workspace" — asking about workspace/file management: "what is workspace", "how does workspace work", "how do I manage files"
   CRITICAL DISTINCTIONS for "about":
     - "about" is ONLY for meta-questions about the app's features/usage/identity.
-    - If user mentions specific files, items, or data INSIDE workspace (e.g. "workspace裡面的X", "你看得到Y嗎", "有沒有Z檔案", "打開那個X"), this is NOT about — it is "chat" or "generate" depending on context.
-    - If user asks about CONTENT they see/have (e.g. "你看得到嗎", "裡面有什麼", "哪些檔案"), this is "chat" NOT "about", even if they mention "workspace" or "sloth space".
-    - "Sloth Space是什麼?" → about. "workspace裡的sloth_space檔案" → NOT about.
-    - "簡報模式怎麼用?" → about. "做一份Sloth Space的pitch deck" → generate.
-    - "你看得到workspace裡面的東西嗎" → chat (asking about AI's ability to see their content).
+    - If user mentions specific files, items, or data INSIDE workspace (e.g. "files in workspace", "can you see my file", "do I have a document", "open that file"), this is NOT about — it is "chat" or "generate" depending on context.
+    - If user asks about CONTENT they see/have (e.g. "can you see it", "what's in it", "which files do I have"), this is "chat" NOT "about", even if they mention "workspace" or "sloth space".
+    - "What is Sloth Space?" → about. "I have a file called sloth_space in my workspace" → NOT about.
+    - "How do I use slide mode?" → about. "Create a pitch deck about Sloth Space" → generate.
+    - "Can you see the files in my workspace" → chat (asking about AI's ability to see their content).
     - Rule of thumb: if the user references things INSIDE the workspace or their documents, it's about their data, not about the app.
 
 "generate" — create NEW content from scratch. User provides a topic or confirms generation.
-  Any mode. Includes: 生成X, 寫X, 介紹X, X的介紹, write about X, create article about X, 做一份簡報, 加三頁.
+  Any mode. Includes: generate X, write X, introduce X, introduction to X, write about X, create article about X, make a presentation, add three pages.
   In DOC mode: if user gives ANY topic to write about → ALWAYS generate.
-  Confirmations like "好", "OK", "做吧", "go", "是", "yes", "對" → generate.
-  TYPO TOLERANCE: Users may have typos! "稱成" likely means "生成", "做簡報" means "做一份簡報", "關於X" means "寫關於X的內容". When in doubt between chat and generate, choose generate.
+  Confirmations like "yes", "OK", "let's do it", "go", "sure", "yes", "right" → generate.
+  TYPO TOLERANCE: Users may have typos! When in doubt between chat and generate, choose generate.
   IMPORTANT: If the user wants to CREATE/GENERATE/WRITE content about ANY topic (including Sloth Space), this is "generate" NOT "about".
 
 "chat" — ONLY for pure greetings with NO topic and NOT asking about Sloth Space.
-  "你好", "hello", "hey"
+  "hello", "hi", "hey"
   CRITICAL: If the message mentions ANY subject/topic (even with typos), it is NOT chat — it is "generate".
 
 PRIORITY RULES (follow in order):
-1. Undo words (恢復/復原/還原/回復/撤銷/undo etc.) → ALWAYS "undo", no exceptions.
-2. Delete words (刪除/刪掉/移除/delete/remove) → "content_edit" with delete:true.
+1. Undo words (undo/redo etc.) → ALWAYS "undo", no exceptions.
+2. Delete words (delete/remove) → "content_edit" with delete:true.
 3. Asking what the current content says/summarize → "describe".
 4. Questions about Sloth Space THE APP itself (features, how-to-use, what-is-this) → "about". BUT if user asks about specific files/items/content INSIDE workspace, that is NOT "about".
 5. Topic/creation requests (including creating content ABOUT Sloth Space) → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
@@ -308,7 +328,7 @@ Rules:
 - Be VERY concise. 1-2 sentences max.
 - Ask AT MOST one question per reply.
 - The ONLY thing you need from the user to start generating is a TOPIC. Everything else (slides count, style, audience) you can decide yourself.
-- If the user mentions ANY topic at all (even with typos, even vague like "AI"), tell them: "好的，請再說一次你想要的主題，我來幫你生成！" or equivalent. Do NOT answer the topic as a knowledge question — the user wants content GENERATED, not explained.
+- If the user mentions ANY topic at all (even with typos, even vague like "AI"), tell them: "Great! Let me know your topic in more detail and I'll generate content for you." or equivalent. Do NOT answer the topic as a knowledge question — the user wants content GENERATED, not explained.
 - Do NOT ask multiple questions. Do NOT keep chatting round after round.
 - Do NOT output JSON.
 - If the user seems frustrated or confused, be encouraging and suggest they type a topic directly.`;
@@ -455,7 +475,7 @@ For SPREADSHEETS specifically:
 - Formulas in cells are shown as "=SUM(B2:C2) → 45". The left side is the formula, the right side is the computed value.
 
 DATA TYPE RECOGNITION — cells may contain various data types. You MUST recognize and handle them intelligently:
-- Dates: "2026/3/15", "2026.03.15", "3/15/2026", "2026-03-15", "Mar 15, 2026", "15 March 2026", "3月15日" etc. Recognize all common date formats. When computing with dates, understand chronological order, durations, and intervals.
+- Dates: "2026/3/15", "2026.03.15", "3/15/2026", "2026-03-15", "Mar 15, 2026", "15 March 2026" etc. Recognize all common date formats. When computing with dates, understand chronological order, durations, and intervals.
 - Times: "1:30", "13:30", "1:30 PM", "14:00", "9:30:45" etc. Understand 12h/24h formats.
 - Date+Time: "2026/3/15 14:30", "2026-03-15T09:00" etc.
 - Decimals: "3.14", "0.5", "1,234.56" (comma as thousands separator), "-2.5". Treat them as numbers for calculations.
@@ -465,7 +485,15 @@ DATA TYPE RECOGNITION — cells may contain various data types. You MUST recogni
 - Empty cells: Treat as blank/null. Do not include them in averages or counts unless the user explicitly asks.
 When the user asks about patterns, trends, or comparisons, interpret these data types naturally — e.g. "which month had the highest sales" requires recognizing date columns and correlating with numeric columns.
 
-MULTILINGUAL CONTENT — cells may contain text in ANY language (Chinese, English, Japanese, Korean, Spanish, etc.) or mixed languages within the same sheet. Read and understand all of them. Headers like "日期", "名稱", "金額" are column labels just like "Date", "Name", "Amount". Respond in the language the user asked in, but reference cell content as-is regardless of its language.`;
+MULTILINGUAL CONTENT — cells may contain text in ANY language (English, Chinese, Japanese, Korean, Spanish, etc.) or mixed languages within the same sheet. Read and understand all of them. Headers are column labels regardless of language. Respond in the language the user asked in, but reference cell content as-is regardless of its language.
+
+CROSS-FILE PROJECT CONTEXT — if the user's file belongs to a project, you will also receive the contents of all sibling files (docs, sheets, slides) in that project under "## PROJECT". Use this to:
+- Answer questions like "what is this project about", "what conclusions can we draw", "summarize the whole project"
+- Cross-reference data: e.g. a sheet's numbers might explain a doc's narrative, or a doc might provide context for a slide deck
+- When the user asks to "generate slides based on the data" or "write a summary from the sheets", synthesize across ALL provided files
+- Clearly distinguish which insights come from which file when summarizing multiple files
+- If the user's question is only about the CURRENT file, focus on it but mention related files if they add useful context
+- The user may ask from the workspace page (no current file open). In that case, you will only have PROJECT CONTEXT. Summarize the entire project: what it contains, key findings, conclusions, and how the files relate to each other.`;
 
 // Helper: serialize current content as readable text for LLM
 function getCurrentContentText(){
@@ -528,13 +556,13 @@ const GEN_PROMPT=`You are Sloth Space, an AI presentation designer. Output ONLY 
 - Content types: plain string, list {"type":"list","items":[...]}, table {"type":"table","headers":[...],"rows":[...]}, image {"type":"image","src":"...","alt":"..."}
 - Style tags: [color: #hex] → style_overrides.heading_color, [bg: #hex] → style_overrides.background, [font: name] → style_overrides.font
 - Users may describe colors in natural language instead of hex codes. You MUST convert them:
-  - 黃色/yellow → #FFD700, 紅色/red → #CC0000, 藍色/blue → #1E90FF, 綠色/green → #2E8B57
-  - 黑色/black → #000000, 白色/white → #FFFFFF, 灰色/gray → #888888, 橘色/orange → #FF8C00
-  - 莫內藍 (Monet blue) → #5B7FA5, 莫內紫 (Monet lavender) → #8E7CC3, 莫內粉 (Monet pink) → #D4A5A5
-  - 修拉金 (Seurat gold) → #C5943A, 修拉棕 (Seurat brown) → #8B6914
+  - yellow → #FFD700, red → #CC0000, blue → #1E90FF, green → #2E8B57
+  - black → #000000, white → #FFFFFF, gray → #888888, orange → #FF8C00
+  - Monet blue → #5B7FA5, Monet lavender → #8E7CC3, Monet pink → #D4A5A5
+  - Seurat gold → #C5943A, Seurat brown → #8B6914
   - For any other color description, pick the closest reasonable hex code
-- "背景黃色" → apply style_overrides.background="#FFD700" on ALL slides
-- "字用莫內藍" → apply style_overrides.heading_color="#5B7FA5" on ALL slides
+- "yellow background" → apply style_overrides.background="#FFD700" on ALL slides
+- "use Monet blue text" → apply style_overrides.heading_color="#5B7FA5" on ALL slides
 - When user says "background X color", apply to ALL slides. When user says "slide 3 background", apply only to slide 3.
 - Default 5-8 slides. Always start with title layout, end with closing layout.
 - Respect the user's language for all slide content.
@@ -543,14 +571,14 @@ const GEN_PROMPT=`You are Sloth Space, an AI presentation designer. Output ONLY 
 ## CONTENT QUALITY — THIS IS THE MOST IMPORTANT SECTION
 
 BAD example (TOO SHORT — NEVER do this):
-{"heading":"問題背景","body":{"type":"list","items":["AI語意問題","模型幻覺","安全隱患"]}}
+{"heading":"Problem Background","body":{"type":"list","items":["AI semantic issues","Model hallucination","Safety risks"]}}
 
 GOOD example (THIS is the minimum quality):
-{"heading":"AI語意崩壞的三大成因","body":{"type":"list","items":["訓練數據偏差：大型語言模型的訓練語料中包含大量矛盾資訊，導致模型在推理時產生邏輯斷裂，尤其在跨語言翻譯場景下問題更為嚴重","注意力機制的局限性：Transformer架構的自注意力機制在處理超過4000 token的長文本時，語意連貫性會顯著下降，研究顯示困惑度上升達40%","RLHF的副作用：人類反饋強化學習雖然提升了回答的禮貌性，但同時也訓練模型學會『自信地胡說八道』，產生看似流暢實則毫無根據的內容"]},"notes":"強調這三個成因是相互關聯的，不是獨立問題"}
+{"heading":"Three Root Causes of AI Semantic Collapse","body":{"type":"list","items":["Training Data Bias: Large language models are trained on corpora containing massive contradictory information, causing logical breaks in reasoning, especially in cross-language translation scenarios where the problems become much more severe.","Attention Mechanism Limitations: The self-attention mechanism in Transformer architecture significantly reduces semantic coherence when processing long texts exceeding 4000 tokens, with research showing perplexity increases up to 40%.","RLHF Side Effects: While reinforcement learning from human feedback improves answer politeness, it also trains models to confidently produce hallucinated content that sounds fluent but lacks factual grounding."]},"notes":"Emphasize that these three causes are interconnected, not independent issues"}
 
 Rules:
 - Every bullet MUST be 1-2 full sentences with specific facts, data, examples, or analysis
-- NEVER write short labels like "背景介紹" or "Key challenges" — always elaborate
+- NEVER write short labels like "Introduction" or "Key challenges" — always elaborate
 - Each content/two-column slide must have 3-5 detailed bullet items
 - Use varied layouts: mix content, two-column, quote, data-table. NOT all bullet lists
 - Include speaker notes on every slide
@@ -924,21 +952,21 @@ MANIPULATION (when user wants to adjust an existing image):
 If the message is NOT about image manipulation, output {"action":"none"}.
 
 Examples:
-"圖片右邊一點" → {"action":"move","dx":25,"dy":0}
+"move image right a bit" → {"action":"move","dx":25,"dy":0}
 "move image left a lot" → {"action":"move","dx":-60,"dy":0}
-"縮小" → {"action":"scale","factor":0.85}
-"放大一點" → {"action":"scale","factor":1.15}
+"make smaller" → {"action":"scale","factor":0.85}
+"make bigger a bit" → {"action":"scale","factor":1.15}
 "bigger" → {"action":"scale","factor":1.15}
 "make it half the size" → {"action":"scale","factor":0.5}
-"寬一點" → {"action":"scale_w","factor":1.1}
-"窄一點" → {"action":"scale_w","factor":0.9}
-"等比縮放" → {"action":"fit","mode":"contain"}
-"填滿" → {"action":"fit","mode":"fill"}
-"裁切" → {"action":"fit","mode":"cover"}
-"放到第3頁左邊" → {"action":"place","slide":3,"position":"left"}
+"wider" → {"action":"scale_w","factor":1.1}
+"narrower" → {"action":"scale_w","factor":0.9}
+"fit proportionally" → {"action":"fit","mode":"contain"}
+"fill" → {"action":"fit","mode":"fill"}
+"crop" → {"action":"fit","mode":"cover"}
+"put it on slide 3 left side" → {"action":"place","slide":3,"position":"left"}
 "put it on slide 5" → {"action":"place","slide":5,"position":"auto"}
-"刪掉這張圖" → {"action":"remove"}
-"圖片上面一點 左邊一點" → {"action":"move","dx":-25,"dy":-25}
+"delete this image" → {"action":"remove"}
+"move image up a bit and left a bit" → {"action":"move","dx":-25,"dy":-25}
 
 Output ONLY the JSON object.`;
 
@@ -1130,43 +1158,42 @@ async function sendMessage(){
 
   // ── PASS -1: Local UI commands (no LLM needed) ──
   const trimText=text.trim();
-  if(/^(復原|undo|撤[銷回]|還原|上一步|回去)$/i.test(trimText)){
-    if(S.currentMode==='doc') window.docUndo(); else window.undo(); return;
+  if(/^(undo|redo)$/i.test(trimText)){
+    if(trimText.toLowerCase()==='undo'){ if(S.currentMode==='doc') window.docUndo(); else window.undo(); }
+    else { if(S.currentMode==='doc') window.docRedo(); else window.redo(); }
+    return;
   }
-  if(/^(重做|redo|取消復原|下一步)$/i.test(trimText)){
-    if(S.currentMode==='doc') window.docRedo(); else window.redo(); return;
-  }
-  if(/^(儲存|存檔|save|保存|存sloth|save\s*sloth)$/i.test(trimText)){
+  if(/^(save|save\s*sloth)$/i.test(trimText)){
     window.saveSloth(); return;
   }
-  if(/^(開新|新檔|新建|new|開新檔案|新增檔案)$/i.test(trimText)){
+  if(/^(new)$/i.test(trimText)){
     window.newDeck(); return;
   }
-  if(/^(載入|讀取|load|開啟|開檔|載入檔案|讀取檔案|open)$/i.test(trimText)){
+  if(/^(load|open)$/i.test(trimText)){
     window.loadDeck(); return;
   }
-  if(/^(匯出|export|export\s*json|json)$/i.test(trimText)){
+  if(/^(export|export\s*json|json)$/i.test(trimText)){
     window.exportJSON(); addMessage('✓ Exported JSON','system'); return;
   }
-  if(/^(匯出\s*ppt|export\s*ppt|pptx?|匯出簡報|下載簡報|export\s*slides)$/i.test(trimText)){
+  if(/^(export\s*ppt|pptx?|export\s*slides)$/i.test(trimText)){
     window.exportPPTX(); return;
   }
-  if(/^(設定|settings?|設置|config)$/i.test(trimText)){
+  if(/^(settings?|config)$/i.test(trimText)){
     window.openSettings(); return;
   }
   // Doc zoom commands
   if(S.currentMode==='doc'){
-    const zoomMatch=trimText.match(/^(?:zoom|縮放|放大|zoom\s*in)\s*(\d+)?%?$/i);
+    const zoomMatch=trimText.match(/^(?:zoom|zoom\s*in)\s*(\d+)?%?$/i);
     if(zoomMatch){ window.docZoomLevel=parseInt(zoomMatch[1])||Math.min(200,window.docZoomLevel+10); window.applyDocZoom(); addMessage(`🔍 Zoom: ${window.docZoomLevel}%`,'system'); return; }
-    const zoomOutMatch=trimText.match(/^(?:zoom\s*out|縮小)\s*(\d+)?%?$/i);
+    const zoomOutMatch=trimText.match(/^(?:zoom\s*out)\s*(\d+)?%?$/i);
     if(zoomOutMatch){ window.docZoomLevel=Math.max(50,parseInt(zoomOutMatch[1])||window.docZoomLevel-10); window.applyDocZoom(); addMessage(`🔍 Zoom: ${window.docZoomLevel}%`,'system'); return; }
-    const zoomSetMatch=trimText.match(/^(?:zoom|縮放)\s*[:=]?\s*(\d+)%?$/i);
+    const zoomSetMatch=trimText.match(/^(?:zoom)\s*[:=]?\s*(\d+)%?$/i);
     if(zoomSetMatch){ window.docZoomLevel=Math.max(50,Math.min(200,parseInt(zoomSetMatch[1]))); window.applyDocZoom(); addMessage(`🔍 Zoom: ${window.docZoomLevel}%`,'system'); return; }
-    if(/^(?:zoom\s*reset|reset\s*zoom|縮放重置|100%)$/i.test(trimText)){ window.docZoomReset(); addMessage('🔍 Zoom reset to 100%','system'); return; }
+    if(/^(?:zoom\s*reset|reset\s*zoom|100%)$/i.test(trimText)){ window.docZoomReset(); addMessage('🔍 Zoom reset to 100%','system'); return; }
   }
 
   // Workspace quick-create: "/doc Title\nContent..." or "/sheet Title\nCSV..."
-  const docMatch=trimText.match(/^\/(doc|文件)\s+(.+)/is);
+  const docMatch=trimText.match(/^\/(doc)\s+(.+)/is);
   if(docMatch){
     const lines=docMatch[2].split('\n');
     const title=lines[0].trim();
@@ -1175,7 +1202,7 @@ async function sendMessage(){
     addMessage(`✓ Created doc "${doc.title}" (${doc.content.blocks.length} blocks). Reference it by name when making slides!`,'system');
     return;
   }
-  const sheetMatch=trimText.match(/^\/(sheet|表格|數據)\s+(.+)/is);
+  const sheetMatch=trimText.match(/^\/(sheet)\s+(.+)/is);
   if(sheetMatch){
     const lines=sheetMatch[2].split('\n');
     const title=lines[0].trim();
@@ -1196,9 +1223,47 @@ async function sendMessage(){
 
   // ── Project-scoped AI context injection ──
   let wsContext='';
+  let _resolvedProjectId=S.wsActiveProjectId||null;
+
+  // 1) Active project context (user explicitly activated a project)
   const projectCtx=window.wsGetActiveProjectContext ? window.wsGetActiveProjectContext() : '';
   if(projectCtx){
     wsContext+='\n\n## PROJECT CONTEXT\nThe user is working inside a project. All linked files are provided below as context. Use this data when generating or editing content.\n\n'+projectCtx;
+  }
+
+  // 2) Project name detection from user text — if user mentions a project by name, inject it
+  //    This enables "what is project X about?" from workspace mode without activating the project
+  if(!wsContext && window.wsListProjects){
+    const allProjects=window.wsListProjects();
+    const lowerText=text.toLowerCase();
+    for(const proj of allProjects){
+      if(proj.name && lowerText.includes(proj.name.toLowerCase())){
+        const pCtx=window.wsProjectContext ? window.wsProjectContext(proj.id) : '';
+        if(pCtx){
+          _resolvedProjectId=proj.id;
+          const fileCount=window.wsGetProjectFiles ? window.wsGetProjectFiles(proj.id).length : 0;
+          wsContext+=`\n\n## PROJECT CONTEXT: "${proj.name}" (${fileCount} files)\nThe user is asking about this project. All files in this project are provided below.\n\n`+pCtx;
+          addMessage(`📁 Reading project "${proj.name}" (${fileCount} file${fileCount!==1?'s':''})...`,'system');
+        }
+        break;
+      }
+    }
+  }
+
+  // 3) Current file's project (auto-detect from the file being viewed)
+  if(!wsContext){
+    const currentFileId=window.wsGetCurrentFileId ? window.wsGetCurrentFileId() : null;
+    if(currentFileId && window.wsGetFileProjects){
+      const fileProjects=window.wsGetFileProjects(currentFileId);
+      if(fileProjects.length>0){
+        const proj=fileProjects[0];
+        const pCtx=window.wsProjectContext ? window.wsProjectContext(proj.id) : '';
+        if(pCtx){
+          _resolvedProjectId=proj.id;
+          wsContext+='\n\n## PROJECT CONTEXT\nThe current file belongs to this project. All sibling files are provided below.\n\n'+pCtx;
+        }
+      }
+    }
   }
 
   // ── Workspace cross-file reference detection (additive to project context) ──
@@ -1206,8 +1271,8 @@ async function sendMessage(){
   if(wsRefs.length>0){
     // Filter out files already in project context to avoid duplication
     const projectFileIds=new Set();
-    if(S.wsActiveProjectId && window.wsGetProjectFiles){
-      window.wsGetProjectFiles(S.wsActiveProjectId).forEach(f=>projectFileIds.add(f.id));
+    if(_resolvedProjectId && window.wsGetProjectFiles){
+      window.wsGetProjectFiles(_resolvedProjectId).forEach(f=>projectFileIds.add(f.id));
     }
     const extraRefs=wsRefs.filter(f=>!projectFileIds.has(f.id));
     if(extraRefs.length>0){
@@ -1222,7 +1287,7 @@ async function sendMessage(){
     // ── If user attached images, go to image path ──
     if(pendingImages.length>0){
       // AUTO-DESIGNER: No text / minimal text → skip LLM entirely, use smart auto-placement
-      const isMinimalText=!text||text.length<3||/^(放|加|貼|drop|add|place|put|image|圖|img|pic|photo|ok|go|here|這|好)$/i.test(text);
+      const isMinimalText=!text||text.length<3||/^(drop|add|place|put|image|img|pic|photo|ok|go|here|yes|sure)$/i.test(text);
       if(isMinimalText){
         statusDiv.remove();
         const msg=placeImageOnSlide(pendingImages,S.currentSlide,'auto');
@@ -1289,6 +1354,12 @@ async function sendMessage(){
     if(S.currentMode==='slide'&&hasImageOnCurrentSlide()) ctx.push('Current slide has floating images.');
     if(S.selectedRegion) ctx.push(`User has selected region "${S.selectedRegion.regionId}" (${S.selectedRegion.role}) on slide ${S.selectedRegion.slideIdx+1}.`);
     if(wsRefs.length>0) ctx.push('User referenced workspace files: '+wsRefs.map(f=>f.title).join(', ')+'.');
+    if(_resolvedProjectId) ctx.push('Project context is loaded and available for this query.');
+    // In workspace mode, list available projects so router knows what exists
+    if(S.currentMode==='workspace' && window.wsListProjects){
+      const allProj=window.wsListProjects();
+      if(allProj.length>0) ctx.push('Available projects: '+allProj.map(p=>`"${p.name}"`).join(', ')+'.');
+    }
     if(S.currentMode==='slide'&&!S.currentDeck) ctx.push('No deck loaded yet.');
     if(ctx.length>0) routerMsgs.push({role:'system',content:'[Context: '+ctx.join(' ')+']'});
 
@@ -1316,8 +1387,8 @@ async function sendMessage(){
     // ── Smart fallback: minimal safety net (router LLM handles most classification) ──
     // If still "chat" and message has substance → generate
     if(intent==='chat'){
-      const hasSubject=text.length>4&&!/^(你好|hi|hello|hey|嗨|哈囉|what|how|why|who|when|where|是什麼|怎麼|可以|能不能|幫我|help)$/i.test(text.trim());
-      const hasGenerateHint=/關於|介紹|生成|寫|做|建|create|make|write|about|build|draft|pitch|簡報|文章|內容|報告|deck/i.test(text);
+      const hasSubject=text.length>4&&!/^(hi|hello|hey|what|how|why|who|when|where|help|sup|yo)$/i.test(text.trim());
+      const hasGenerateHint=/create|make|write|about|build|draft|pitch|deck|report|article|content|generate/i.test(text);
       const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2));
       if(hasSubject&&(hasGenerateHint||noDeckOrDoc)){
         console.log('Smart fallback: chat → generate (message has topic substance)');
@@ -1359,15 +1430,20 @@ async function sendMessage(){
       }
 
     }else if(intent==='describe'){
-      // ── DESCRIBE: summarize current content ──
+      // ── DESCRIBE: summarize current content + project context ──
       const contentText=getCurrentContentText();
-      if(!contentText){
+      // In workspace mode, there may be no "current file" but wsContext has project data
+      if(!contentText && !wsContext){
         statusDiv.remove();
-        addMessage('目前還沒有內容可以摘要。請先建立一份簡報、文件或表格！','ai');
+        addMessage('No content to summarize yet. Please create a presentation, document, or sheet first, or ask about a specific project by name!','ai');
       }else{
         statusDiv.textContent='Reading content...';
         try{
-          const summary=await callLLM(DESCRIBE_PROMPT,[{role:'user',content:`User asked: "${text}"\n\nCurrent content:\n${contentText}`}],{max_tokens:1024});
+          let fullContext='';
+          if(contentText) fullContext+=`## CURRENT FILE\n${contentText}`;
+          if(wsContext) fullContext+=wsContext;
+
+          const summary=await callLLM(DESCRIBE_PROMPT,[{role:'user',content:`User asked: "${text}"\n\n${fullContext}`}],{max_tokens:2048});
           statusDiv.remove();
           const descDiv=addMessage('','ai');
           descDiv.textContent=summary;
@@ -1375,7 +1451,7 @@ async function sendMessage(){
         }catch(e){
           console.error('Describe failed:',e);
           statusDiv.remove();
-          addMessage('抱歉，摘要時發生錯誤。','ai');
+          addMessage('Sorry, an error occurred while summarizing.','ai');
         }
       }
 
@@ -1486,8 +1562,8 @@ async function sendMessage(){
       // For bare "delete" with nothing selected, ask user
       if(routerData.delete&&!routerData.region&&!routerData.slide&&!S.selectedRegion){
         statusDiv.remove();
-        addMessage('請先點選你要刪除的區域，或告訴我要刪除哪一頁的什麼內容。','ai');
-        S.chatHistory.push({role:'assistant',content:'請先點選你要刪除的區域。'});
+        addMessage('Please select the region you want to delete, or tell me which page and what content to remove.','ai');
+        S.chatHistory.push({role:'assistant',content:'Please select the region you want to delete.'});
         sendBtn.disabled=false; sendBtn.innerHTML=SEND_ARROW_SVG;
         window.autoSave();
         return;
@@ -1553,8 +1629,8 @@ async function sendMessage(){
       }else{
         // No region found — ask user
         statusDiv.remove();
-        addMessage('請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。','ai');
-        S.chatHistory.push({role:'assistant',content:'請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。'});
+        addMessage('Please click the region on the slide you want to edit, or tell me which page and section to modify.','ai');
+        S.chatHistory.push({role:'assistant',content:'Please click the region on the slide you want to edit, or tell me which page and section to modify.'});
       }
 
     }else if(intent==='generate'&&S.currentMode==='doc'){
@@ -1587,9 +1663,10 @@ async function sendMessage(){
       }
 
     }else{
-      // ── CHAT: general conversation ──
+      // ── CHAT: general conversation (inject project context if available) ──
       statusDiv.textContent='...';
-      const raw=await callLLM(CHAT_PROMPT,S.chatHistory);
+      const chatSysPrompt=wsContext ? CHAT_PROMPT+'\n\nThe user may be asking about project data. Here is the context:\n'+wsContext : CHAT_PROMPT;
+      const raw=await callLLM(chatSysPrompt,S.chatHistory);
       S.chatHistory.push({role:'assistant',content:raw});
       statusDiv.remove();
       addMessage(raw,'ai');
