@@ -339,6 +339,30 @@ INTENTS:
   - "create a project called X" → ui_action. "create a document about X" → generate.
   Rule of thumb: "open X" / "switch to X" / "go to X" / "create a project" / "link files" / "sort by" / "search for" → ui_action. "Write about X" / "make a presentation about X" / "generate a report" → generate.
 
+"multi_step" — user wants MULTIPLE THINGS done in sequence that span different intent types.
+  Use this ONLY when the message contains BOTH app management AND content creation in ONE request.
+  Output: {"intent":"multi_step","steps":[step1, step2, ...],"message":"description"}
+  Each step is one of:
+    {"type":"ui_action","actions":[{"fn":"functionName","args":[...]}]}
+    {"type":"generate","target":"doc"|"slide","topic":"what to write about"}
+    {"type":"link_last","project":"projectName"} — link the most recently created file to a project
+  Examples:
+  - "create a project called Q2 and write a budget report for it" →
+    {"intent":"multi_step","steps":[
+      {"type":"ui_action","actions":[{"fn":"wsCreateProject","args":["Q2",""]}]},
+      {"type":"generate","target":"doc","topic":"budget report for Q2"},
+      {"type":"link_last","project":"Q2"}
+    ],"message":"Creating project Q2, generating budget report, and linking it"}
+  - "make a project called Research, create a slide deck about AI, and a doc about machine learning" →
+    {"intent":"multi_step","steps":[
+      {"type":"ui_action","actions":[{"fn":"wsCreateProject","args":["Research",""]}]},
+      {"type":"generate","target":"slide","topic":"AI"},
+      {"type":"link_last","project":"Research"},
+      {"type":"generate","target":"doc","topic":"machine learning"},
+      {"type":"link_last","project":"Research"}
+    ],"message":"Creating Research project with AI slides and ML doc"}
+  IMPORTANT: Only use multi_step when the request TRULY requires multiple different intent types. If it's just multiple ui_actions, use "ui_action" with multiple actions in the array.
+
 "chat" — ONLY for pure greetings with NO topic and NOT asking about Sloth Space.
   "hello", "hi", "hey"
   CRITICAL: If the message mentions ANY subject/topic (even with typos), it is NOT chat — it is "generate".
@@ -346,17 +370,18 @@ INTENTS:
 PRIORITY RULES (follow in order):
 1. Undo words (undo/redo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (delete/remove) → "content_edit" with delete:true.
-3. **APP MANAGEMENT OVERRIDE**: If the message asks to CREATE/DELETE/MANAGE a PROJECT, or OPEN/SWITCH/NAVIGATE to a mode/file/project, or LINK/UNLINK files → ALWAYS "ui_action". Keywords: project, open, switch, navigate, link, unlink, sort, search, settings. "create a project" / "open settings" / "switch to workspace" → ui_action, NOT generate.
-4. **CONTENT CREATION OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation (CONTENT, not a project) → ALWAYS "generate", even if the message ALSO asks about content.
-5. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
-6. Questions about Sloth Space THE APP itself → "about".
-7. Navigation, mode switching, opening files, managing projects, UI control → "ui_action".
-8. Topic/creation requests → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
-9. Edit existing specific content → "content_edit".
-10. Style/visual changes → "style" (slide only).
-11. Image manipulation → "image" (slide only).
-12. Batch edits → "deck_edit".
-13. ONLY if NONE of the above apply → "chat".
+3. **MULTI-STEP CHECK**: If the message asks for BOTH project/file management AND content creation (e.g. "create project X and write a doc about Y for it"), → "multi_step".
+4. **APP MANAGEMENT OVERRIDE**: If the message asks to CREATE/DELETE/MANAGE a PROJECT, or OPEN/SWITCH/NAVIGATE to a mode/file/project, or LINK/UNLINK files → ALWAYS "ui_action". Keywords: project, open, switch, navigate, link, unlink, sort, search, settings. "create a project" / "open settings" / "switch to workspace" → ui_action, NOT generate.
+5. **CONTENT CREATION OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation (CONTENT, not a project) → ALWAYS "generate", even if the message ALSO asks about content.
+6. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
+7. Questions about Sloth Space THE APP itself → "about".
+8. Navigation, mode switching, opening files, managing projects, UI control → "ui_action".
+9. Topic/creation requests → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
+10. Edit existing specific content → "content_edit".
+11. Style/visual changes → "style" (slide only).
+12. Image manipulation → "image" (slide only).
+13. Batch edits → "deck_edit".
+14. ONLY if NONE of the above apply → "chat".
 
 MODE-SPECIFIC:
 - "style" and "image" intents ONLY in slide mode. In doc mode use content_edit or generate.
@@ -1309,17 +1334,34 @@ async function sendMessage(){
 
   // 2) Project name detection from user text — if user mentions a project by name, inject it
   //    This enables "what is project X about?" from workspace mode without activating the project
-  if(!wsContext && window.wsListProjects){
+  //    Also resolves _resolvedProjectId even for empty projects (for auto-linking new files)
+  if(window.wsListProjects){
     const allProjects=window.wsListProjects();
     const lowerText=text.toLowerCase();
-    for(const proj of allProjects){
-      if(proj.name && lowerText.includes(proj.name.toLowerCase())){
-        const pCtx=window.wsProjectContext ? window.wsProjectContext(proj.id) : '';
-        if(pCtx){
-          _resolvedProjectId=proj.id;
-          const fileCount=window.wsGetProjectFiles ? window.wsGetProjectFiles(proj.id).length : 0;
-          wsContext+=`\n\n## PROJECT CONTEXT: "${proj.name}" (${fileCount} files)\nThe user is asking about this project. All files in this project are provided below.\n\n`+pCtx;
-          addMessage(`📁 Reading project "${proj.name}" (${fileCount} file${fileCount!==1?'s':''})...`,'system');
+    // Sort by name length descending to prefer longer matches (avoid "Hi" matching "this")
+    const sorted=[...allProjects].sort((a,b)=>(b.name||'').length-(a.name||'').length);
+    for(const proj of sorted){
+      if(!proj.name) continue;
+      const pName=proj.name.toLowerCase();
+      // Use word-boundary match for short names (<=3 chars), substring for longer
+      let matched=false;
+      if(pName.length<=3){
+        const re=new RegExp('\\b'+pName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+        matched=re.test(text);
+      }else{
+        matched=lowerText.includes(pName);
+      }
+      if(matched){
+        // Always resolve the project ID (even for empty projects) so _autoLinkToProject works
+        if(!_resolvedProjectId) _resolvedProjectId=proj.id;
+        // Only inject context if project has content and we don't already have wsContext
+        if(!wsContext){
+          const pCtx=window.wsProjectContext ? window.wsProjectContext(proj.id) : '';
+          if(pCtx){
+            const fileCount=window.wsGetProjectFiles ? window.wsGetProjectFiles(proj.id).length : 0;
+            wsContext+=`\n\n## PROJECT CONTEXT: "${proj.name}" (${fileCount} files)\nThe user is asking about this project. All files in this project are provided below.\n\n`+pCtx;
+            addMessage(`📁 Reading project "${proj.name}" (${fileCount} file${fileCount!==1?'s':''})...`,'system');
+          }
         }
         break;
       }
@@ -1827,6 +1869,18 @@ async function sendMessage(){
         }
       }
 
+    }else if(intent==='multi_step'){
+      // ── MULTI-STEP: sequential execution of mixed intent types ──
+      statusDiv.remove();
+      const steps = routerData.steps || [];
+      const message = routerData.message || 'Executing multi-step operation...';
+      if(steps.length === 0){
+        addMessage(message || 'No steps to perform.', 'ai');
+      } else {
+        await executeMultiStep(steps, message, text, wsContext);
+        S.chatHistory.push({role:'assistant',content:`[Multi-step: ${message}]`});
+      }
+
     }else{
       // ── CHAT: general conversation (inject project context if available) ──
       statusDiv.textContent='...';
@@ -1848,6 +1902,92 @@ async function sendMessage(){
     saveChatTabs(); // Persist chat tabs
     scheduleTabTitleGen(); // AI-generate tab title if needed
   }
+}
+
+// ── Multi-step executor: sequentially runs mixed ui_action / generate / link steps ──
+async function executeMultiStep(steps, message, userText, wsContext) {
+  _showAIActionOverlay(`AI multi-step: ${message}`);
+  addMessage(`✦ ${message}`, 'system');
+
+  let lastCreatedProjectId = null;
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const stepLabel = `Step ${i+1}/${steps.length}`;
+    _updateAIActionOverlay(`AI ▸ ${stepLabel}: ${step.type}`);
+
+    // Small delay between steps so user can see what's happening
+    if (i > 0) await new Promise(r => setTimeout(r, 400));
+
+    try {
+      if (step.type === 'ui_action') {
+        // Re-resolve refs with fresh data each time (projects created in earlier steps now exist)
+        const resolved = resolveActionRefs(step.actions || []);
+        const results = executeUIActions(resolved, '', {quiet:true});
+        // Track if a project was created
+        for (const a of (step.actions || [])) {
+          if (a.fn === 'wsCreateProject' && a.args?.[0]) {
+            // Find the just-created project by name
+            const projects = window.wsListProjects ? window.wsListProjects() : [];
+            const p = projects.find(p => (p.name || '').toLowerCase() === a.args[0].toLowerCase());
+            if (p) lastCreatedProjectId = p.id;
+          }
+        }
+        const failCount = results.filter(r => r.error).length;
+        if (failCount > 0) addMessage(`⚠️ ${stepLabel}: ${failCount} action(s) failed.`, 'system');
+
+      } else if (step.type === 'generate') {
+        _updateAIActionOverlay(`AI ▸ ${stepLabel}: Generating ${step.target || 'doc'}...`);
+        // Create a temporary status div for the generate functions
+        const tempStatus = document.createElement('div');
+        tempStatus.className = 'chat-status';
+        const topic = step.topic || userText;
+        if (step.target === 'slide') {
+          window.modeEnter('slide');
+          // Build minimal chat history with just the topic
+          const prevHistory = [...S.chatHistory];
+          S.chatHistory = [{ role: 'user', content: topic }];
+          await doGenerate(tempStatus, wsContext);
+          S.chatHistory = prevHistory;
+        } else {
+          window.modeEnter('doc');
+          await doDocGenerate(tempStatus, topic, wsContext);
+        }
+        tempStatus.remove();
+        // Auto-link to the project created earlier in this multi-step
+        if (lastCreatedProjectId) {
+          _autoLinkToProject(lastCreatedProjectId);
+        }
+
+      } else if (step.type === 'link_last') {
+        // Link the most recently created/active file to a project
+        const projectName = step.project || '';
+        let projectId = lastCreatedProjectId;
+        if (!projectId && projectName) {
+          const projects = window.wsListProjects ? window.wsListProjects() : [];
+          const p = projects.find(p => (p.name || '').toLowerCase().includes(projectName.toLowerCase()));
+          if (p) projectId = p.id;
+        }
+        if (projectId) {
+          _autoLinkToProject(projectId);
+        }
+      }
+    } catch (e) {
+      console.error(`[Multi-step] Step ${i+1} failed:`, e);
+      addMessage(`⚠️ ${stepLabel} failed: ${e.message}`, 'system');
+    }
+  }
+
+  // Final: navigate to workspace projects to show result
+  if (lastCreatedProjectId) {
+    await new Promise(r => setTimeout(r, 300));
+    _updateAIActionOverlay('AI ▸ Showing results...');
+    window.modeEnter('workspace');
+    window.wsSetView('projects');
+  }
+
+  _updateAIActionOverlay('AI ▸ All steps done ✓');
+  setTimeout(_hideAIActionOverlay, 1500);
 }
 
 // ── Auto-save generated content to workspace & link to source project ──
@@ -2189,11 +2329,12 @@ function _autoChainActions(actions) {
  * Each action: { fn: 'functionName', args: [...] }
  * Returns array of results/errors for logging.
  */
-function executeUIActions(actions, message) {
-  actions = _autoChainActions(actions);
+function executeUIActions(actions, message, opts={}) {
+  if (!opts.quiet) actions = _autoChainActions(actions);
   if (message) addMessage(`✦ ${message}`, 'system');
-  // Show Monet-orange overlay
-  _showAIActionOverlay(`AI operating: ${message || 'Performing actions...'}`);
+  // Show Monet-orange overlay (suppress when called from multi-step which has its own overlay)
+  const showOverlay = !opts.quiet;
+  if (showOverlay) _showAIActionOverlay(`AI operating: ${message || 'Performing actions...'}`);
   const results = [];
   let stepIdx = 0;
   for (const action of actions) {
@@ -2243,13 +2384,15 @@ function executeUIActions(actions, message) {
     }
   }
   // Done — show completion briefly then hide
-  const failCount = results.filter(r => r.error).length;
-  if (failCount > 0) {
-    _updateAIActionOverlay(`AI ▸ Done (${failCount} failed)`);
-  } else {
-    _updateAIActionOverlay('AI ▸ Done ✓');
+  if (showOverlay) {
+    const failCount = results.filter(r => r.error).length;
+    if (failCount > 0) {
+      _updateAIActionOverlay(`AI ▸ Done (${failCount} failed)`);
+    } else {
+      _updateAIActionOverlay('AI ▸ Done ✓');
+    }
+    setTimeout(_hideAIActionOverlay, 1200);
   }
-  setTimeout(_hideAIActionOverlay, 1200);
   return results;
 }
 
@@ -2329,6 +2472,7 @@ export {
   applyImageAction,
   autoDesignImagePlacement,
   executeUIActions,
+  executeMultiStep,
   resolveActionRefs,
   ALLOWED_ACTIONS,
   STYLE_PROMPT,
