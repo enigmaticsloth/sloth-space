@@ -365,12 +365,19 @@ function validateDeck(deck){
 }
 
 function extractJSON(text){
+  if(!text||typeof text!=='string')return null;
   // Try direct parse first
   try{ return JSON.parse(text); }catch(e){}
   // Try to extract from code fences
   const fenceMatch=text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if(fenceMatch){
-    try{ return JSON.parse(fenceMatch[1]); }catch(e){}
+    try{ return JSON.parse(fenceMatch[1].trim()); }catch(e){}
+  }
+  // Try to find first [ ... last ] (for array responses)
+  const firstBracket=text.indexOf('[');
+  const lastBracket=text.lastIndexOf(']');
+  if(firstBracket!==-1&&lastBracket>firstBracket){
+    try{ return JSON.parse(text.slice(firstBracket,lastBracket+1)); }catch(e){}
   }
   // Try to find first { ... last }
   const first=text.indexOf('{');
@@ -809,7 +816,17 @@ async function sendMessage(){
       routerData=JSON.parse(routerRaw);
       intent=routerData.intent||'chat';
     }catch(e){
-      console.warn('Router parse failed:',e,'raw:',routerRaw);
+      // Try extractJSON fallback before giving up
+      const extracted=extractJSON(routerRaw);
+      if(extracted&&extracted.intent){
+        routerData=extracted;
+        intent=extracted.intent;
+        console.warn('Router JSON.parse failed, extractJSON succeeded:',routerRaw);
+      }else{
+        console.warn('Router parse failed completely, defaulting to generate:',e,'raw:',routerRaw);
+        // Default to 'generate' instead of 'chat' — user likely wants content created
+        intent='generate';
+      }
     }
 
     // ── Dispatch based on router intent (all classification done by LLM, no hardcoded overrides) ──
@@ -830,7 +847,11 @@ async function sendMessage(){
       // ── IMAGE: LLM interprets image command ──
       statusDiv.textContent='Processing image...';
       const imgRaw=await callLLM(IMAGE_PROMPT,[{role:'user',content:text}],{temperature:0,max_tokens:128,json:true});
-      const imgAction=JSON.parse(imgRaw);
+      let imgAction;
+      try{ imgAction=JSON.parse(imgRaw); }catch(e){
+        imgAction=extractJSON(imgRaw);
+        if(!imgAction){ imgAction={action:'none'}; console.warn('Image intent JSON parse failed:',e,'raw:',imgRaw); }
+      }
       if(imgAction.action==='none'){
         // LLM says not really an image command — fall through to chat
         statusDiv.textContent='...';
@@ -857,7 +878,11 @@ async function sendMessage(){
         styleInput+=`\n[USER HAS SELECTED: slide ${S.selectedRegion.slideIdx+1}, region "${S.selectedRegion.regionId}" (${S.selectedRegion.role}). Apply changes to this region unless they specify otherwise.]`;
       }
       const styleRaw=await callLLM(STYLE_PROMPT,[{role:'user',content:styleInput}],{temperature:0,max_tokens:128,json:true});
-      const styleObj=JSON.parse(styleRaw);
+      let styleObj;
+      try{ styleObj=JSON.parse(styleRaw); }catch(e){
+        styleObj=extractJSON(styleRaw);
+        if(!styleObj){ styleObj={none:true}; console.warn('Style JSON parse failed:',e,'raw:',styleRaw); }
+      }
       if(!styleObj.none){
         const msgs=applyStyleOverrides(styleObj);
         S.chatHistory.push({role:'assistant',content:`[style: ${msgs.join(', ')}]`});
@@ -883,9 +908,15 @@ async function sendMessage(){
       let updated;
       try{updated=JSON.parse(raw);}catch(e){
         const extracted=extractJSON(raw);
-        if(Array.isArray(extracted))updated=extracted;
-        else if(extracted&&Array.isArray(extracted.slides))updated=extracted.slides;
+        if(extracted) updated=extracted;
         else throw new Error('LLM returned invalid JSON for deck edit');
+      }
+      // Normalize: accept array directly, or object with .slides/.updates/.data array
+      if(!Array.isArray(updated)){
+        if(updated&&Array.isArray(updated.slides))updated=updated.slides;
+        else if(updated&&Array.isArray(updated.updates))updated=updated.updates;
+        else if(updated&&Array.isArray(updated.data))updated=updated.data;
+        else{ console.warn('deck_edit: unexpected shape',updated); updated=[]; }
       }
       window.pushUndo();
       let count=0;
@@ -1047,9 +1078,15 @@ async function doGenerate(statusDiv,wsContext){
   S.chatHistory.push({role:'assistant',content:raw});
 
   const deck=extractJSON(raw);
-  if(!deck)throw new Error('LLM returned invalid JSON');
+  if(!deck){
+    console.error('Generation failed — raw LLM response:',raw.substring(0,500));
+    throw new Error('LLM returned invalid JSON. Please try again.');
+  }
   const err=validateDeck(deck);
-  if(err)throw new Error(err);
+  if(err){
+    console.error('Deck validation failed:',err,'deck:',JSON.stringify(deck).substring(0,500));
+    throw new Error(`Invalid deck: ${err}`);
+  }
 
   // Apply template style bank: override content but keep the color scheme
   if(styleBank){
