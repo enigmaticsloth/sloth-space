@@ -333,8 +333,12 @@ INTENTS:
   - "open settings" → {"intent":"ui_action","actions":[{"fn":"openSettings","args":[]}],"message":"Opening settings"}
   - "switch to doc mode" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["doc"]}],"message":"Switching to Doc mode"}
 
-  CRITICAL: ui_action is for NAVIGATION and MANAGEMENT only. If user wants to CREATE CONTENT (write a doc, generate slides), use "generate" instead. If user wants to EDIT existing content, use "content_edit".
-  Rule of thumb: "open X" / "switch to X" / "go to X" / "create a project" / "link files" → ui_action. "Write about X" / "make a presentation about X" → generate.
+  CRITICAL DISTINCTION — "create project" vs "create document":
+  - "建立/create a PROJECT (專案)" → ui_action (wsCreateProject). A project is an organizational container, NOT content.
+  - "建立/create/write a DOCUMENT/FILE/REPORT/SLIDES" → generate. This is content creation.
+  - "create a project called X" → ui_action. "create a document about X" → generate.
+  - "幫我建一個project叫X" → ui_action. "幫我寫一份關於X的文件" → generate.
+  Rule of thumb: "open X" / "switch to X" / "go to X" / "create a project" / "link files" / "sort by" / "search for" → ui_action. "Write about X" / "make a presentation about X" / "generate a report" → generate.
 
 "chat" — ONLY for pure greetings with NO topic and NOT asking about Sloth Space.
   "hello", "hi", "hey"
@@ -343,16 +347,17 @@ INTENTS:
 PRIORITY RULES (follow in order):
 1. Undo words (undo/redo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (delete/remove) → "content_edit" with delete:true.
-3. **CRITICAL OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation → ALWAYS "generate", even if the message ALSO asks about content.
-4. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
-5. Questions about Sloth Space THE APP itself → "about".
-6. Navigation, mode switching, opening files, managing projects, UI control → "ui_action".
-7. Topic/creation requests → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
-8. Edit existing specific content → "content_edit".
-9. Style/visual changes → "style" (slide only).
-10. Image manipulation → "image" (slide only).
-11. Batch edits → "deck_edit".
-12. ONLY if NONE of the above apply → "chat".
+3. **APP MANAGEMENT OVERRIDE**: If the message asks to CREATE/DELETE/MANAGE a PROJECT, or OPEN/SWITCH/NAVIGATE to a mode/file/project, or LINK/UNLINK files → ALWAYS "ui_action". Keywords: project, 專案, open, switch, navigate, link, unlink, sort, search, settings. "建立一個project" / "create a project" / "open settings" / "切到workspace" → ui_action, NOT generate.
+4. **CONTENT CREATION OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation (CONTENT, not a project) → ALWAYS "generate", even if the message ALSO asks about content.
+5. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
+6. Questions about Sloth Space THE APP itself → "about".
+7. Navigation, mode switching, opening files, managing projects, UI control → "ui_action".
+8. Topic/creation requests → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
+9. Edit existing specific content → "content_edit".
+10. Style/visual changes → "style" (slide only).
+11. Image manipulation → "image" (slide only).
+12. Batch edits → "deck_edit".
+13. ONLY if NONE of the above apply → "chat".
 
 MODE-SPECIFIC:
 - "style" and "image" intents ONLY in slide mode. In doc mode use content_edit or generate.
@@ -1476,6 +1481,28 @@ async function sendMessage(){
       if(hasCreateFileHint){
         console.log('Smart fallback: describe → generate (user wants to CREATE a file, not just describe)');
         intent='generate';
+      }
+    }
+
+    // ── Smart fallback: generate → ui_action when user wants to create a PROJECT (not content) ──
+    if(intent==='generate'){
+      const wantsProject=/project|專案|proj/i.test(text)
+        && /create|make|build|new|建立|建|新增|開/i.test(text)
+        && !/document|doc|report|article|file|slide|presentation|deck|文件|文檔|簡報|報告/i.test(text);
+      if(wantsProject){
+        console.log('Smart fallback: generate → ui_action (user wants to CREATE a project, not content)');
+        // Extract project name: look for "叫X" / "called X" / "named X" patterns
+        let projName='';
+        const cnMatch=text.match(/叫\s*[「「"']?(.+?)[」」"']?\s*(?:的|$)/);
+        const enMatch=text.match(/(?:called|named)\s+[""']?(.+?)[""']?\s*$/i);
+        const rawMatch=text.match(/project\s+[""']?(.+?)[""']?\s*$/i);
+        projName=(cnMatch&&cnMatch[1])||(enMatch&&enMatch[1])||(rawMatch&&rawMatch[1])||'';
+        projName=projName.trim().replace(/[。，！？.,!?]+$/,'');
+        if(projName){
+          intent='ui_action';
+          routerData.actions=[{fn:'wsCreateProject',args:[projName,'']}];
+          routerData.message=`Creating project "${projName}"`;
+        }
       }
     }
 
