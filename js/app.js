@@ -5,14 +5,14 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260315t';
-import * as slide from './slide.js?v=20260315t';
-import * as doc from './doc.js?v=20260315t';
-import * as workspace from './workspace.js?v=20260315t';
-import * as ai from './ai.js?v=20260315t';
-import * as ui from './ui.js?v=20260315t';
-import * as storage from './storage.js?v=20260315t';
-import * as keys from './keys.js?v=20260315t';
+import { S } from './state.js?v=20260315u';
+import * as slide from './slide.js?v=20260315u';
+import * as doc from './doc.js?v=20260315u';
+import * as workspace from './workspace.js?v=20260315u';
+import * as ai from './ai.js?v=20260315u';
+import * as ui from './ui.js?v=20260315u';
+import * as storage from './storage.js?v=20260315u';
+import * as keys from './keys.js?v=20260315u';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -36,35 +36,40 @@ for (const [name, fn] of Object.entries(allExports)) {
 window.S = S;
 
 // ─── Initialization sequence (order matters) ───
-// Load config
+// 1. Load config + auth
 ai.loadConfig();
-
-// Init auth
 storage.initAuth();
 
-// Init toolbar
+// 2. Init slide infrastructure (toolbar, canvas, keys)
 slide.initToolbar();
-
-// Init freeform canvas (slide move/resize)
 slide.initFreeformCanvas();
-
-// Init keyboard handlers
 keys.initKeys();
 
-// Auto-load saved state (MUST run before checkWelcomeScreen so doc/deck data is ready)
+// 3. Restore all persisted data (deck, doc, mode)
 storage.autoLoad();
 
-// Check welcome screen (restores mode, uses already-loaded data)
-ui.checkWelcomeScreen();
-
-// Initialize chat tabs (restore from localStorage)
+// 4. Restore chat tabs
 ai.initChatTabs();
 
-// Check share link
+// 5. Check share link (may override loaded deck)
 storage.checkShareLink();
 
-// Initial render
-ui.renderApp();
+// 6. Enter the correct mode — single deterministic path
+const _hasConfig = window.isConfigured && window.isConfigured();
+const _savedMode = sessionStorage.getItem('sloth_mode') || localStorage.getItem('sloth_last_mode');
+const _wasActive = sessionStorage.getItem('sloth_active');
+
+if (_hasConfig && _savedMode && _wasActive) {
+  // Returning user (refresh / restore) — enter their last mode directly
+  ui.modeEnter(_savedMode);
+} else if (_hasConfig && _savedMode) {
+  // Tab was closed and reopened (sessionStorage cleared, localStorage has mode)
+  ui.modeEnter(_savedMode);
+} else {
+  // First time or no config — show welcome / mode picker
+  ui.checkWelcomeScreen();
+  ui.renderApp(); // render default slide behind welcome overlay
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── Typewriter placeholder animation ──

@@ -722,8 +722,10 @@ export async function loadFromCloud(filename){
       }
       window.addMessage(`✓ Loaded from cloud: "${S.currentDeck.title||'Untitled'}"`,'system');
       autoSave();
-      window.renderApp();
       window.closeFileNav();
+      // Switch to slide mode if not already there
+      if(S.currentMode!=='slide') window.modeEnter('slide');
+      else window.renderApp();
     }
   }catch(e){window.addMessage('Cloud load error: '+e.message,'system');}
 }

@@ -7,15 +7,19 @@ function renderApp(){
   // Skip re-render while user is inline-editing text (would destroy cursor + edit state)
   if(window.isInlineEditing())return;
 
-  // If in doc or workspace mode, don't render slide UI — enforce mode isolation
+  // If NOT in slide mode, delegate to the correct renderer — enforce mode isolation
   if(S.currentMode==='doc'){
     document.getElementById('slideCanvas').style.display='none';
     const sb=document.querySelector('.slide-bar'); if(sb) sb.style.display='none';
+    const sp=document.querySelector('.slide-panel'); if(sp) sp.style.display='none';
+    const pills=document.getElementById('presetPills'); if(pills) pills.style.display='none';
     window.renderDocMode(); return;
   }
   if(S.currentMode==='workspace'){
     document.getElementById('slideCanvas').style.display='none';
     const sb=document.querySelector('.slide-bar'); if(sb) sb.style.display='none';
+    const sp=document.querySelector('.slide-panel'); if(sp) sp.style.display='none';
+    const pills=document.getElementById('presetPills'); if(pills) pills.style.display='none';
     window.renderWorkspaceMode(); return;
   }
 
@@ -562,9 +566,11 @@ function modeShowUI(mode){
     }
     // Move name bar into doc-canvas (before content)
     if(nameBar) dc.prepend(nameBar);
-    // Hide slide-panel entirely
+    // Hide ALL slide-specific UI
     const spDoc=document.querySelector('.slide-panel');
     if(spDoc) spDoc.style.display='none';
+    if(slideCanvas) slideCanvas.style.display='none';
+    if(slideBar) slideBar.style.display='none';
     dc.style.display='';
   } else if(mode==='workspace'){
     let wc=wsCanvas;
