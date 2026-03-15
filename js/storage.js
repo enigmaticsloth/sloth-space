@@ -449,7 +449,8 @@ export function setAuthUser(user){
   const name=user.user_metadata?.full_name||user.email?.split('@')[0]||'User';
   const email=user.email||'';
   const initial=name.charAt(0).toUpperCase();
-  const providerDef=window.LLM_DEFAULTS[window.llmConfig.provider]||window.LLM_DEFAULTS.groq;
+  const cfg=window.llmConfig||S.llmConfig||{provider:'groq'};
+  const providerDef=(window.LLM_DEFAULTS||{})[cfg.provider]||{label:'AI',color:'#8B9E8B',desc:''};
   bar.innerHTML=`
     <span class="auth-name">${name}</span>
     <div class="user-menu-wrap">
@@ -461,7 +462,7 @@ export function setAuthUser(user){
         </div>
         <div class="um-provider">
           <div class="um-provider-dot" style="background:${providerDef.color}"></div>
-          <span class="um-provider-name">${providerDef.label||window.llmConfig.provider}</span>
+          <span class="um-provider-name">${providerDef.label||cfg.provider}</span>
           <span class="um-provider-change" onclick="openSettings();closeUserMenu();">Change</span>
         </div>
         <div class="um-item" onclick="openSettings();closeUserMenu();">
@@ -500,9 +501,9 @@ export function setAuthUser(user){
     S._authSyncDone=true;
     const restored=window.restoreConfigFromCloud(user);
     // Set display name from GitHub if not already set from cloud
-    if(!window.llmConfig.displayName){
+    if(window.llmConfig&&!window.llmConfig.displayName){
       window.llmConfig.displayName=name;
-      window.saveConfig();
+      window.saveConfig&&window.saveConfig();
     }
     if(restored&&window.isConfigured()){
       // Respect the current mode — don't force slide mode on auth sync
