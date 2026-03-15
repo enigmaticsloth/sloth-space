@@ -8,33 +8,33 @@
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 
-/* ─── File Nav Popup ─── */
+/* ─── File Nav Sidebar ─── */
 .file-nav-toggle { background:none; border:none; color:var(--text2); font-size:18px; cursor:pointer; padding:2px 6px; border-radius:4px; flex-shrink:0; }
 .file-nav-toggle:hover { color:var(--text); background:var(--surface2); }
-.file-nav-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.45); z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s; backdrop-filter:blur(2px); }
+.file-nav-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s; }
 .file-nav-overlay.open { opacity:1; pointer-events:auto; }
-.file-nav { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.95); width:380px; max-width:calc(100vw - 32px); max-height:calc(100vh - 60px); background:#161A24; border:1px solid #252A38; border-radius:18px; z-index:501; display:flex; flex-direction:column; opacity:0; pointer-events:none; transition:opacity 0.2s ease, transform 0.2s ease; box-shadow:0 12px 40px rgba(0,0,0,0.5); overflow:hidden; }
-.file-nav.open { opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }
-.fn-header { display:flex; align-items:center; padding:14px 18px 10px; gap:10px; }
+.file-nav { position:fixed; top:0; left:-320px; width:320px; height:100%; background:#161A24; border-right:1px solid #252A38; border-radius:0 16px 16px 0; z-index:501; display:flex; flex-direction:column; transition:left 0.25s ease; box-shadow:6px 0 24px rgba(0,0,0,0.35); overflow:hidden; }
+.file-nav.open { left:0; }
+.fn-header { display:flex; align-items:center; padding:14px 16px 10px; gap:10px; }
 .fn-header h3 { flex:1; font-size:14px; color:var(--text); font-weight:600; margin:0; }
 .fn-close { background:none; border:none; color:var(--text2); font-size:18px; cursor:pointer; padding:2px 6px; border-radius:6px; }
 .fn-close:hover { color:var(--text); background:rgba(255,255,255,0.06); }
 /* Source tabs (cloud/local/all) */
-.fn-source-tabs { display:flex; gap:6px; padding:0 18px 8px; }
+.fn-source-tabs { display:flex; gap:6px; padding:0 16px 8px; }
 .fn-src-tab { padding:5px 14px; background:rgba(255,255,255,0.04); border:1px solid #252A38; border-radius:10px; color:#8890A5; font-size:11px; font-family:Arial; cursor:pointer; transition:all 0.15s; }
 .fn-src-tab:hover { color:var(--text); background:rgba(255,255,255,0.08); }
 .fn-src-tab.active { background:#7886A5; color:#fff; border-color:#7886A5; }
 /* Type filter checkboxes */
-.fn-type-filters { display:flex; gap:10px; padding:4px 18px 8px; }
+.fn-type-filters { display:flex; gap:10px; padding:4px 16px 8px; }
 .fn-type-chk { display:flex; align-items:center; gap:4px; font-size:11px; color:#8890A5; cursor:pointer; }
 .fn-type-chk input[type="checkbox"] { accent-color:#7886A5; width:13px; height:13px; cursor:pointer; }
 .fn-type-chk span { user-select:none; }
-/* Project selector */
-.fn-project-row { padding:0 18px 8px; }
-.fn-project-select { width:100%; padding:6px 10px; background:rgba(255,255,255,0.04); border:1px solid #252A38; border-radius:8px; color:var(--text); font-size:11px; font-family:Arial; cursor:pointer; appearance:auto; }
+/* Project selector — flat, no native gradient */
+.fn-project-row { padding:0 16px 8px; }
+.fn-project-select { width:100%; padding:7px 10px; background:#1C2030; border:1px solid #252A38; border-radius:8px; color:var(--text); font-size:11px; font-family:Arial; cursor:pointer; -webkit-appearance:none; -moz-appearance:none; appearance:none; background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238890A5' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; padding-right:28px; }
 .fn-project-select:focus { outline:none; border-color:#7886A5; }
 /* File list */
-.fn-list { flex:1; overflow-y:auto; padding:4px 10px; min-height:120px; }
+.fn-list { flex:1; overflow-y:auto; padding:4px 8px; min-height:80px; }
 .fn-list::-webkit-scrollbar { width:4px; } .fn-list::-webkit-scrollbar-thumb { background:#333; border-radius:4px; }
 .fn-empty { text-align:center; padding:30px 16px; color:#6670A0; font-size:12px; }
 .fn-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px; cursor:pointer; transition:background 0.15s; border:1px solid transparent; position:relative; }
@@ -57,19 +57,30 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .fn-cloud-badge { font-size:8px; background:#7886A5; color:#fff; padding:1px 5px; border-radius:5px; margin-left:4px; }
 .fn-local-badge { font-size:8px; background:#3A3E4A; color:#aaa; padding:1px 5px; border-radius:5px; margin-left:4px; }
 /* Multi-select bar */
-.fn-select-bar { display:flex; align-items:center; gap:8px; padding:8px 18px; border-top:1px solid #252A38; }
+.fn-select-bar { display:flex; align-items:center; gap:8px; padding:8px 16px; border-top:1px solid #252A38; }
 .fn-select-bar span { flex:1; font-size:11px; color:#8890A5; }
 .fn-sel-btn { padding:5px 12px; background:rgba(255,255,255,0.06); border:1px solid #252A38; border-radius:8px; color:var(--text); font-size:10px; font-family:Arial; cursor:pointer; }
 .fn-sel-btn:hover { background:rgba(255,255,255,0.1); }
 .fn-sel-btn.danger { color:#e74c3c; }
 .fn-sel-btn.danger:hover { background:rgba(231,76,60,0.12); border-color:#e74c3c; }
-/* Bottom action bar */
-.fn-bottom-bar { padding:8px 14px 12px; border-top:1px solid #252A38; }
-.fn-bottom-row { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+/* Bottom action bar — Monet colors: slide=blue, doc=orange, sheet=green */
+.fn-bottom-bar { padding:8px 12px 12px; border-top:1px solid #252A38; }
+.fn-bottom-row { display:flex; align-items:center; gap:5px; margin-bottom:6px; }
 .fn-bottom-row:last-child { margin-bottom:0; }
 .fn-bottom-label { font-size:10px; color:#6670A0; width:42px; flex-shrink:0; font-weight:600; }
-.fn-action-btn { padding:6px 12px; background:rgba(255,255,255,0.05); color:#b0b8cc; border:1px solid #252A38; border-radius:8px; cursor:pointer; font-size:10px; font-family:Arial; text-align:center; transition:all 0.15s; }
+.fn-action-btn { padding:6px 11px; background:rgba(255,255,255,0.05); color:#b0b8cc; border:1px solid #252A38; border-radius:8px; cursor:pointer; font-size:10px; font-family:Arial; text-align:center; transition:all 0.15s; }
 .fn-action-btn:hover { color:var(--text); background:rgba(255,255,255,0.08); border-color:#3A3E4A; }
+/* Monet accent button colors */
+.fn-action-btn.monet-blue { background:rgba(120,134,165,0.18); color:#9BA8C4; border-color:rgba(120,134,165,0.35); }
+.fn-action-btn.monet-blue:hover { background:rgba(120,134,165,0.3); color:#fff; border-color:#7886A5; }
+.fn-action-btn.monet-orange { background:rgba(200,160,100,0.15); color:#C8A870; border-color:rgba(200,160,100,0.3); }
+.fn-action-btn.monet-orange:hover { background:rgba(200,160,100,0.28); color:#E8C888; border-color:#C8A870; }
+.fn-action-btn.monet-green { background:rgba(130,180,130,0.14); color:#88B488; border-color:rgba(130,180,130,0.28); }
+.fn-action-btn.monet-green:hover { background:rgba(130,180,130,0.26); color:#A8D4A8; border-color:#88B488; }
+.fn-action-btn.monet-rose { background:rgba(180,130,150,0.14); color:#B488A0; border-color:rgba(180,130,150,0.28); }
+.fn-action-btn.monet-rose:hover { background:rgba(180,130,150,0.26); color:#D4A8C0; border-color:#B488A0; }
+.fn-action-btn.monet-plum { background:rgba(150,120,170,0.14); color:#A088B0; border-color:rgba(150,120,170,0.28); }
+.fn-action-btn.monet-plum:hover { background:rgba(150,120,170,0.26); color:#C0A8D4; border-color:#A088B0; }
 .fn-action-btn.primary { background:#7886A5; color:#fff; border-color:#7886A5; }
 .fn-action-btn.primary:hover { background:#6775A0; }
 .fn-select-toggle { margin-left:auto; }
