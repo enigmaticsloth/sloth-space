@@ -55,23 +55,24 @@
   <!-- Multi-select bar (hidden by default) -->
   <div class="fn-select-bar" id="fnSelectBar" style="display:none;">
     <span id="fnSelectCount">0 selected</span>
-    <button class="fn-sel-btn" onclick="fnCopySelected()">Copy</button>
+    <button class="fn-sel-btn" onclick="fnCopySelected()">☁️ Sync to Cloud</button>
     <button class="fn-sel-btn danger" onclick="fnDeleteSelected()">Delete</button>
   </div>
   <!-- Bottom action bar -->
   <div class="fn-bottom-bar">
     <div class="fn-bottom-row">
+      <button class="fn-action-btn fn-select-toggle" id="fnSelectToggle" onclick="toggleFileSelect()">Select File</button>
+    </div>
+    <div class="fn-bottom-row">
       <span class="fn-bottom-label">Create</span>
       <button class="fn-action-btn monet-blue" onclick="newDeck()">+ Slide</button>
-      <button class="fn-action-btn monet-orange" onclick="showWsNewDoc()">+ Doc</button>
-      <button class="fn-action-btn monet-green" onclick="showWsNewSheet()">+ Sheet</button>
+      <button class="fn-action-btn monet-orange" onclick="wsNewFile('doc')">+ Doc</button>
+      <button class="fn-action-btn monet-green" onclick="wsNewFile('sheet')">+ Sheet</button>
     </div>
     <div class="fn-bottom-row">
       <span class="fn-bottom-label">Import</span>
       <button class="fn-action-btn monet-rose" onclick="modeImport()">Files</button>
       <button class="fn-action-btn monet-plum" onclick="fnImportImages()">Images</button>
-      <div style="flex:1"></div>
-      <button class="fn-action-btn fn-select-toggle" id="fnSelectToggle" onclick="toggleFileSelect()">Select</button>
     </div>
   </div>
 </div>

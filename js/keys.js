@@ -106,6 +106,13 @@ export function initKeys(){
       return;
     }
 
+    // ── Ctrl+S — save (block browser "Save Page" dialog) ──
+    if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')&&!e.altKey){
+      e.preventDefault();
+      window.saveSloth();
+      return;
+    }
+
     if(window.isInlineEditing()) return; // let browser handle other keys in slide inline edit
 
     // ── Sheet-specific keys (early-return dispatch) ──
@@ -364,6 +371,24 @@ export function initKeys(){
       if(S.currentMode==='sheet'&&S.sheet.current){
         try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){}
       }
+    }
+  });
+
+  // ── Block browser back/forward — remap to in-app navigation ──
+  // Push two dummy states so both back and forward are trapped
+  history.pushState({sloth:true}, '');
+  history.pushState({sloth:true}, '');
+  window.addEventListener('popstate', function(e){
+    // Re-push state to keep the trap active (prevents actual page navigation)
+    history.pushState({sloth:true}, '');
+    // Map to in-app action based on current mode
+    if(S.currentMode==='slide'&&S.currentDeck){
+      // Back = prev slide, Forward would also trigger but we treat any pop as "back"
+      window.goSlide(Math.max(S.currentSlide-1, 0));
+    } else if(S.currentMode==='doc'){
+      window.docUndo();
+    } else if(S.currentMode==='sheet'){
+      window.shUndo();
     }
   });
 }

@@ -1252,10 +1252,20 @@ function _toggleFileItem(id,ev){
   if(item) item.classList.toggle('selected',fileSelectedIds.has(id));
 }
 
-function fnCopySelected(){
-  // Copy selected files to the other storage (cloud↔local)
-  window.addMessage(`Copy ${fileSelectedIds.size} files — coming soon!`,'system');
+async function fnCopySelected(){
+  if(fileSelectedIds.size===0) return;
+  if(!S.supabaseClient||!S.currentUser){
+    window.addMessage('Sign in to sync files to cloud.','system');
+    toggleFileSelect();
+    return;
+  }
+  // Force a full workspace → cloud sync
+  if(window.syncWorkspaceToCloud){
+    await window.syncWorkspaceToCloud();
+    window.addMessage(`☁️ Synced ${fileSelectedIds.size} file(s) to cloud.`,'system');
+  }
   toggleFileSelect();
+  window.refreshFileList();
 }
 
 async function fnDeleteSelected(){
@@ -1331,15 +1341,16 @@ async function refreshFileList(){
 
   let files=[];
 
-  // Workspace docs & sheets (always available locally)
+  // Workspace docs & sheets (stored locally, auto-synced to cloud when logged in)
   const wsFiles=window.wsListFiles?window.wsListFiles():[];
+  const isLoggedIn=!!(S.supabaseClient&&S.currentUser);
   for(const wf of wsFiles){
     files.push({
       id:'ws_'+wf.id,
       wsId:wf.id,
       title:wf.title,
       type:wf.type,
-      source:'local',
+      source: isLoggedIn ? 'cloud' : 'local',
       updated:new Date(wf.updated).getTime(),
       meta: wf.type==='doc'? `${(wf.content.blocks||[]).length} blocks` :
             wf.type==='sheet'? `${(wf.content.rows||[]).length} rows` : ''

@@ -1636,10 +1636,12 @@ async function sendMessage(){
     }else if(intent==='generate'&&S.currentMode==='doc'){
       // ── DOC GENERATE: create doc blocks instead of slides ──
       await doDocGenerate(statusDiv,text,wsContext);
+      _autoLinkToProject(_resolvedProjectId);
 
     }else if(intent==='generate'){
       // ── GENERATE: create/modify slides ──
       await doGenerate(statusDiv,wsContext);
+      _autoLinkToProject(_resolvedProjectId);
 
     }else if(S.currentMode==='doc'&&(intent==='content_edit'||intent==='deck_edit')){
       // ── DOC EDIT ──
@@ -1660,6 +1662,7 @@ async function sendMessage(){
         }
       } else {
         await doDocGenerate(statusDiv,text,wsContext);
+        _autoLinkToProject(_resolvedProjectId);
       }
 
     }else{
@@ -1682,6 +1685,54 @@ async function sendMessage(){
     window.autoSave(); // Save chat history after every message
     saveChatTabs(); // Persist chat tabs
     scheduleTabTitleGen(); // AI-generate tab title if needed
+  }
+}
+
+// ── Auto-save generated content to workspace & link to source project ──
+function _autoLinkToProject(projectId){
+  if(!projectId) return;
+  if(!window.wsLoad || !window.wsSave || !window.wsLinkFile) return;
+  const files=window.wsLoad();
+  let fileId=S._wsCurrentFileId;
+
+  // If current content isn't in workspace yet, create an entry
+  if(!fileId || !files.some(f=>f.id===fileId)){
+    const now=new Date().toISOString();
+    if(S.currentMode==='slide' && S.currentDeck){
+      const entry={
+        id: 'ws_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),
+        type:'slides',
+        title: S.currentDeck.title||'Untitled',
+        created: now, updated: now,
+        content: S.currentDeck
+      };
+      files.push(entry);
+      fileId=entry.id;
+    } else if(S.currentMode==='doc' && S.currentDoc){
+      const entry={
+        id: S.currentDoc.id || 'ws_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),
+        type:'doc',
+        title: S.currentDoc.title||'Untitled',
+        created: now, updated: now,
+        content: { blocks: S.currentDoc.blocks }
+      };
+      // Check if doc already exists by id
+      const existing=files.findIndex(f=>f.id===entry.id);
+      if(existing>=0) files[existing]=entry;
+      else files.push(entry);
+      fileId=entry.id;
+    }
+    if(fileId){
+      S._wsCurrentFileId=fileId;
+      window.wsSave(files);
+    }
+  }
+
+  // Link to project (wsLinkFile auto-dedupes)
+  if(fileId){
+    window.wsLinkFile(fileId, projectId);
+    const proj=window.wsGetProject ? window.wsGetProject(projectId) : null;
+    if(proj) addMessage(`📁 Linked to project "${proj.name}"`,'system');
   }
 }
 
