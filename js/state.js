@@ -199,6 +199,9 @@ export const S = {
   ],
   wsView: 'recent',          // 'recent' | 'projects' | 'all' | 'unlinked' | 'project-detail'
   wsTypeFilters: { slide: true, doc: true, sheet: true },  // file type filter checkboxes
+  wsSearchQuery: '',         // search bar text
+  wsSortBy: 'date',          // 'date' | 'name' | 'type'
+  wsSortAsc: false,          // false = newest/Z-A first, true = oldest/A-Z first
 
   // ── File Nav ──
   fileNavTab: 'all',

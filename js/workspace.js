@@ -674,11 +674,25 @@ export function renderWorkspaceMode() {
   // Batch bar
   let batchHtml = '';
   if (S.wsSelectedIds.size > 0) {
+    const projects = wsListProjects();
+    let moveMenu = '';
+    if (projects.length > 0) {
+      moveMenu = `<div class="ws-new-dropdown">
+        <button class="ws-batch-btn" onclick="wsToggleBatchMoveMenu(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Move to... ▾</button>
+        <div class="ws-new-menu" id="wsBatchMoveMenu">${projects.map(p => {
+          const c = wsGetProjectColor(p);
+          return `<button class="ws-new-menu-item" onclick="wsBatchMoveToProject('${p.id}')"><span class="ws-tag-dot" style="background:${c.dot};width:8px;height:8px;flex-shrink:0"></span> ${escapeHtml(p.name)}</button>`;
+        }).join('')}</div>
+      </div>`;
+    }
     batchHtml = `<div class="ws-batch-bar">
       <span class="ws-batch-count">${S.wsSelectedIds.size} selected</span>
-      <button class="ws-batch-btn danger" onclick="wsBatchDelete()">Delete</button>
-      <button class="ws-batch-btn" onclick="wsBatchDuplicate()">Duplicate</button>
-      <button class="ws-batch-cancel" onclick="wsClearSelection()">Cancel</button>
+      <button class="ws-batch-btn" onclick="wsSelectAll()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> All</button>
+      ${moveMenu}
+      <button class="ws-batch-btn" onclick="wsBatchUnlink()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M5.16 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71"/></svg> Unlink</button>
+      <button class="ws-batch-btn" onclick="wsBatchDuplicate()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Duplicate</button>
+      <button class="ws-batch-btn danger" onclick="wsBatchDelete()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>
+      <button class="ws-batch-cancel" onclick="wsClearSelection()">✕</button>
     </div>`;
   }
 
@@ -718,6 +732,7 @@ export function renderWorkspaceMode() {
       ${projectBadge}
       ${navHtml}
       ${batchHtml}
+      ${(view !== 'projects' && view !== 'project-detail') ? renderSearchAndSort() : ''}
       <div class="ws-content">${contentHtml}</div>
     </div>
   `;
@@ -766,28 +781,54 @@ function renderFileListView(view) {
     return f[t] !== false;
   });
 
-  // Sort by updated (recent first)
+  // Apply search filter
+  const q = (S.wsSearchQuery || '').trim().toLowerCase();
+  if (q) {
+    files = files.filter(item => {
+      const title = (item.title || '').toLowerCase();
+      const type = (item.type || 'slide').toLowerCase();
+      // Also search project names
+      const projNames = wsGetFileProjects(item.id).map(p => p.name.toLowerCase()).join(' ');
+      return title.includes(q) || type.includes(q) || projNames.includes(q);
+    });
+  }
+
+  // Apply sort
+  const sortBy = S.wsSortBy || 'date';
+  const asc = S.wsSortAsc;
   files.sort((a, b) => {
-    const da = new Date(a.updated || a.created || 0).getTime();
-    const db = new Date(b.updated || b.created || 0).getTime();
-    return db - da;
+    let cmp = 0;
+    if (sortBy === 'date') {
+      const da = new Date(a.updated || a.created || 0).getTime();
+      const db = new Date(b.updated || b.created || 0).getTime();
+      cmp = db - da;
+    } else if (sortBy === 'name') {
+      cmp = (a.title || '').localeCompare(b.title || '');
+    } else if (sortBy === 'type') {
+      cmp = (a.type || 'slide').localeCompare(b.type || 'slide');
+      if (cmp === 0) cmp = (a.title || '').localeCompare(b.title || '');
+    }
+    return asc ? cmp : -cmp;
   });
 
   if (view === 'recent') {
-    // Show only last 20
     files = files.slice(0, 20);
   }
 
   const filtersHtml = renderTypeFilters();
+  const totalCount = files.length;
 
   if (files.length === 0) {
-    const msg = view === 'unlinked'
-      ? 'All files are linked to projects. Nice!'
-      : 'No files yet. Create one to get started.';
+    const msg = q
+      ? `No files matching "${escapeHtml(q)}"`
+      : view === 'unlinked'
+        ? 'All files are linked to projects. Nice!'
+        : 'No files yet. Create one to get started.';
     return `${filtersHtml}<div class="ws-empty"><div class="ws-empty-text">${msg}</div></div>`;
   }
 
-  return `${filtersHtml}<div class="ws-file-list">${files.map(f => renderFileCard(f)).join('')}</div>`;
+  const countHtml = q ? `<div class="ws-result-count">${totalCount} result${totalCount !== 1 ? 's' : ''}</div>` : '';
+  return `${filtersHtml}${countHtml}<div class="ws-file-list">${files.map(f => renderFileCard(f)).join('')}</div>`;
 }
 
 /** Render a single file card */
@@ -1083,6 +1124,116 @@ export function wsBatchDuplicate() {
   S.wsSelectedIds.clear();
   renderWorkspaceMode();
   window.addMessage(`✓ Duplicated ${count} file${count > 1 ? 's' : ''}`, 'system');
+}
+
+/**
+ * Select all visible files.
+ */
+export function wsSelectAll() {
+  const files = wsLoad();
+  const f = S.wsTypeFilters;
+  files.forEach(item => {
+    const t = item.type || 'slide';
+    if (f[t] !== false) S.wsSelectedIds.add(item.id);
+  });
+  renderWorkspaceMode();
+}
+
+/**
+ * Batch move selected files to a project.
+ */
+export function wsBatchMoveToProject(projectId) {
+  if (S.wsSelectedIds.size === 0) return;
+  let count = 0;
+  for (const fileId of S.wsSelectedIds) {
+    if (!wsIsLinked(fileId, projectId)) {
+      wsLinkFile(fileId, projectId);
+      count++;
+    }
+  }
+  S.wsSelectedIds.clear();
+  const proj = wsGetProject(projectId);
+  renderWorkspaceMode();
+  window.addMessage(`✓ Linked ${count} file${count > 1 ? 's' : ''} to "${proj?.name || 'project'}"`, 'system');
+}
+
+/**
+ * Toggle the batch move menu.
+ */
+export function wsToggleBatchMoveMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('wsBatchMoveMenu');
+  if (menu) menu.classList.toggle('show');
+}
+
+/**
+ * Batch unlink selected files from all projects.
+ */
+export function wsBatchUnlink() {
+  if (S.wsSelectedIds.size === 0) return;
+  let count = 0;
+  for (const fileId of S.wsSelectedIds) {
+    const linkedProjects = wsGetFileProjects(fileId);
+    for (const p of linkedProjects) {
+      wsUnlinkFile(fileId, p.id);
+      count++;
+    }
+  }
+  S.wsSelectedIds.clear();
+  renderWorkspaceMode();
+  window.addMessage(`✓ Unlinked ${count} link${count > 1 ? 's' : ''}`, 'system');
+}
+
+// ═══════════════════════════════════════════
+// SEARCH & SORT
+// ═══════════════════════════════════════════
+
+/**
+ * Render search bar and sort controls.
+ */
+function renderSearchAndSort() {
+  const q = S.wsSearchQuery || '';
+  const sortBy = S.wsSortBy || 'date';
+  const asc = S.wsSortAsc;
+  const arrow = asc ? '↑' : '↓';
+  return `<div class="ws-search-sort">
+    <div class="ws-search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="ws-search-input" type="text" placeholder="Search files..." value="${escapeHtml(q)}" oninput="wsSetSearch(this.value)" id="wsSearchInput">
+      ${q ? `<button class="ws-search-clear" onclick="wsSetSearch('');document.getElementById('wsSearchInput').value=''">✕</button>` : ''}
+    </div>
+    <div class="ws-sort-controls">
+      <button class="ws-sort-btn${sortBy==='date'?' active':''}" onclick="wsSetSort('date')">Date ${sortBy==='date'?arrow:''}</button>
+      <button class="ws-sort-btn${sortBy==='name'?' active':''}" onclick="wsSetSort('name')">Name ${sortBy==='name'?arrow:''}</button>
+      <button class="ws-sort-btn${sortBy==='type'?' active':''}" onclick="wsSetSort('type')">Type ${sortBy==='type'?arrow:''}</button>
+    </div>
+  </div>`;
+}
+
+/**
+ * Set search query and re-render.
+ */
+export function wsSetSearch(query) {
+  S.wsSearchQuery = query;
+  renderWorkspaceMode();
+  // Re-focus search input after re-render
+  setTimeout(() => {
+    const input = document.getElementById('wsSearchInput');
+    if (input) { input.focus(); input.selectionStart = input.selectionEnd = input.value.length; }
+  }, 0);
+}
+
+/**
+ * Set sort mode. Clicking same sort toggles direction.
+ */
+export function wsSetSort(by) {
+  if (S.wsSortBy === by) {
+    S.wsSortAsc = !S.wsSortAsc;
+  } else {
+    S.wsSortBy = by;
+    S.wsSortAsc = by === 'name'; // name defaults A-Z, others default desc
+  }
+  renderWorkspaceMode();
 }
 
 /**
