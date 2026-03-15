@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Sloth Space</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PptxGenJS/3.12.0/pptxgen.bundle.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Sloth Space</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PptxGenJS/3.12.0/pptxgen.bundle.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <link rel="stylesheet" href="shared/styles.css">
+  <link rel="stylesheet" href="slides/slides.css">
 </head>
 <body>
 
@@ -73,27 +74,16 @@
 
 <!-- Top bar -->
 <!-- # Goodbye Google. You will never scam me or mess with me again. — Enigmaticsloth -->
-<div class="topbar">
-  <!-- Left: nav + branding + mode -->
-  <div class="topbar-left">
-    <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
-    <div class="logo" onclick="showModePicker()" style="cursor:pointer;" title="Home">Sloth Space</div>
-    <div class="tagline" style="color:#777;">Type what you want. Sloth will design it.</div>
-    <div class="mode-badge" id="modeBadge" onclick="toggleModeSwitchMenu(event)" title="Switch mode">
-      <svg class="mode-badge-icon" id="modeBadgeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-      <span id="modeBadgeLabel">Slide</span>
-      <div class="mode-switch-menu" id="modeSwitchMenu" style="display:none;"></div>
-    </div>
-  </div>
-  <!-- Center: preset pills (slide-only, fills remaining space) -->
-  <div class="topbar-center" id="presetPills"></div>
-  <!-- Right: exports + settings + auth (always right-aligned) -->
-  <div class="topbar-right">
-    <div class="topbar-exports" id="topbarExports"></div>
-    <button class="export-btn topbar-settings-btn" onclick="openSettings()" title="Settings">&#9881;</button>
-    <div class="auth-bar" id="authBar">
-      <button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>
-    </div>
+<div class="topbar slides-ui">
+  <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
+  <div class="logo" onclick="showWelcome()" style="cursor:pointer;" title="Home">Sloth Space</div>
+  <div class="tagline">Type what you want. Sloth will design it.</div>
+  <div class="preset-pills" id="presetPills"></div>
+  <button class="export-btn" onclick="saveSloth()">Export .sloth</button>
+  <button class="export-btn" onclick="exportPPTX()">Export .pptx</button>
+  <button class="export-btn" onclick="openSettings()" title="Settings" style="font-size:20px;line-height:1;padding:2px 8px;">&#9881;</button>
+  <div class="auth-bar" id="authBar">
+    <button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>
   </div>
   <input type="file" id="fileInput" accept=".json,.sloth" style="display:none;" onchange="handleFileLoad(event)">
 </div>
@@ -327,115 +317,6 @@
   </div>
 </div>
 
-<!-- Mode Picker (shown after welcome, before entering editor) -->
-<div class="mode-picker-overlay hidden" id="modePickerOverlay">
-  <div class="mode-picker">
-    <div class="mp-logo">Sloth Space</div>
-    <div class="mp-tagline">What would you like to create?</div>
-    <div class="mode-cards">
-
-      <!-- Slide -->
-      <div class="mode-card" onclick="pickMode('slide')">
-        <div class="mode-card-demo">
-          <span class="mode-card-badge ready">Ready</span>
-          <div class="mc-slide-preview">
-            <div class="mc-title"></div>
-            <div class="mc-subtitle"></div>
-            <div class="mc-body"><div class="mc-body-line"></div><div class="mc-body-line"></div></div>
-          </div>
-        </div>
-        <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#7886A5,#9BA8C4);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-          </div>
-          <div class="mode-card-name">Slide</div>
-          <div class="mode-card-desc">Presentations with AI-powered design. Free-form canvas, smart layouts, style presets.</div>
-        </div>
-      </div>
-
-      <!-- Doc -->
-      <div class="mode-card" onclick="pickMode('doc')">
-        <div class="mode-card-demo">
-          <span class="mode-card-badge ready">Ready</span>
-          <div class="mc-doc-preview">
-            <div class="mc-dh"></div>
-            <div class="mc-dp w90"></div>
-            <div class="mc-dp w80"></div>
-            <div class="mc-dp w70"></div>
-            <div class="mc-dimg"></div>
-            <div class="mc-dcap"></div>
-            <div class="mc-dp w90"></div>
-            <div class="mc-dp w60"></div>
-          </div>
-        </div>
-        <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#6B8E7B,#8FB89F);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </div>
-          <div class="mode-card-name">Doc</div>
-          <div class="mode-card-desc">Block-based documents. Drag to reorder, auto figure numbering, paper-quality layout.</div>
-        </div>
-      </div>
-
-      <!-- Sheet -->
-      <div class="mode-card disabled">
-        <div class="mode-card-demo">
-          <span class="mode-card-badge soon">Planned</span>
-          <div class="mc-sheet-preview">
-            <div class="mc-sheet-row header"><div class="mc-sheet-cell">A</div><div class="mc-sheet-cell">B</div><div class="mc-sheet-cell">C</div><div class="mc-sheet-cell">D</div></div>
-            <div class="mc-sheet-row"><div class="mc-sheet-cell">12.4</div><div class="mc-sheet-cell">8.7</div><div class="mc-sheet-cell">15.2</div><div class="mc-sheet-cell">9.1</div></div>
-            <div class="mc-sheet-row"><div class="mc-sheet-cell">6.3</div><div class="mc-sheet-cell">11.5</div><div class="mc-sheet-cell">7.8</div><div class="mc-sheet-cell">14.6</div></div>
-            <div class="mc-sheet-row"><div class="mc-sheet-cell">18.1</div><div class="mc-sheet-cell">5.2</div><div class="mc-sheet-cell">10.9</div><div class="mc-sheet-cell">3.7</div></div>
-            <div class="mc-sheet-row"><div class="mc-sheet-cell">9.6</div><div class="mc-sheet-cell">13.8</div><div class="mc-sheet-cell">4.5</div><div class="mc-sheet-cell">16.3</div></div>
-          </div>
-        </div>
-        <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#A08060,#C4A882);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-          </div>
-          <div class="mode-card-name">Sheet</div>
-          <div class="mode-card-desc">Spreadsheets with formulas, charts, and AI data analysis. Cross-references to docs and slides.</div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Workspace card (full width below the three) -->
-    <div class="mode-card mode-card-wide" onclick="pickMode('workspace')">
-      <div class="mode-card-demo">
-        <span class="mode-card-badge soon">Coming Soon</span>
-        <div class="mc-ws-preview">
-          <div class="mc-ws-sidebar">
-            <div class="mc-ws-dot active"></div>
-            <div class="mc-ws-dot"></div>
-            <div class="mc-ws-dot"></div>
-            <div class="mc-ws-dot dim"></div>
-          </div>
-          <div class="mc-ws-main">
-            <div class="mc-ws-row"><div class="mc-ws-thumb slide"></div><div class="mc-ws-meta"><div class="mc-ws-name"></div><div class="mc-ws-date"></div></div></div>
-            <div class="mc-ws-row"><div class="mc-ws-thumb doc"></div><div class="mc-ws-meta"><div class="mc-ws-name w60"></div><div class="mc-ws-date"></div></div></div>
-            <div class="mc-ws-row"><div class="mc-ws-thumb sheet"></div><div class="mc-ws-meta"><div class="mc-ws-name w80"></div><div class="mc-ws-date"></div></div></div>
-          </div>
-        </div>
-      </div>
-      <div class="mode-card-info">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#8B7BA8,#A899C4);width:32px;height:32px;border-radius:8px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="mode-card-name">Workspace</div>
-        </div>
-        <div class="mode-card-desc">Your project hub. Manage all docs, slides, and sheets in one place.</div>
-      </div>
-    </div>
-
-    <button class="mp-back" onclick="showWelcomeFromPicker()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
-      Settings
-    </button>
-  </div>
-</div>
-
 <!-- Terms of Service overlay -->
 <div class="tos-overlay" id="tosOverlay">
   <div class="tos-box">
@@ -485,14 +366,14 @@
 </div>
 
 <!-- Middle: slide left + conversation right -->
-<div class="middle">
+<div class="middle slides-ui">
   <div class="slide-panel">
-    <div class="deck-name-bar" id="modeNameBar">
+    <div class="deck-name-bar">
       <input type="text" id="deckNameInput" class="deck-name-input" placeholder="Untitled Presentation" spellcheck="false">
-      <div class="deck-actions" id="modeActions">
-        <button class="deck-action-btn" onclick="modeNew()">+ New</button>
-        <button class="deck-action-btn" onclick="modeImport()">Import</button>
-        <button class="deck-action-btn primary" onclick="modeSaveCloud()">Save to Cloud</button>
+      <div class="deck-actions">
+        <button class="deck-action-btn" onclick="newDeck()">+ New</button>
+        <button class="deck-action-btn" onclick="loadDeck()">Import</button>
+        <button class="deck-action-btn primary" onclick="saveCurrentToCloud()">Save to Cloud</button>
       </div>
     </div>
     <div class="slide-frame" id="slideCanvas"></div>
@@ -501,105 +382,89 @@
       <div class="slide-info" id="slideInfo"></div>
     </div>
   </div>
-  <div class="chat-panel" id="chatPanel">
-    <div class="chat-header" onclick="toggleChatPanel()"><span>Chat</span><span class="chat-toggle-icon" id="chatToggleIcon">▼</span></div>
+  <div class="chat-panel">
+    <div class="chat-header">Chat</div>
     <div class="chat-messages" id="chatMessages"></div>
   </div>
 </div>
 
 <!-- Bottom: toolbar + tall input -->
-<div class="bottom-panel">
+<div class="bottom-panel slides-ui">
   <div class="selection-bar" id="selectionBar" style="display:none;">
     <span style="color:#444;">Selected:</span>
     <span class="selection-tag" id="selectionTag"></span>
     <button class="selection-clear" onclick="clearSelection()">✕ clear</button>
   </div>
-  <!-- Unified toolbar (adapts to current mode) -->
-  <div class="toolbar" id="unifiedToolbar">
-    <!-- INSERT (+) — leftmost, prominent -->
-    <div class="dt-group insert-group" style="position:relative;">
-      <button class="dt-btn insert-plus-btn" id="insertPlusBtn" onclick="toggleInsertMenu(event)" title="Insert">
-        <span>+</span>
-      </button>
-      <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleInsertedFiles(this.files)">
-      <div class="insert-menu" id="insertMenu" style="display:none;">
-        <div class="insert-menu-title">Insert</div>
-        <div class="insert-menu-item" onclick="triggerLocalImageInsert()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Image (file)</div>
-        <div class="insert-menu-item" onclick="triggerUrlImageInsert()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Image (URL)</div>
-        <div class="insert-menu-item tb-doc-only" onclick="docInsertTablePrompt();hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Table</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: content]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg> Content</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: two-column]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg> Two Column</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-top]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="10" cy="7.5" r="1.5"/></svg> Image Top</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-left]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><rect x="5" y="6" width="5" height="5" rx="1"/></svg> Image Left</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: image-right]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><rect x="14" y="6" width="5" height="5" rx="1"/></svg> Image Right</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: quote]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.76-2.02-2-2H6c-1.25 0-2 .75-2 2v6c0 1 .75 2 2 2h1c-.17 2.14-1.5 3.6-4 4z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.76-2.02-2-2h-2c-1.25 0-2 .75-2 2v6c0 1 .75 2 2 2h1c-.17 2.14-1.5 3.6-4 4z"/></svg> Quote</div>
-        <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: data-table]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg> Data Table</div>
+  <div class="toolbar">
+    <button class="img-attach-btn" onclick="document.getElementById('imgFileInput').click()" title="Attach image">+</button>
+    <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleImageFiles(this.files)">
+    <span class="font-size-indicator" id="fontSizeIndicator" title="Current font size">--</span>
+    <button class="tool-btn" onclick="togglePopup('textPopup',this,event)">
+      Text
+      <div class="popup" id="textPopup">
+        <h4>Basic</h4>
+        <div class="color-grid" id="textBasicColors"></div>
+        <h4>Monet</h4>
+        <div class="color-grid" id="textMonetColors"></div>
+        <h4>Seurat</h4>
+        <div class="color-grid" id="textSeuratColors"></div>
       </div>
-    </div>
-    <!-- Divider button (doc-only) -->
-    <div class="dt-group tb-doc-only" style="display:none;">
-      <button class="dt-btn" onclick="docInsertDivider()" title="Insert divider"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="3" y1="18" x2="9" y2="18"/></svg></button>
-    </div>
-    <!-- Undo/Redo -->
-    <div class="undo-redo-group">
-      <button class="undo-redo-btn" id="undoBtn" onclick="modeUndo()" title="Undo (Ctrl+Z)">&#8630;</button>
-      <button class="undo-redo-btn" id="redoBtn" onclick="modeRedo()" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
-    </div>
-    <!-- Doc-only: Block type -->
-    <div class="dt-group tb-doc-only" style="display:none;">
-      <select class="dt-select" id="dtBlockType" onchange="docToolbarChangeType(this.value)" title="Block type">
-        <option value="paragraph">¶ Text</option>
-        <option value="heading1">H1</option>
-        <option value="heading2">H2</option>
-        <option value="heading3">H3</option>
-        <option value="quote">❝ Quote</option>
-        <option value="code">⟨⟩ Code</option>
-        <option value="list">• Bullet</option>
-        <option value="numbered">1. Numbered</option>
-      </select>
-    </div>
-    <!-- Text formatting -->
-    <div class="dt-group">
-      <button class="dt-btn" onclick="modeExecCmd('bold')" title="Bold (Ctrl+B)"><strong>B</strong></button>
-      <button class="dt-btn" onclick="modeExecCmd('italic')" title="Italic (Ctrl+I)"><em>I</em></button>
-      <button class="dt-btn" onclick="modeExecCmd('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
-      <button class="dt-btn" onclick="modeExecCmd('strikeThrough')" title="Strikethrough"><s>S</s></button>
-      <button class="dt-btn" onclick="modeExecCmd('superscript')" title="Superscript">X<sup style="font-size:8px;">²</sup></button>
-      <button class="dt-btn" onclick="modeExecCmd('subscript')" title="Subscript">X<sub style="font-size:8px;">₂</sub></button>
-    </div>
-    <!-- Font family & size -->
-    <div class="dt-group">
-      <select class="dt-select" id="dtFontFamily" onchange="modeToolbarFont(this.value)" title="Font family">
-        <option value="Arial">Arial</option>
-        <option value="Georgia">Georgia</option>
-        <option value="Helvetica">Helvetica</option>
-        <option value="Times New Roman">Times New Roman</option>
-        <option value="Courier New">Courier New</option>
-        <option value="Verdana">Verdana</option>
-        <option value="Trebuchet MS">Trebuchet MS</option>
-        <option value="Palatino">Palatino</option>
-        <option value="Garamond">Garamond</option>
-        <option value="Calibri">Calibri</option>
-      </select>
-      <input type="number" class="dt-font-size" id="dtFontSize" value="15" min="8" max="72" onchange="modeToolbarFontSize(this.value)" title="Font size (px)">
-    </div>
-    <!-- Colors -->
-    <div class="dt-group">
-      <label title="Text color" style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:0 4px;border-top:1px solid var(--border);font-size:10px;color:#aaa;">
-        A <input type="color" id="dtTextColor" value="#e0e0e0" onchange="modeToolbarTextColor(this.value)" style="width:18px;height:18px;border:none;background:none;cursor:pointer;padding:0;">
-      </label>
-      <label title="Highlight" style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:0 4px;border-top:1px solid var(--border);font-size:10px;color:#aaa;">
-        <span style="background:#7886A5;color:#fff;padding:0 3px;border-radius:2px;font-size:9px;">bg</span>
-        <input type="color" id="dtBgColor" value="#1e1e1e" onchange="modeToolbarBgColor(this.value)" style="width:18px;height:18px;border:none;background:none;cursor:pointer;padding:0;">
-      </label>
-    </div>
-    <!-- Doc-only: Zoom -->
-    <div class="dt-group tb-doc-only" style="display:none;">
-      <button class="dt-btn" onclick="docZoom(-10)" title="Zoom out">−</button>
-      <span class="dt-btn" id="docZoomLabel" style="cursor:default;min-width:36px;text-align:center;font-family:'Courier New',monospace;" onclick="docZoomReset()">100%</span>
-      <button class="dt-btn" onclick="docZoom(10)" title="Zoom in">+</button>
-    </div>
+    </button>
+    <button class="tool-btn" onclick="togglePopup('bgPopup',this,event)">
+      Background
+      <div class="popup" id="bgPopup">
+        <h4>Basic</h4>
+        <div class="color-grid" id="bgBasicColors"></div>
+        <h4>Monet</h4>
+        <div class="color-grid" id="bgMonetColors"></div>
+        <h4>Seurat</h4>
+        <div class="color-grid" id="bgSeuratColors"></div>
+      </div>
+    </button>
+    <button class="tool-btn" onclick="togglePopup('fontPopup',this,event)">
+      Font
+      <div class="popup" id="fontPopup">
+        <div class="font-list" id="fontList"></div>
+      </div>
+    </button>
+    <button class="tool-btn" onclick="togglePopup('stylePopup',this,event)">
+      Style
+      <div class="popup" id="stylePopup">
+        <div class="style-row">
+          <span class="style-tag" onclick="insertTag('[bold]')"><b>B</b></span>
+          <span class="style-tag" onclick="insertTag('[italic]')"><i>I</i></span>
+          <span class="style-tag" onclick="insertTag('[underline]')"><u>U</u></span>
+          <span class="style-tag" onclick="insertTag('[strikethrough]')"><s>S</s></span>
+        </div>
+        <h4>Size</h4>
+        <div class="style-row">
+          <span class="style-tag" onclick="insertTag('[size: small]')">Small</span>
+          <span class="style-tag" onclick="insertTag('[size: medium]')">Medium</span>
+          <span class="style-tag" onclick="insertTag('[size: large]')">Large</span>
+          <span class="style-tag" onclick="insertTag('[size: xlarge]')">XL</span>
+        </div>
+      </div>
+    </button>
+    <button class="tool-btn" onclick="togglePopup('layoutPopup',this,event)">
+      Layout
+      <div class="popup" id="layoutPopup">
+        <div class="font-list">
+          <div class="font-item" onclick="insertTag('[layout: content]')">Content</div>
+          <div class="font-item" onclick="insertTag('[layout: two-column]')">Two Column</div>
+          <div class="font-item" onclick="insertTag('[layout: image-top]')">Image Top</div>
+          <div class="font-item" onclick="insertTag('[layout: image-left]')">Image Left</div>
+          <div class="font-item" onclick="insertTag('[layout: image-right]')">Image Right</div>
+          <div class="font-item" onclick="insertTag('[layout: image-bottom]')">Image Bottom</div>
+          <div class="font-item" onclick="insertTag('[layout: quote]')">Quote</div>
+          <div class="font-item" onclick="insertTag('[layout: data-table]')">Data Table</div>
+        </div>
+      </div>
+    </button>
     <div class="toolbar-spacer"></div>
+    <div class="undo-redo-group">
+      <button class="undo-redo-btn" id="undoBtn" onclick="undo()" disabled title="Undo (Ctrl+Z)">&#8630;<span class="undo-label">Undo</span></button>
+      <button class="undo-redo-btn" id="redoBtn" onclick="redo()" disabled title="Redo (Ctrl+Shift+Z)">&#8631;<span class="undo-label">Redo</span></button>
+    </div>
   </div>
   <div class="img-staging" id="imgStaging">
     <span class="img-staging-label">📎 Attached:</span>
@@ -619,20 +484,97 @@
   </div>
 </div>
 
-<!-- Contextual AI Menu (positioned dynamically near selected region) -->
-<div class="ctx-ai-menu" id="ctxAiMenu" style="display:none;"></div>
-<div class="text-sel-tooltip" id="textSelTooltip" style="display:none;">
-  <button onclick="editFromSelection()">✏️ Edit</button>
-  <button onclick="copySelectionToChat()">✦ Ask AI</button>
-  <button onclick="copySelectionToClipboard()">📋 Copy</button>
-</div>
+  <script type="module">
+    // Import all modules
+    import { state, PRESETS, LAYOUTS, BASIC_COLORS, MONET_COLORS, SEURAT_COLORS, FONTS } from './shared/config.js';
+    import { LLM_DEFAULTS, CONFIG_KEY, llmConfig, loadConfig, saveConfig, isConfigured, clearLocalConfig, callLLM, setOnConfigSave } from './shared/llm.js';
+    import { wsLoad, wsSave, syncWorkspaceToCloud, syncWorkspaceFromCloud, wsGetFile, wsCreateDoc, wsCreateSheet, wsDeleteFile, wsUpdateFile, wsListFiles, wsFileToContext, wsDetectReferences, setGetAuthState } from './shared/storage.js';
+    import { initAuth, setAuthUser, clearAuthUser, doLogin, doLogout, doWelcomeSignOut, showWelcome, toggleUserMenu, closeUserMenu, supabaseClient, currentUser, syncConfigToCloud, setOnEnterSlides, setOnAddMessage as setAuthOnAddMessage, setOnRenderApp } from './shared/auth.js';
+    import { initUndoRedo, snapshotDeck, pushUndo, undo, redo, selectRegion, clearSelection, updateFontSizeIndicator, SC, rs, rc, renderSlide, renderApp, slideAnimDir, goSlide, setPreset, generateTemplateDeck, togglePopup, insertTag, insertTextColor, insertBgColor, initToolbar, ONBOARDING_PROMPTS, useOnboardingPrompt, renderChatOnboarding, setOnAddMessage as setRendererOnAddMessage, setOnAutoSave, setOnSendMessage } from './slides/renderer.js';
+    import { addMessage, validateDeck, extractJSON, applyStyleOverrides, placeImageOnSlide, hasImageOnCurrentSlide, applyImageAction, sendMessage, doGenerate, toggleInputSize, stagedImages, handleImageFiles, removeStagedImage, renderStagedImages, consumeStagedImages, initDragDrop, initInputHandlers } from './slides/editor.js';
+    import { autoSave, autoLoad, newDeck, saveDeck, loadDeck, handleFileLoad, exportJSON, exportPPTX, saveSloth, loadSlothFile, switchProduct, openFileNav, closeFileNav, setFileTab, refreshFileList, loadFileFromNav, loadFromCloud, saveCurrentToCloud, deleteFileFromNav, shareFile, showWsNewDoc, showWsNewSheet, closeWsModal, saveWsModal, checkShareLink } from './slides/export.js';
+    import { enterSlides, checkWelcomeScreen, initMobileHandlers, initTypewriterPlaceholder, initDemoAnimation, openSettings, closeSettings, saveSettings, setSettingsProvider, getOS, initOllamaGuide, copyCmd, detectOllama, testConnection, confirmWelcomeProvider, toggleWelcomeProviders, setWelcomeProvider, showMobileForm, finishWelcome, skipWelcome, showTerms, closeTerms, INITIAL_VH, INITIAL_VW } from './shared/welcome.js';
 
-<script>
-// ES modules require http:// — detect file:// and show helpful message
-if(location.protocol==='file:'){
-  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
-}
-</script>
-<script type="module" src="js/app.js"></script>
+    // Expose all functions to window scope for onclick handlers
+    window.switchProduct = switchProduct;
+    window.closeFileNav = closeFileNav;
+    window.setFileTab = setFileTab;
+    window.showWsNewDoc = showWsNewDoc;
+    window.showWsNewSheet = showWsNewSheet;
+    window.newDeck = newDeck;
+    window.closeWsModal = closeWsModal;
+    window.saveWsModal = saveWsModal;
+    window.openFileNav = openFileNav;
+    window.showWelcome = showWelcome;
+    window.saveSloth = saveSloth;
+    window.exportPPTX = exportPPTX;
+    window.openSettings = openSettings;
+    window.doLogin = doLogin;
+    window.handleFileLoad = handleFileLoad;
+    window.closeSettings = closeSettings;
+    window.testConnection = testConnection;
+    window.saveSettings = saveSettings;
+    window.showMobileForm = showMobileForm;
+    window.skipWelcome = skipWelcome;
+    window.confirmWelcomeProvider = confirmWelcomeProvider;
+    window.toggleWelcomeProviders = toggleWelcomeProviders;
+    window.setWelcomeProvider = setWelcomeProvider;
+    window.finishWelcome = finishWelcome;
+    window.doWelcomeSignOut = doWelcomeSignOut;
+    window.showTerms = showTerms;
+    window.closeTerms = closeTerms;
+    window.loadDeck = loadDeck;
+    window.saveCurrentToCloud = saveCurrentToCloud;
+    window.clearSelection = clearSelection;
+    window.handleImageFiles = handleImageFiles;
+    window.togglePopup = togglePopup;
+    window.insertTag = insertTag;
+    window.undo = undo;
+    window.redo = redo;
+    window.toggleInputSize = toggleInputSize;
+    window.sendMessage = sendMessage;
+    window.removeStagedImage = removeStagedImage;
+    window.selectRegion = selectRegion;
+    window.goSlide = goSlide;
+    window.setPreset = setPreset;
+    window.loadFileFromNav = loadFileFromNav;
+    window.deleteFileFromNav = deleteFileFromNav;
+    window.shareFile = shareFile;
+    window.useOnboardingPrompt = useOnboardingPrompt;
+    window.insertTextColor = insertTextColor;
+    window.insertBgColor = insertBgColor;
+    window.copyCmd = copyCmd;
+    window.detectOllama = detectOllama;
+    window.toggleUserMenu = toggleUserMenu;
+    window.closeUserMenu = closeUserMenu;
+    window.doLogout = doLogout;
+    window.setSettingsProvider = setSettingsProvider;
+
+    // Wire up hooks between modules for event callbacks
+    setOnConfigSave(() => {
+      syncConfigToCloud();
+    });
+    setOnEnterSlides(enterSlides);
+    setOnRenderApp(renderApp);
+    setOnAutoSave(autoSave);
+    setOnSendMessage(sendMessage);
+    setAuthOnAddMessage(addMessage);
+    setRendererOnAddMessage(addMessage);
+
+    // Initialize the application
+    loadConfig();
+    initAuth();
+    initToolbar();
+    initUndoRedo();
+    initDragDrop();
+    initInputHandlers();
+    initMobileHandlers();
+    initTypewriterPlaceholder();
+    initDemoAnimation();
+    autoLoad();
+    checkWelcomeScreen();
+    checkShareLink();
+    renderApp();
+  </script>
 </body>
 </html>

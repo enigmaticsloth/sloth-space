@@ -297,10 +297,13 @@ function saveProjects(projects) {
 
 export function wsCreateProject(name, description) {
   const projects = loadProjects();
+  // Auto-assign next Monet color (round-robin)
+  const colorIdx = projects.length % S.wsProjectColors.length;
   const project = {
     id: 'prj_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     name: name || 'Untitled Project',
     description: description || '',
+    color: S.wsProjectColors[colorIdx].id,
     status: 'active',
     created: new Date().toISOString(),
     modified: new Date().toISOString()
@@ -308,6 +311,22 @@ export function wsCreateProject(name, description) {
   projects.push(project);
   saveProjects(projects);
   return project;
+}
+
+/** Get the Monet color object for a project */
+export function wsGetProjectColor(project) {
+  if (!project || !project.color) return S.wsProjectColors[0];
+  return S.wsProjectColors.find(c => c.id === project.color) || S.wsProjectColors[0];
+}
+
+/** Cycle a project's color to the next Monet palette */
+export function wsCycleProjectColor(projectId) {
+  const project = wsGetProject(projectId);
+  if (!project) return;
+  const currentIdx = S.wsProjectColors.findIndex(c => c.id === project.color);
+  const nextIdx = (currentIdx + 1) % S.wsProjectColors.length;
+  wsUpdateProject(projectId, { color: S.wsProjectColors[nextIdx].id });
+  renderWorkspaceMode();
 }
 
 export function wsGetProject(id) {
@@ -641,9 +660,13 @@ export function renderWorkspaceMode() {
   if (S.wsActiveProjectId && view !== 'project-detail') {
     const proj = wsGetProject(S.wsActiveProjectId);
     if (proj) {
-      projectBadge = `<div class="ws-project-badge" onclick="wsOpenProject('${proj.id}')">
-        📁 AI Context: <strong>${escapeHtml(proj.name)}</strong>
-        <button onclick="event.stopPropagation();wsClearActiveProject()" title="Clear project context">✕</button>
+      const c = wsGetProjectColor(proj);
+      const fCount = wsProjectFileCount(proj.id);
+      projectBadge = `<div class="ws-project-badge" style="background:${c.bg};border-color:${c.border}" onclick="wsOpenProject('${proj.id}')">
+        <span class="ws-tag-dot" style="background:${c.dot}"></span>
+        <span style="color:${c.text}">Working in <strong>${escapeHtml(proj.name)}</strong></span>
+        <span style="color:${c.text};opacity:0.6;font-size:10px;">${fCount} file${fCount!==1?'s':''} in context</span>
+        <button onclick="event.stopPropagation();wsClearActiveProject()" title="Clear project context" style="color:${c.text}">✕</button>
       </div>`;
     }
   }
@@ -778,13 +801,14 @@ function renderFileCard(item) {
   const preview = wsRenderFilePreview(item);
   const status = item.status || 'draft';
 
-  // Project tags
+  // Project tags with Monet colors
   const fileProjects = wsGetFileProjects(item.id);
   let tagsHtml = '';
   if (fileProjects.length > 0) {
-    tagsHtml = `<div class="ws-file-tags">${fileProjects.map(p =>
-      `<span class="ws-file-tag" onclick="event.stopPropagation();wsOpenProject('${p.id}')" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>`
-    ).join('')}</div>`;
+    tagsHtml = `<div class="ws-file-tags">${fileProjects.map(p => {
+      const c = wsGetProjectColor(p);
+      return `<span class="ws-file-tag" style="background:${c.bg};border-color:${c.border};color:${c.text}" onclick="event.stopPropagation();wsOpenProject('${p.id}')" title="${escapeHtml(p.name)}"><span class="ws-tag-dot" style="background:${c.dot}"></span>${escapeHtml(p.name)}</span>`;
+    }).join('')}</div>`;
   }
 
   return `<div class="ws-file-card${selClass}" data-ws-id="${item.id}">
@@ -801,7 +825,7 @@ function renderFileCard(item) {
       </div>
     </div>
     <div class="ws-file-actions">
-      <button class="ws-link-btn${fileProjects.length > 0 ? ' has-links' : ''}" onclick="event.stopPropagation();wsShowLinkPicker('${item.id}')" title="${fileProjects.length > 0 ? 'Linked to ' + fileProjects.length + ' project(s) — click to manage' : 'Link to project'}">🔗</button>
+      <button class="ws-link-btn${fileProjects.length > 0 ? ' has-links' : ''}" onclick="event.stopPropagation();wsShowLinkPicker('${item.id}')" title="${fileProjects.length > 0 ? 'Linked to ' + fileProjects.length + ' project(s) — click to manage' : 'Link to project'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
     </div>
   </div>`;
 }
@@ -821,17 +845,22 @@ function renderProjectsListView() {
     const status = p.status || 'active';
     const date = p.modified ? new Date(p.modified).toLocaleDateString() : '';
     const isActive = S.wsActiveProjectId === p.id;
-    return `<div class="ws-project-card${isActive ? ' active-context' : ''}" onclick="wsOpenProject('${p.id}')">
-      <div class="ws-project-icon">📁</div>
+    const c = wsGetProjectColor(p);
+    const statusLabel = { active:'Active', paused:'Paused', done:'Done' }[status] || status;
+    return `<div class="ws-project-card${isActive ? ' active-context' : ''}" style="border-left:3px solid ${c.dot}" onclick="wsOpenProject('${p.id}')">
+      <div class="ws-project-icon" style="background:${c.bg};color:${c.dot}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </div>
       <div class="ws-project-info">
         <div class="ws-project-name">${escapeHtml(p.name)}</div>
         <div class="ws-project-meta">
-          <span class="ws-status-dot ${status}"></span>
+          <span class="ws-status-badge ${status}">${statusLabel}</span>
           ${fileCount} file${fileCount !== 1 ? 's' : ''} · ${date}
         </div>
         ${p.description ? `<div class="ws-project-desc">${escapeHtml(p.description)}</div>` : ''}
       </div>
       <div class="ws-project-actions">
+        <button class="ws-color-btn" onclick="event.stopPropagation();wsCycleProjectColor('${p.id}')" title="Change color"><span class="ws-color-dot" style="background:${c.dot}"></span></button>
         <button class="ws-ctx-btn${isActive ? ' active' : ''}" onclick="event.stopPropagation();${isActive ? 'wsClearActiveProject()' : `wsSetActiveProject('${p.id}')`}" title="${isActive ? 'Clear AI context' : 'Set as AI context'}">
           ${isActive ? '🧠 Active' : '🧠'}
         </button>
@@ -861,22 +890,25 @@ function renderProjectDetailView() {
     filesHtml = `<div class="ws-file-list">${files.map(f => renderProjectFileCard(f, project.id)).join('')}</div>`;
   }
 
+  const c = wsGetProjectColor(project);
+  const statusLabel = { active:'Active', paused:'Paused', done:'Done' }[project.status] || project.status;
   return `<div class="ws-project-detail">
-    <div class="ws-pd-header">
+    <div class="ws-pd-header" style="border-left:3px solid ${c.dot};padding-left:16px;">
       <button class="ws-back-btn" onclick="wsSetView('projects')">← Projects</button>
       <div class="ws-pd-title-row">
         <div class="ws-pd-title">${escapeHtml(project.name)}</div>
-        <div class="ws-pd-actions">
-          <button class="ws-ctx-btn${isActive ? ' active' : ''}" onclick="${isActive ? 'wsClearActiveProject()' : `wsSetActiveProject('${project.id}')`}">
-            ${isActive ? '🧠 AI Context Active' : '🧠 Use as AI Context'}
-          </button>
-          <select class="ws-pd-status" onchange="wsUpdateProject('${project.id}',{status:this.value});renderWorkspaceMode()">
-            <option value="active"${project.status === 'active' ? ' selected' : ''}>Active</option>
-            <option value="paused"${project.status === 'paused' ? ' selected' : ''}>Paused</option>
-            <option value="done"${project.status === 'done' ? ' selected' : ''}>Done</option>
-          </select>
-          <button class="ws-pd-btn danger" onclick="if(confirm('Delete this project? Files will not be deleted.'))wsDeleteProject('${project.id}')">Delete</button>
+        <button class="ws-color-btn" onclick="wsCycleProjectColor('${project.id}')" title="Change color"><span class="ws-color-dot" style="background:${c.dot}"></span></button>
+      </div>
+      <div class="ws-pd-actions-row">
+        <button class="ws-ctx-btn${isActive ? ' active' : ''}" onclick="${isActive ? 'wsClearActiveProject()' : `wsSetActiveProject('${project.id}')`}">
+          ${isActive ? '🧠 AI Context Active' : '🧠 Use as AI Context'}
+        </button>
+        <div class="ws-pd-status-group">
+          <button class="ws-status-pill${project.status==='active'?' selected':''}" onclick="wsUpdateProject('${project.id}',{status:'active'});renderWorkspaceMode()">Active</button>
+          <button class="ws-status-pill${project.status==='paused'?' selected':''}" onclick="wsUpdateProject('${project.id}',{status:'paused'});renderWorkspaceMode()">Paused</button>
+          <button class="ws-status-pill${project.status==='done'?' selected':''}" onclick="wsUpdateProject('${project.id}',{status:'done'});renderWorkspaceMode()">Done</button>
         </div>
+        <button class="ws-pd-btn danger" onclick="if(confirm('Delete this project? Files will not be deleted.'))wsDeleteProject('${project.id}')">Delete</button>
       </div>
       ${project.description ? `<div class="ws-pd-desc">${escapeHtml(project.description)}</div>` : ''}
       <div class="ws-pd-stats">${files.length} file${files.length !== 1 ? 's' : ''} · Created ${new Date(project.created).toLocaleDateString()}</div>
@@ -936,15 +968,16 @@ export function wsRenderTopbarProjectInfo() {
   const fileProjects = wsGetFileProjects(fileId);
   let html = '';
 
-  // Show project badges
+  // Show project badges with Monet colors
   if (fileProjects.length > 0) {
-    html += fileProjects.map(p =>
-      `<span class="topbar-project-badge" onclick="wsOpenProject('${p.id}')" title="${escapeHtml(p.name)}">📁 <span class="tpb-name">${escapeHtml(p.name)}</span></span>`
-    ).join('');
+    html += fileProjects.map(p => {
+      const c = wsGetProjectColor(p);
+      return `<span class="topbar-project-badge" style="background:${c.bg};border-color:${c.border}" onclick="wsOpenProject('${p.id}')" title="${escapeHtml(p.name)}"><span class="ws-tag-dot" style="background:${c.dot}"></span><span class="tpb-name" style="color:${c.text}">${escapeHtml(p.name)}</span></span>`;
+    }).join('');
   }
 
-  // Link button
-  html += `<button class="topbar-project-link-btn" onclick="wsShowLinkPicker('${fileId}')" title="Link to project">🔗 ${fileProjects.length > 0 ? 'Edit' : 'Link'}</button>`;
+  // Link button (flat SVG)
+  html += `<button class="topbar-project-link-btn" onclick="wsShowLinkPicker('${fileId}')" title="Link to project"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> ${fileProjects.length > 0 ? 'Edit' : 'Link'}</button>`;
 
   return html;
 }

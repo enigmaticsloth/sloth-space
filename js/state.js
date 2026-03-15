@@ -170,6 +170,15 @@ export const S = {
   wsModalType: 'doc',
   wsActiveProjectId: null,   // currently viewing/working in this project
   _wsCurrentFileId: null,    // workspace file ID of file currently being edited
+  // Monet palette for project colors (user can pick per project)
+  wsProjectColors: [
+    { id:'monet-blue',    bg:'rgba(120,134,165,0.15)', border:'rgba(120,134,165,0.35)', text:'#9BA8C4', dot:'#7886A5' },
+    { id:'monet-lavender',bg:'rgba(139,123,168,0.15)', border:'rgba(139,123,168,0.35)', text:'#A899C4', dot:'#8B7BA8' },
+    { id:'monet-sage',    bg:'rgba(107,142,123,0.15)', border:'rgba(107,142,123,0.35)', text:'#8FB89F', dot:'#6B8E7B' },
+    { id:'monet-rose',    bg:'rgba(168,120,130,0.15)', border:'rgba(168,120,130,0.35)', text:'#C49BA5', dot:'#A87882' },
+    { id:'monet-ochre',   bg:'rgba(168,145,100,0.15)', border:'rgba(168,145,100,0.35)', text:'#C4B48F', dot:'#A89164' },
+    { id:'monet-mist',    bg:'rgba(130,155,160,0.15)', border:'rgba(130,155,160,0.35)', text:'#A8BFC4', dot:'#829BA0' },
+  ],
   wsView: 'recent',          // 'recent' | 'projects' | 'all' | 'unlinked' | 'project-detail'
   wsTypeFilters: { slide: true, doc: true, sheet: true },  // file type filter checkboxes
 
