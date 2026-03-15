@@ -444,81 +444,83 @@ export function initAuth(){
 }
 
 export function setAuthUser(user){
-  S.currentUser=user;
-  const bar=document.getElementById('authBar');
-  const name=user.user_metadata?.full_name||user.email?.split('@')[0]||'User';
-  const email=user.email||'';
-  const initial=name.charAt(0).toUpperCase();
-  const cfg=window.llmConfig||S.llmConfig||{provider:'groq'};
-  const providerDef=(window.LLM_DEFAULTS||{})[cfg.provider]||{label:'AI',color:'#8B9E8B',desc:''};
-  bar.innerHTML=`
-    <span class="auth-name">${name}</span>
-    <div class="user-menu-wrap">
-      <div class="auth-avatar" onclick="toggleUserMenu(event)" title="Account menu">${initial}</div>
-      <div class="user-menu" id="userMenu">
-        <div class="um-header">
-          <div class="um-name">${name}</div>
-          <div class="um-email">${email}</div>
-        </div>
-        <div class="um-provider">
-          <div class="um-provider-dot" style="background:${providerDef.color}"></div>
-          <span class="um-provider-name">${providerDef.label||cfg.provider}</span>
-          <span class="um-provider-change" onclick="openSettings();closeUserMenu();">Change</span>
-        </div>
-        <div class="um-item" onclick="openSettings();closeUserMenu();">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.3-6.7-1.4 1.4M5.7 18.3l-1.4 1.4m0-13.4 1.4 1.4m12.6 12.6 1.4 1.4"/></svg>
-          Settings &amp; API
-        </div>
-        <div class="um-item" onclick="showModePicker();closeUserMenu();">
-          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          Home
-        </div>
-        <div class="um-divider"></div>
-        <div class="um-item danger" onclick="doLogout();closeUserMenu();">
-          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Sign Out
+  try{
+    S.currentUser=user;
+    const bar=document.getElementById('authBar');
+    if(!bar) return;
+    const name=user.user_metadata?.full_name||user.email?.split('@')[0]||'User';
+    const email=user.email||'';
+    const initial=name.charAt(0).toUpperCase();
+    const cfg=window.llmConfig||S.llmConfig||{provider:'groq'};
+    const providerDef=(window.LLM_DEFAULTS||{})[cfg.provider]||{label:'AI',color:'#8B9E8B',desc:''};
+    bar.innerHTML=`
+      <span class="auth-name">${name}</span>
+      <div class="user-menu-wrap">
+        <div class="auth-avatar" onclick="toggleUserMenu(event)" title="Account menu">${initial}</div>
+        <div class="user-menu" id="userMenu">
+          <div class="um-header">
+            <div class="um-name">${name}</div>
+            <div class="um-email">${email}</div>
+          </div>
+          <div class="um-provider">
+            <div class="um-provider-dot" style="background:${providerDef.color}"></div>
+            <span class="um-provider-name">${providerDef.label||cfg.provider}</span>
+            <span class="um-provider-change" onclick="openSettings();closeUserMenu();">Change</span>
+          </div>
+          <div class="um-item" onclick="openSettings();closeUserMenu();">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2m-9-11h2m18 0h2m-3.3-6.7-1.4 1.4M5.7 18.3l-1.4 1.4m0-13.4 1.4 1.4m12.6 12.6 1.4 1.4"/></svg>
+            Settings &amp; API
+          </div>
+          <div class="um-item" onclick="showModePicker();closeUserMenu();">
+            <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Home
+          </div>
+          <div class="um-divider"></div>
+          <div class="um-item danger" onclick="doLogout();closeUserMenu();">
+            <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sign Out
+          </div>
         </div>
       </div>
-    </div>
-  `;
-  // Update welcome page auth section if visible
-  const wStatus=document.getElementById('welcomeAuthStatus');
-  const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
-  const wName=document.getElementById('welcomeAuthName');
-  if(wStatus&&wLoggedIn){
-    wStatus.style.display='none';
-    wLoggedIn.style.display='block';
-    if(wName)wName.textContent=name;
-    const soRow=document.getElementById('welcomeSignOutRow');
-    if(soRow)soRow.style.display='block';
-  }
-  // Auto-fill welcome name field
-  const nameInput=document.getElementById('welcomeDisplayName');
-  if(nameInput&&!nameInput.value)nameInput.value=name;
-  // Always restore LLM config from cloud on login (cloud takes priority)
-  // This ensures API keys sync across devices — but only show message once
-  if(!S._authSyncDone){
-    S._authSyncDone=true;
-    const restored=window.restoreConfigFromCloud(user);
-    // Set display name from GitHub if not already set from cloud
-    if(window.llmConfig&&!window.llmConfig.displayName){
-      window.llmConfig.displayName=name;
-      window.saveConfig&&window.saveConfig();
+    `;
+    // Update welcome page auth section if visible
+    const wStatus=document.getElementById('welcomeAuthStatus');
+    const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
+    const wName=document.getElementById('welcomeAuthName');
+    if(wStatus&&wLoggedIn){
+      wStatus.style.display='none';
+      wLoggedIn.style.display='block';
+      if(wName)wName.textContent=name;
+      const soRow=document.getElementById('welcomeSignOutRow');
+      if(soRow)soRow.style.display='block';
     }
-    if(restored&&window.isConfigured()){
-      // Respect the current mode — don't force slide mode on auth sync
-      const savedMode=sessionStorage.getItem('sloth_mode');
-      if(savedMode&&savedMode!=='slide'){
-        // Already in a mode (doc/workspace), just hide welcome
-        document.getElementById('welcomeOverlay').classList.add('hidden');
-        sessionStorage.setItem('sloth_active','1');
-      } else {
-        window.enterSlides();
+    // Auto-fill welcome name field
+    const nameInput=document.getElementById('welcomeDisplayName');
+    if(nameInput&&!nameInput.value)nameInput.value=name;
+    // Restore LLM config from cloud on login (cloud takes priority)
+    if(!S._authSyncDone){
+      S._authSyncDone=true;
+      if(window.restoreConfigFromCloud) window.restoreConfigFromCloud(user);
+      if(window.llmConfig&&!window.llmConfig.displayName){
+        window.llmConfig.displayName=name;
+        if(window.saveConfig) window.saveConfig();
       }
-      window.addMessage('☁️ Settings synced from cloud.','system');
+      if(window.isConfigured&&window.isConfigured()){
+        const savedMode=sessionStorage.getItem('sloth_mode');
+        if(savedMode&&savedMode!=='slide'){
+          document.getElementById('welcomeOverlay')?.classList.add('hidden');
+          sessionStorage.setItem('sloth_active','1');
+        } else {
+          if(window.enterSlides) window.enterSlides();
+        }
+        if(window.addMessage) window.addMessage('☁️ Settings synced from cloud.','system');
+      }
+      if(window.syncWorkspaceFromCloud) window.syncWorkspaceFromCloud();
     }
-    // Also sync workspace files from cloud
-    window.syncWorkspaceFromCloud();
+  }catch(e){
+    console.warn('[Auth] setAuthUser error (non-fatal):',e.message);
+    // Still set the user even if UI rendering failed
+    S.currentUser=user;
   }
 }
 
