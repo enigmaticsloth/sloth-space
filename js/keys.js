@@ -118,9 +118,13 @@ export function initKeys(){
         else window.shClearSelection();
         return;
       }
-      if(e.key==='Enter'&&!isInput){
+      if(e.key==='Enter'){
+        // Shift+Enter while editing → insert newline (let browser handle contentEditable)
+        if(e.shiftKey&&S.sheet.editingCell) return;
+        // Enter while editing → commit + move down
         e.preventDefault();
         if(S.sheet.editingCell){ window.shCommitEdit(); window.shNavigate('down'); }
+        // Enter while selected → start editing
         else if(S.sheet.selectedCell) window.shStartEdit(S.sheet.selectedCell.rowId, S.sheet.selectedCell.colId);
         return;
       }

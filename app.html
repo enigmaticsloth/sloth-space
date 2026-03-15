@@ -315,7 +315,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mc-sheet-row.header .mc-sheet-cell { color:rgba(255,255,255,0.5); font-weight:600; }
 
 /* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop, centered */
-.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin:8px auto 0; }
+.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin:16px auto 0; }
 .mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:140px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
 .mode-card-wide .mode-card-info { text-align:left; padding:14px 18px; display:flex; flex-direction:column; gap:4px; }
 .mode-card-wide .mode-card-icon { margin:0; flex-shrink:0; }
@@ -1293,26 +1293,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     <div class="mp-tagline">What would you like to create?</div>
     <div class="mode-cards">
 
-      <!-- Slide -->
-      <div class="mode-card" onclick="pickMode('slide')">
-        <div class="mode-card-demo">
-          <span class="mode-card-badge ready">Ready</span>
-          <div class="mc-slide-preview">
-            <div class="mc-title"></div>
-            <div class="mc-subtitle"></div>
-            <div class="mc-body"><div class="mc-body-line"></div><div class="mc-body-line"></div></div>
-          </div>
-        </div>
-        <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#7886A5,#9BA8C4);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-          </div>
-          <div class="mode-card-name">Slide</div>
-          <div class="mode-card-desc">Presentations with AI-powered design. Free-form canvas, smart layouts, style presets.</div>
-        </div>
-      </div>
-
-      <!-- Doc -->
+      <!-- Doc (Monet Blue) -->
       <div class="mode-card" onclick="pickMode('doc')">
         <div class="mode-card-demo">
           <span class="mode-card-badge ready">Ready</span>
@@ -1328,7 +1309,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
           </div>
         </div>
         <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#6B8E7B,#8FB89F);">
+          <div class="mode-card-icon" style="background:linear-gradient(135deg,#4A6FA5,#6B8FC5);">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </div>
           <div class="mode-card-name">Doc</div>
@@ -1336,10 +1317,29 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
         </div>
       </div>
 
-      <!-- Sheet -->
-      <div class="mode-card disabled">
+      <!-- Slide (Monet Orange) -->
+      <div class="mode-card" onclick="pickMode('slide')">
         <div class="mode-card-demo">
-          <span class="mode-card-badge soon">Planned</span>
+          <span class="mode-card-badge ready">Ready</span>
+          <div class="mc-slide-preview">
+            <div class="mc-title"></div>
+            <div class="mc-subtitle"></div>
+            <div class="mc-body"><div class="mc-body-line"></div><div class="mc-body-line"></div></div>
+          </div>
+        </div>
+        <div class="mode-card-info">
+          <div class="mode-card-icon" style="background:linear-gradient(135deg,#C4783A,#D9945A);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+          </div>
+          <div class="mode-card-name">Slide</div>
+          <div class="mode-card-desc">Presentations with AI-powered design. Free-form canvas, smart layouts, style presets.</div>
+        </div>
+      </div>
+
+      <!-- Sheet (Monet Green) -->
+      <div class="mode-card" onclick="pickMode('sheet')">
+        <div class="mode-card-demo">
+          <span class="mode-card-badge ready">Ready</span>
           <div class="mc-sheet-preview">
             <div class="mc-sheet-row header"><div class="mc-sheet-cell">A</div><div class="mc-sheet-cell">B</div><div class="mc-sheet-cell">C</div><div class="mc-sheet-cell">D</div></div>
             <div class="mc-sheet-row"><div class="mc-sheet-cell">12.4</div><div class="mc-sheet-cell">8.7</div><div class="mc-sheet-cell">15.2</div><div class="mc-sheet-cell">9.1</div></div>
@@ -1349,7 +1349,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
           </div>
         </div>
         <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#A08060,#C4A882);">
+          <div class="mode-card-icon" style="background:linear-gradient(135deg,#5A8A5A,#7AAF7A);">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
           </div>
           <div class="mode-card-name">Sheet</div>
@@ -1362,7 +1362,6 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
     <!-- Workspace card (full width below the three) -->
     <div class="mode-card mode-card-wide" onclick="pickMode('workspace')">
       <div class="mode-card-demo">
-        <span class="mode-card-badge soon">Coming Soon</span>
         <div class="mc-ws-preview">
           <div class="mc-ws-sidebar">
             <div class="mc-ws-dot active"></div>

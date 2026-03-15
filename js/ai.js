@@ -376,21 +376,26 @@ Doc mode is an AI-powered document editor for long-form writing — articles, re
 
   sheet:`📈 **Sheet Mode**
 
-Sheet mode lets you create and manage structured data tables inside your workspace.
+Sheet mode lets you create and manage structured data tables with formulas.
 
 **How it works:**
-1. Use the quick-create command: type "/sheet Title" followed by CSV data on new lines.
-2. Or create from the Workspace panel with the "+ Sheet" button.
-3. Sheets are stored in your workspace and can be referenced by name when generating slides or docs.
+1. Switch to Sheet mode from the mode picker or create from Workspace.
+2. Click a cell to select, double-click or press Enter to edit.
+3. Press Enter to confirm and move down, Tab to move right, Escape to cancel.
+4. Shift+Enter inserts a newline inside a cell.
+5. Use the ƒx button in the toolbar or type = to see formula autocomplete.
 
-**Example:**
-/sheet Q1 Sales
-Region,Revenue,Growth
-North America,$2.4M,+12%
-Europe,$1.8M,+8%
-Asia Pacific,$3.1M,+22%
+**Formulas:** Start with = to use formulas. Available functions:
+• =SUM(A1:A10) — sum of range
+• =AVERAGE(A1:A10) — mean value
+• =COUNT(A1:A10) — count non-empty cells
+• =MIN / =MAX — smallest / largest value
+• =STDEV(A1:A10) — standard deviation
+• =MEDIAN(A1:A10) — median value
+• Arithmetic: =A1+B1*2, =A1/A2
 
-**Cross-referencing:** When creating a presentation, just mention the sheet name (e.g. "use the Q1 Sales data") and AI will pull in the actual data to populate tables, charts, and content.`,
+**Quick-create from chat:** /sheet Title followed by CSV data.
+**Cross-referencing:** Mention a sheet name when making slides and AI will use the data.`,
 
   workspace:`📁 **Workspace**
 
@@ -459,12 +464,13 @@ function getCurrentContentText(){
     }).filter(l=>l.trim().length>3);
     return `Document "${S.currentDoc.title||'Untitled'}" (${S.currentDoc.blocks.length} blocks):\n\n`+lines.join('\n');
   }
-  if(S.currentMode==='sheet'){
-    // Check if there's a current sheet open
-    const f=S.files&&S.files.find(f=>f.id===S.currentFileId&&f.type==='sheet');
-    if(f&&f.data){
-      const rows=f.data.split('\n').slice(0,20);
-      return `Sheet "${f.title||'Untitled'}":\n`+rows.join('\n')+(f.data.split('\n').length>20?'\n... (truncated)':'');
+  if(S.currentMode==='sheet'&&S.sheet&&S.sheet.current){
+    const sh=S.sheet.current;
+    const serialized=window.shSerializeForAI ? window.shSerializeForAI() : '';
+    if(serialized){
+      const lines=serialized.split('\n');
+      const preview=lines.slice(0,25).join('\n')+(lines.length>25?'\n... (truncated)':'');
+      return `Sheet "${sh.title||'Untitled'}" (${sh.rows.length} rows × ${sh.columns.length} cols):\n\n`+preview;
     }
   }
   return '';
@@ -1241,6 +1247,19 @@ async function sendMessage(){
           }
         }
       }
+    }
+    if(S.currentMode==='sheet'&&S.sheet&&S.sheet.current){
+      const sh=S.sheet.current;
+      ctx.push(`User is in Sheet mode editing "${sh.title}" with ${sh.rows.length} rows × ${sh.columns.length} cols.`);
+      if(S.sheet.selectedCell){
+        const rowIdx=sh.rows.findIndex(r=>r.id===S.sheet.selectedCell.rowId);
+        const colIdx=sh.columns.findIndex(c=>c.id===S.sheet.selectedCell.colId);
+        if(rowIdx>=0&&colIdx>=0){
+          const cellVal=sh.rows[rowIdx].cells[S.sheet.selectedCell.colId]||'';
+          ctx.push(`Selected cell: ${window.colIndexToLetter(colIdx)}${rowIdx+1} = "${cellVal.substring(0,100)}".`);
+        }
+      }
+      ctx.push('Available functions: SUM, AVERAGE, COUNT, MIN, MAX, STDEV, MEDIAN. Formulas start with =.');
     }
     if(S.currentMode==='slide'&&S.currentDeck) ctx.push('User has a deck loaded with '+S.currentDeck.slides.length+' slides.');
     if(S.currentMode==='slide'&&hasImageOnCurrentSlide()) ctx.push('Current slide has floating images.');

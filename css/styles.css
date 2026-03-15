@@ -366,7 +366,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mc-sheet-row.header .mc-sheet-cell { color:rgba(255,255,255,0.5); font-weight:600; }
 
 /* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop, centered */
-.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin:8px auto 0; }
+.mode-card-wide { max-width:364px !important; flex-direction:row; display:flex; margin:16px auto 0; }
 .mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:140px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
 .mode-card-wide .mode-card-info { text-align:left; padding:14px 18px; display:flex; flex-direction:column; gap:4px; }
 .mode-card-wide .mode-card-icon { margin:0; flex-shrink:0; }
@@ -625,6 +625,43 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
   z-index:2;
 }
 .sh-cell.error { color:#e55; font-style:italic; font-size:11px; }
+
+/* Add row/col buttons */
+.sh-add-col-btn {
+  background:#1a1a1a;
+  border-bottom:1px solid #2a2a2a;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; color:#555; cursor:pointer;
+  user-select:none; position:sticky; top:0; z-index:2;
+  transition:background 0.15s, color 0.15s;
+}
+.sh-add-col-btn:hover { background:#252525; color:#7886A5; }
+.sh-add-col-spacer { background:transparent; }
+.sh-add-row-btn {
+  background:#1a1a1a;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; color:#555; cursor:pointer;
+  user-select:none; padding:4px;
+  border-top:1px solid #252525;
+  transition:background 0.15s, color 0.15s;
+  font-family:Arial,sans-serif;
+}
+.sh-add-row-btn:hover { background:#252525; color:#7886A5; }
+
+/* Function picker dropdown */
+.sh-func-picker {
+  position:absolute; background:#1e1e1e; border:1px solid #333;
+  border-radius:8px; padding:4px; z-index:100;
+  box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  min-width:200px; max-height:240px; overflow-y:auto;
+}
+.sh-func-item {
+  display:flex; flex-direction:column; padding:6px 10px;
+  border-radius:4px; cursor:pointer; transition:background 0.1s;
+}
+.sh-func-item:hover { background:#2a2a2a; }
+.sh-func-item .sh-func-name { font-size:12px; font-weight:600; color:#7886A5; font-family:monospace; }
+.sh-func-item .sh-func-desc { font-size:10px; color:#888; margin-top:1px; }
 
 /* Frozen row/col sticky support (will be activated in Step 5) */
 /* .sh-grid .sh-cell.frozen-row { position:sticky; top:32px; z-index:1; } */

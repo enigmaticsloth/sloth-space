@@ -87,9 +87,9 @@ export function renderSheetMode() {
   const totalCols = columns.length;
   const totalRows = rows.length;
 
-  // Build grid template: row-header-width + col widths
+  // Build grid template: row-header-width + col widths + add-col button
   const colWidths = columns.map(c => `${c.width || DEFAULT_COL_WIDTH}px`).join(' ');
-  const gridCols = `40px ${colWidths}`; // 40px for row header
+  const gridCols = `40px ${colWidths} 32px`; // 40px row header + col widths + 32px add-col button
 
   let html = '';
 
@@ -103,6 +103,9 @@ export function renderSheetMode() {
       oncontextmenu="event.preventDefault(); window.shColHeaderCtx(event, '${col.id}')"
       ondblclick="window.shAutoFitCol('${col.id}')">${col.name}</div>`;
   }
+
+  // Add-column button (in header row, rightmost)
+  html += `<div class="sh-add-col-btn" onclick="window.shPushUndo(); window.shAddCol()" title="Add column">+</div>`;
 
   // Rows
   for (let r = 0; r < totalRows; r++) {
@@ -133,7 +136,14 @@ export function renderSheetMode() {
         oncontextmenu="event.preventDefault(); window.shCellCtx(event, '${row.id}', '${col.id}')"
         >${escHtml(String(displayText))}</div>`;
     }
+    // Empty spacer for add-col column on each data row
+    html += `<div class="sh-add-col-spacer"></div>`;
   }
+
+  // Add-row button row (spans full width below data)
+  const lastRowId = rows.length > 0 ? rows[rows.length - 1].id : null;
+  html += `<div class="sh-add-row-btn" onclick="window.shPushUndo(); window.shAddRow('${lastRowId}')" title="Add row"
+    style="grid-column: 1 / -1;">+ Add row</div>`;
 
   const grid = document.getElementById('shGrid') || canvas;
   // If shGrid doesn't exist yet, create it
@@ -146,7 +156,7 @@ export function renderSheetMode() {
 
   const shGrid = document.getElementById('shGrid');
   shGrid.style.gridTemplateColumns = gridCols;
-  shGrid.style.gridTemplateRows = `32px repeat(${totalRows}, auto)`; // 32px header row
+  shGrid.style.gridTemplateRows = `32px repeat(${totalRows}, auto) 28px`; // header + data rows + add-row button
   shGrid.innerHTML = html;
 }
 
@@ -231,6 +241,13 @@ export function shStartEdit(rowId, colId) {
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
+
+  // Listen for input to show function autocomplete
+  cellEl.addEventListener('input', _onCellInput);
+}
+
+function _onCellInput(e) {
+  shShowFuncPicker(e.target);
 }
 
 export function shCommitEdit() {
@@ -240,8 +257,11 @@ export function shCommitEdit() {
   const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
   if (!cellEl) { S.sheet.editingCell = null; return; }
 
-  const newVal = cellEl.textContent.trim();
+  // Use innerText to preserve line breaks from Shift+Enter, but trim outer whitespace
+  const newVal = (cellEl.innerText || cellEl.textContent || '').trim();
   cellEl.contentEditable = 'false';
+  cellEl.removeEventListener('input', _onCellInput);
+  shHideFuncPicker();
 
   // Check if value actually changed before pushing undo
   const sh = S.sheet.current;
@@ -258,7 +278,11 @@ export function shCancelEdit() {
   if (!S.sheet.editingCell) return;
   const { rowId, colId } = S.sheet.editingCell;
   const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
-  if (cellEl) cellEl.contentEditable = 'false';
+  if (cellEl) {
+    cellEl.contentEditable = 'false';
+    cellEl.removeEventListener('input', _onCellInput);
+  }
+  shHideFuncPicker();
   S.sheet.editingCell = null;
   renderSheetMode();
 }
@@ -524,7 +548,9 @@ export function shEvalFormula(formula, sh, _visited) {
   if (!_visited) _visited = new Set();
 
   try {
-    const expr = formula.slice(1).trim().toUpperCase();
+    // Normalize: strip whitespace, uppercase, convert full-width parens/operators
+    let expr = formula.slice(1).trim().toUpperCase();
+    expr = expr.replace(/（/g, '(').replace(/）/g, ')').replace(/，/g, ',').replace(/：/g, ':');
 
     // Match function calls: SUM(A1:A10), AVG(B2:B5), etc.
     const funcMatch = expr.match(/^(SUM|AVG|AVERAGE|COUNT|MIN|MAX|STDEV|MEDIAN)\((.+)\)$/);
@@ -810,6 +836,149 @@ export function shAutoFitCol(colId) {
   // For now, toggle between default and max
   col.width = col.width === DEFAULT_COL_WIDTH ? MAX_COL_WIDTH : DEFAULT_COL_WIDTH;
   renderSheetMode();
+}
+
+// ═══════════════════════════════════════════
+// FUNCTION PICKER — autocomplete dropdown for formulas
+// ═══════════════════════════════════════════
+
+const SHEET_FUNCTIONS = [
+  { name: 'SUM', desc: 'Sum of values', usage: 'SUM(A1:A10)' },
+  { name: 'AVERAGE', desc: 'Mean of values', usage: 'AVERAGE(A1:A10)' },
+  { name: 'COUNT', desc: 'Count non-empty cells', usage: 'COUNT(A1:A10)' },
+  { name: 'MIN', desc: 'Smallest value', usage: 'MIN(A1:A10)' },
+  { name: 'MAX', desc: 'Largest value', usage: 'MAX(A1:A10)' },
+  { name: 'STDEV', desc: 'Standard deviation', usage: 'STDEV(A1:A10)' },
+  { name: 'MEDIAN', desc: 'Median value', usage: 'MEDIAN(A1:A10)' },
+];
+
+let _funcPickerEl = null;
+
+/**
+ * Show/update function picker based on current cell text.
+ */
+export function shShowFuncPicker(cellEl) {
+  if (!cellEl) { shHideFuncPicker(); return; }
+  const text = (cellEl.innerText || '').trim().toUpperCase();
+  // Only show if starts with = and has partial function name
+  if (!text.startsWith('=')) { shHideFuncPicker(); return; }
+  const partial = text.slice(1).replace(/\(.*$/, '').trim(); // text before first (
+  if (!partial || partial.includes(')')) { shHideFuncPicker(); return; }
+
+  const matches = SHEET_FUNCTIONS.filter(f => f.name.startsWith(partial));
+  if (matches.length === 0) { shHideFuncPicker(); return; }
+
+  if (!_funcPickerEl) {
+    _funcPickerEl = document.createElement('div');
+    _funcPickerEl.className = 'sh-func-picker';
+    document.body.appendChild(_funcPickerEl);
+  }
+
+  _funcPickerEl.innerHTML = matches.map(f =>
+    `<div class="sh-func-item" onmousedown="event.preventDefault(); window.shInsertFunction('${f.name}')">
+      <span class="sh-func-name">${f.name}()</span>
+      <span class="sh-func-desc">${f.desc} — ${f.usage}</span>
+    </div>`
+  ).join('');
+
+  // Position below the cell
+  const rect = cellEl.getBoundingClientRect();
+  _funcPickerEl.style.display = 'block';
+  _funcPickerEl.style.left = rect.left + 'px';
+  _funcPickerEl.style.top = (rect.bottom + 2) + 'px';
+}
+
+export function shHideFuncPicker() {
+  if (_funcPickerEl) _funcPickerEl.style.display = 'none';
+}
+
+/**
+ * Insert a function into the currently editing cell.
+ */
+export function shInsertFunction(funcName) {
+  if (!S.sheet.editingCell) return;
+  const { rowId, colId } = S.sheet.editingCell;
+  const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
+  if (!cellEl) return;
+  cellEl.textContent = `=${funcName}(`;
+  cellEl.focus();
+  // Move cursor to end
+  const range = document.createRange();
+  range.selectNodeContents(cellEl);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  shHideFuncPicker();
+}
+
+/**
+ * Toggle function picker from toolbar button (shows all functions).
+ */
+export function shToggleFuncPickerToolbar() {
+  if (_funcPickerEl && _funcPickerEl.style.display === 'block') {
+    shHideFuncPicker();
+    return;
+  }
+  // If no cell is selected, just show list as reference
+  if (!_funcPickerEl) {
+    _funcPickerEl = document.createElement('div');
+    _funcPickerEl.className = 'sh-func-picker';
+    document.body.appendChild(_funcPickerEl);
+  }
+
+  _funcPickerEl.innerHTML = SHEET_FUNCTIONS.map(f =>
+    `<div class="sh-func-item" onmousedown="event.preventDefault(); window.shInsertFuncFromToolbar('${f.name}')">
+      <span class="sh-func-name">${f.name}()</span>
+      <span class="sh-func-desc">${f.desc} — ${f.usage}</span>
+    </div>`
+  ).join('');
+
+  // Position under the toolbar fx button
+  const btn = document.getElementById('shFuncBtn');
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    _funcPickerEl.style.left = rect.left + 'px';
+    _funcPickerEl.style.top = (rect.bottom + 4) + 'px';
+  } else {
+    _funcPickerEl.style.left = '100px';
+    _funcPickerEl.style.top = '60px';
+  }
+  _funcPickerEl.style.display = 'block';
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function _close(ev) {
+      if (_funcPickerEl && !_funcPickerEl.contains(ev.target)) {
+        shHideFuncPicker();
+        document.removeEventListener('click', _close);
+      }
+    });
+  }, 10);
+}
+
+/**
+ * Insert function from toolbar — starts editing if needed.
+ */
+export function shInsertFuncFromToolbar(funcName) {
+  shHideFuncPicker();
+  if (!S.sheet.selectedCell) return;
+  const { rowId, colId } = S.sheet.selectedCell;
+  // Start editing and set formula
+  shStartEdit(rowId, colId);
+  // Wait for DOM to update
+  requestAnimationFrame(() => {
+    const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
+    if (!cellEl) return;
+    cellEl.textContent = `=${funcName}(`;
+    cellEl.focus();
+    const range = document.createRange();
+    range.selectNodeContents(cellEl);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
 }
 
 // ═══════════════════════════════════════════
