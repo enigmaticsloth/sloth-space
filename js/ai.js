@@ -244,28 +244,44 @@ INTENTS:
 "deck_edit" — batch edit ALL slides at once or restructure entire doc.
   "全部翻成英文", "translate everything", "重新整理這篇文章"
 
+"about" — user is asking ABOUT Sloth Space itself: what it is, features, how to use it, a specific mode, etc.
+  Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
+  topic guide:
+    "general" — asking about Sloth Space overall: "Sloth Space是什麼", "what is this app", "介紹一下", "有什麼功能"
+    "slides" — asking about slide/presentation mode: "簡報模式怎麼用", "how do slides work", "怎麼做簡報"
+    "doc" — asking about document mode: "文件模式是什麼", "how does doc mode work", "怎麼寫文章"
+    "sheet" — asking about sheet/data mode: "表格怎麼用", "how do sheets work", "怎麼建數據表"
+    "workspace" — asking about workspace/file management: "工作區是什麼", "how does workspace work", "怎麼管理檔案"
+  IMPORTANT: Only use "about" when the user is asking ABOUT the app itself. If the user wants to CREATE content about Sloth Space (e.g. "生成關於Sloth Space的簡報"), that is "generate" NOT "about".
+  Distinction: "簡報模式怎麼用?" → about (topic:slides). "做一份Sloth Space的pitch deck" → generate.
+
 "generate" — create NEW content from scratch. User provides a topic or confirms generation.
   Any mode. Includes: 生成X, 寫X, 介紹X, X的介紹, write about X, create article about X, 做一份簡報, 加三頁.
   In DOC mode: if user gives ANY topic to write about → ALWAYS generate.
-  Confirmations like "好", "OK", "做吧", "go" → generate.
+  Confirmations like "好", "OK", "做吧", "go", "是", "yes", "對" → generate.
+  TYPO TOLERANCE: Users may have typos! "稱成" likely means "生成", "做簡報" means "做一份簡報", "關於X" means "寫關於X的內容". When in doubt between chat and generate, choose generate.
+  IMPORTANT: If the user wants to CREATE/GENERATE/WRITE content about ANY topic (including Sloth Space), this is "generate" NOT "about".
 
-"chat" — pure conversation, greetings, questions with no action.
-  "你好", "hello", "what can you do", "這是什麼app"
+"chat" — ONLY for pure greetings with NO topic and NOT asking about Sloth Space.
+  "你好", "hello", "hey"
+  CRITICAL: If the message mentions ANY subject/topic (even with typos), it is NOT chat — it is "generate".
 
 PRIORITY RULES (follow in order):
 1. Undo words (恢復/復原/還原/回復/撤銷/undo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (刪除/刪掉/移除/delete/remove) → "content_edit" with delete:true.
-3. Topic/creation requests → "generate".
-4. Edit existing specific content → "content_edit".
-5. Style/visual changes → "style" (slide only).
-6. Image manipulation → "image" (slide only).
-7. Batch edits → "deck_edit".
-8. Everything else → "chat".
+3. Questions about Sloth Space the app itself → "about".
+4. Topic/creation requests (including creating content ABOUT Sloth Space) → "generate". WHEN IN DOUBT, prefer "generate" over "chat".
+5. Edit existing specific content → "content_edit".
+6. Style/visual changes → "style" (slide only).
+7. Image manipulation → "image" (slide only).
+8. Batch edits → "deck_edit".
+9. ONLY if NONE of the above apply → "chat".
 
 MODE-SPECIFIC:
 - "style" and "image" intents ONLY in slide mode. In doc mode use content_edit or generate.
 - In DOC mode: insert table/divider, position image → content_edit. Topic creation → generate.
 - NEVER choose "chat" when user wants content created, edited, or deleted.
+- NEVER choose "chat" if the message contains a topic/subject. Always prefer "generate" or "about".
 
 Output ONLY the JSON object.`;
 
@@ -273,12 +289,119 @@ Output ONLY the JSON object.`;
 const CHAT_PROMPT=`You are Sloth Space, a friendly AI presentation assistant. Reply in the user's language.
 
 Rules:
-- Be VERY concise. 1 sentence max.
+- Be VERY concise. 1-2 sentences max.
 - Ask AT MOST one question per reply.
 - The ONLY thing you need from the user to start generating is a TOPIC. Everything else (slides count, style, audience) you can decide yourself.
-- If the user gives any topic at all, even vague like "AI", that is enough. Tell them you'll start generating and ask them to send the request one more time with any preferences, or just say you'll use defaults.
+- If the user mentions ANY topic at all (even with typos, even vague like "AI"), tell them: "好的，請再說一次你想要的主題，我來幫你生成！" or equivalent. Do NOT answer the topic as a knowledge question — the user wants content GENERATED, not explained.
 - Do NOT ask multiple questions. Do NOT keep chatting round after round.
-- Do NOT output JSON.`;
+- Do NOT output JSON.
+- If the user seems frustrated or confused, be encouraging and suggest they type a topic directly.`;
+
+// ── Hardcoded Sloth Space intros (English = source of truth, non-EN → LLM translate) ──
+const ABOUT_TEXTS={
+  general:`🦥 **Sloth Space** — AI-Powered Content Creation Platform
+
+**What is it?**
+Sloth Space is an AI-native content creation tool that lets you build beautiful presentations, documents, and data sheets using natural language. No blank pages, no templates to hunt for — just tell me your topic and I'll generate complete, polished content for you.
+
+**Four Modes:**
+• **Slides** — Auto-generate multi-page presentations with 5 design themes and real-time style tweaks
+• **Doc** — AI-powered long-form writing with rich block types (headings, tables, images, quotes)
+• **Sheet** — Create and manage structured data tables right inside your workspace
+• **Workspace** — Organize all your files into projects, cross-reference data, and let AI use your materials as context
+
+**Key Features:**
+• 🎨 Natural language styling — "make the background Monet blue", "bigger title font"
+• 📎 Cross-file references — mention a doc or sheet by name and AI uses its data
+• 🖼️ Smart image placement — drag, drop, or paste; AI picks the best position
+• 📤 Export to PPTX — one-click PowerPoint export
+• ↩️ Unlimited Undo/Redo — go back to any state
+
+**How to start?**
+Just type a topic below! Examples:
+"Create a pitch deck about AI trends"
+"Write an article about sustainable energy"`,
+
+  slides:`📊 **Slides Mode**
+
+Slides mode lets you create professional presentations entirely through natural language.
+
+**How it works:**
+1. Type a topic (e.g. "AI trends in healthcare") and I'll generate a complete deck — title slide, content slides, data tables, quotes, and a closing slide.
+2. Edit any region by clicking on it and typing instructions like "rewrite this in English" or "add more detail".
+3. Change styles naturally — "background to dark blue", "title font bigger", "Monet theme".
+
+**Design Themes:** clean-white, clean-gray, clean-dark, monet (impressionist), seurat (pointillist)
+**Layouts:** title, content, two-column, quote, data-table, image-top/left/right/bottom, closing
+**Image Support:** Paste or drag images onto slides; AI auto-positions them based on aspect ratio and content density.
+
+**Key commands:**
+• Type a topic → generates a new deck
+• Click a region + type instruction → edits that specific region
+• "translate to English" → translates entire deck
+• "export ppt" → downloads as .pptx file
+• Undo/Redo available at any time`,
+
+  doc:`📝 **Doc Mode**
+
+Doc mode is an AI-powered document editor for long-form writing — articles, reports, memos, and more.
+
+**How it works:**
+1. Type a topic and I'll generate a complete document with proper structure: headings, paragraphs, lists, tables, quotes, and dividers.
+2. Click any block to select it, then type an instruction to edit just that block.
+3. Supports rich block types: heading1/2/3, paragraph, list, numbered list, quote, code, table, image, divider, and caption.
+
+**Editing capabilities:**
+• "Enrich this paragraph" → expands with more detail
+• "Rewrite in a more professional tone" → rewrites selected block
+• "Add a comparison table" → inserts a table block
+• "Translate to Chinese" → translates entire document
+• Drag-and-drop block reordering (coming soon)
+
+**Tables:** Full support with headers, rows, floating (left/right/center), and captions.
+**Images:** Insert with URL, supports float positioning and captions.
+**Zoom:** Type "zoom 150%" or "zoom in/out" to adjust the editor view.`,
+
+  sheet:`📈 **Sheet Mode**
+
+Sheet mode lets you create and manage structured data tables inside your workspace.
+
+**How it works:**
+1. Use the quick-create command: type "/sheet Title" followed by CSV data on new lines.
+2. Or create from the Workspace panel with the "+ Sheet" button.
+3. Sheets are stored in your workspace and can be referenced by name when generating slides or docs.
+
+**Example:**
+/sheet Q1 Sales
+Region,Revenue,Growth
+North America,$2.4M,+12%
+Europe,$1.8M,+8%
+Asia Pacific,$3.1M,+22%
+
+**Cross-referencing:** When creating a presentation, just mention the sheet name (e.g. "use the Q1 Sales data") and AI will pull in the actual data to populate tables, charts, and content.`,
+
+  workspace:`📁 **Workspace**
+
+Workspace is your file management hub — organize, search, and connect all your content.
+
+**File types:** Slides (decks), Docs (documents), Sheets (data tables), Images (drag-drop or paste)
+**Projects:** Group related files into project folders. When you're inside a project, AI automatically uses all linked files as context.
+**Search & Filter:** Full-text search across all files, filter by type (slides/doc/sheet/image), sort by date or name.
+
+**Key features:**
+• **Batch operations** — select multiple files to delete, move to project, or export
+• **Image support** — drag-drop or paste images; stored with automatic compression
+• **Cross-file AI context** — mention any file by name in your prompt and AI reads its content
+• **Project detail view** — see all linked files, edit project name/description, add files
+
+**Quick-create commands:**
+• /doc Title — creates a new document
+• /sheet Title + CSV data — creates a new data sheet
+• Use the "+" menu in workspace for slides, docs, sheets, or images`
+};
+
+// Translation prompt for about texts
+const ABOUT_TRANSLATE_PROMPT=`You are a translator. Translate the following product introduction text to the target language. Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, emojis, markdown bold markers, numbered lists, line breaks. Only translate the text content. Output ONLY the translated text, nothing else.`;
 
 // ── Pass 2b: slide generation mode ──
 const GEN_PROMPT=`You are Sloth Space, an AI presentation designer. Output ONLY valid JSON — no text, no markdown, no code fences, no explanation.
@@ -829,9 +952,58 @@ async function sendMessage(){
       }
     }
 
-    // ── Dispatch based on router intent (all classification done by LLM, no hardcoded overrides) ──
+    // ── Smart fallback: if router says "chat" but message has substance, escalate ──
+    if(intent==='chat'){
+      // Check if user is asking about Sloth Space itself → escalate to "about"
+      const isAboutSloth=/sloth\s*space|這個app|這個工具|這是什麼|what is this|how does this work/i.test(text);
+      if(isAboutSloth){
+        console.log('Smart fallback: chat → about (asking about Sloth Space)');
+        intent='about';
+      }else{
+        const hasSubject=text.length>4&&!/^(你好|hi|hello|hey|嗨|哈囉|what|how|why|who|when|where|是什麼|怎麼|可以|能不能|幫我|help)$/i.test(text.trim());
+        const hasGenerateHint=/關於|介紹|生成|寫|做|建|create|make|write|about|build|draft|pitch|簡報|文章|內容|報告|deck/i.test(text);
+        const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2));
+        if(hasSubject&&(hasGenerateHint||noDeckOrDoc)){
+          console.log('Smart fallback: chat → generate (message has topic substance)');
+          intent='generate';
+        }
+      }
+    }
 
-    if(intent==='undo'){
+    // ── Dispatch based on router intent ──
+
+    if(intent==='about'){
+      // ── ABOUT: hardcoded intro, translated if needed ──
+      const topic=routerData.topic||'general';
+      const sourceText=ABOUT_TEXTS[topic]||ABOUT_TEXTS.general;
+      const isEN=/^[a-zA-Z\s\?\!\.,'0-9]+$/.test(text.trim());
+
+      if(isEN){
+        // English user → show directly, no LLM needed
+        statusDiv.remove();
+        const aboutDiv=addMessage('','ai');
+        aboutDiv.innerHTML=sourceText.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+        S.chatHistory.push({role:'assistant',content:sourceText});
+      }else{
+        // Non-English → translate via LLM
+        statusDiv.textContent='Translating...';
+        try{
+          const translated=await callLLM(ABOUT_TRANSLATE_PROMPT,[{role:'user',content:`Translate to the same language as: "${text}"\n\n${sourceText}`}],{max_tokens:2048});
+          statusDiv.remove();
+          const aboutDiv=addMessage('','ai');
+          aboutDiv.innerHTML=translated.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+          S.chatHistory.push({role:'assistant',content:translated});
+        }catch(e){
+          // Fallback: show English if translation fails
+          console.warn('About translation failed, showing English:',e);
+          statusDiv.remove();
+          const aboutDiv=addMessage('','ai');
+          aboutDiv.innerHTML=sourceText.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+          S.chatHistory.push({role:'assistant',content:sourceText});
+        }
+      }
+
+    }else if(intent==='undo'){
       // ── UNDO: restore previous state ──
       statusDiv.remove();
       if(S.currentMode==='doc'){
