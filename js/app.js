@@ -5,14 +5,14 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260315e';
-import * as slide from './slide.js?v=20260315e';
-import * as doc from './doc.js?v=20260315e';
-import * as workspace from './workspace.js?v=20260315e';
-import * as ai from './ai.js?v=20260315e';
-import * as ui from './ui.js?v=20260315e';
-import * as storage from './storage.js?v=20260315e';
-import { initKeys } from './keys.js?v=20260315e';
+import { S } from './state.js?v=20260315g';
+import * as slide from './slide.js?v=20260315g';
+import * as doc from './doc.js?v=20260315g';
+import * as workspace from './workspace.js?v=20260315g';
+import * as ai from './ai.js?v=20260315g';
+import * as ui from './ui.js?v=20260315g';
+import * as storage from './storage.js?v=20260315g';
+import * as keys from './keys.js?v=20260315g';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -23,6 +23,7 @@ const allExports = {
   ...ai,
   ...ui,
   ...storage,
+  ...keys,
 };
 
 for (const [name, fn] of Object.entries(allExports)) {
@@ -31,9 +32,8 @@ for (const [name, fn] of Object.entries(allExports)) {
   }
 }
 
-// Also expose the state object and initKeys
+// Also expose the state object
 window.S = S;
-window.initKeys = initKeys;
 
 // ─── Initialization sequence (order matters) ───
 // Load config
@@ -49,7 +49,7 @@ slide.initToolbar();
 slide.initFreeformCanvas();
 
 // Init keyboard handlers
-initKeys();
+keys.initKeys();
 
 // Check welcome screen
 ui.checkWelcomeScreen();

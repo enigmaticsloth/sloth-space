@@ -1,5 +1,8 @@
 import { S, LLM_DEFAULTS, CONFIG_KEY, VALID_PRESETS, VALID_LAYOUTS, PRESETS, LAYOUTS } from './state.js';
 
+// Send button arrow SVG (shared constant)
+const SEND_ARROW_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+
 // ═══════════════════════════════════════════
 // LLM CONFIGURATION
 // ═══════════════════════════════════════════
@@ -706,7 +709,7 @@ async function sendMessage(){
   const statusDiv=addMessage('Thinking...','system');
   const sendBtn=document.querySelector('.send-btn');
   sendBtn.disabled=true;
-  sendBtn.textContent='...';
+  sendBtn.innerHTML='...';
 
   // ── Project-scoped AI context injection ──
   let wsContext='';
@@ -742,7 +745,7 @@ async function sendMessage(){
         const msg=placeImageOnSlide(pendingImages,S.currentSlide,'auto');
         if(msg) addMessage(msg,'ai');
         window.renderApp();
-        sendBtn.disabled=false; sendBtn.textContent='Send';
+        sendBtn.disabled=false; sendBtn.innerHTML=SEND_ARROW_SVG;
         window.autoSave();
         return;
       }
@@ -764,7 +767,7 @@ async function sendMessage(){
         if(msg) addMessage(msg,'ai');
         window.renderApp();
       }
-      sendBtn.disabled=false; sendBtn.textContent='Send';
+      sendBtn.disabled=false; sendBtn.innerHTML=SEND_ARROW_SVG;
       window.autoSave();
       return;
     }
@@ -906,7 +909,7 @@ async function sendMessage(){
         statusDiv.remove();
         addMessage('請先點選你要刪除的區域，或告訴我要刪除哪一頁的什麼內容。','ai');
         S.chatHistory.push({role:'assistant',content:'請先點選你要刪除的區域。'});
-        sendBtn.disabled=false; sendBtn.textContent='Send';
+        sendBtn.disabled=false; sendBtn.innerHTML=SEND_ARROW_SVG;
         window.autoSave();
         return;
       }
@@ -1019,7 +1022,7 @@ async function sendMessage(){
     addMessage(`Error: ${err.message}. Try again?`,'ai');
   }finally{
     sendBtn.disabled=false;
-    sendBtn.textContent='Send';
+    sendBtn.innerHTML=SEND_ARROW_SVG;
     window.autoSave(); // Save chat history after every message
   }
 }
