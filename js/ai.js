@@ -1765,6 +1765,8 @@ function _autoLinkToProject(projectId){
     window.wsLinkFile(fileId, projectId);
     const proj=window.wsGetProject ? window.wsGetProject(projectId) : null;
     if(proj) addMessage(`📁 Linked to project "${proj.name}"`,'system');
+    // Refresh sidebar file list so new file appears immediately
+    if(window.refreshFileList) window.refreshFileList();
   }
 }
 
@@ -1917,6 +1919,8 @@ async function doDocGenerate(statusDiv,userText,wsContext){
   addMessage(`✓ Generated document "${S.currentDoc.title}" (${newBlocks.length} blocks)`,'ai');
   window.renderDocMode();
   window.docSaveNow(); // immediate save, not debounced — survives quick refresh
+  // Ensure workspace file ID is tracked so _autoLinkToProject can find it
+  if(S.currentDoc && S.currentDoc.id) S._wsCurrentFileId = S.currentDoc.id;
 }
 
 export {
