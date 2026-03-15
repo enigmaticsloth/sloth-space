@@ -334,10 +334,9 @@ INTENTS:
   - "switch to doc mode" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["doc"]}],"message":"Switching to Doc mode"}
 
   CRITICAL DISTINCTION — "create project" vs "create document":
-  - "建立/create a PROJECT (專案)" → ui_action (wsCreateProject). A project is an organizational container, NOT content.
-  - "建立/create/write a DOCUMENT/FILE/REPORT/SLIDES" → generate. This is content creation.
+  - "create a PROJECT" → ui_action (wsCreateProject). A project is an organizational container, NOT content.
+  - "create/write a DOCUMENT/FILE/REPORT/SLIDES" → generate. This is content creation.
   - "create a project called X" → ui_action. "create a document about X" → generate.
-  - "幫我建一個project叫X" → ui_action. "幫我寫一份關於X的文件" → generate.
   Rule of thumb: "open X" / "switch to X" / "go to X" / "create a project" / "link files" / "sort by" / "search for" → ui_action. "Write about X" / "make a presentation about X" / "generate a report" → generate.
 
 "chat" — ONLY for pure greetings with NO topic and NOT asking about Sloth Space.
@@ -347,7 +346,7 @@ INTENTS:
 PRIORITY RULES (follow in order):
 1. Undo words (undo/redo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (delete/remove) → "content_edit" with delete:true.
-3. **APP MANAGEMENT OVERRIDE**: If the message asks to CREATE/DELETE/MANAGE a PROJECT, or OPEN/SWITCH/NAVIGATE to a mode/file/project, or LINK/UNLINK files → ALWAYS "ui_action". Keywords: project, 專案, open, switch, navigate, link, unlink, sort, search, settings. "建立一個project" / "create a project" / "open settings" / "切到workspace" → ui_action, NOT generate.
+3. **APP MANAGEMENT OVERRIDE**: If the message asks to CREATE/DELETE/MANAGE a PROJECT, or OPEN/SWITCH/NAVIGATE to a mode/file/project, or LINK/UNLINK files → ALWAYS "ui_action". Keywords: project, open, switch, navigate, link, unlink, sort, search, settings. "create a project" / "open settings" / "switch to workspace" → ui_action, NOT generate.
 4. **CONTENT CREATION OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation (CONTENT, not a project) → ALWAYS "generate", even if the message ALSO asks about content.
 5. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
 6. Questions about Sloth Space THE APP itself → "about".
@@ -962,7 +961,21 @@ async function callLLM(systemContent,messages,opts={}){
     body=JSON.stringify(oaiBody);
   }
 
-  const res=await fetch(S.llmConfig.url,{method:'POST',headers,body});
+  // Fetch with auto-retry on 429 rate limit
+  let res, retries=0;
+  const MAX_RETRIES=3;
+  while(true){
+    res=await fetch(S.llmConfig.url,{method:'POST',headers,body});
+    if(res.status===429 && retries<MAX_RETRIES){
+      retries++;
+      const wait=retries*5; // 5s, 10s, 15s
+      console.warn(`[callLLM] 429 rate limit, retry ${retries}/${MAX_RETRIES} in ${wait}s...`);
+      if(window.addMessage) addMessage(`⏳ Rate limited — retrying in ${wait}s... (${retries}/${MAX_RETRIES})`,'system');
+      await new Promise(r=>setTimeout(r,wait*1000));
+      continue;
+    }
+    break;
+  }
   if(!res.ok){const e=await res.text();throw new Error(`API ${res.status}: ${e.slice(0,200)}`);}
   const data=await res.json();
 
@@ -1500,7 +1513,11 @@ async function sendMessage(){
         projName=projName.trim().replace(/[。，！？.,!?]+$/,'');
         if(projName){
           intent='ui_action';
-          routerData.actions=[{fn:'wsCreateProject',args:[projName,'']}];
+          routerData.actions=[
+            {fn:'wsCreateProject',args:[projName,'']},
+            {fn:'modeEnter',args:['workspace']},
+            {fn:'wsSetView',args:['projects']}
+          ];
           routerData.message=`Creating project "${projName}"`;
         }
       }
@@ -2154,11 +2171,26 @@ function _updateAIActionOverlay(text) {
 }
 
 /**
+ * Auto-append smart follow-up actions.
+ * e.g. after wsCreateProject → navigate to workspace projects tab to show result.
+ */
+function _autoChainActions(actions) {
+  const fns = actions.map(a => a.fn);
+  // After creating a project, navigate to workspace → projects tab to show result
+  if (fns.includes('wsCreateProject') && !fns.includes('modeEnter')) {
+    actions.push({ fn: 'modeEnter', args: ['workspace'] });
+    actions.push({ fn: 'wsSetView', args: ['projects'] });
+  }
+  return actions;
+}
+
+/**
  * Execute an array of AI-driven UI actions.
  * Each action: { fn: 'functionName', args: [...] }
  * Returns array of results/errors for logging.
  */
 function executeUIActions(actions, message) {
+  actions = _autoChainActions(actions);
   if (message) addMessage(`✦ ${message}`, 'system');
   // Show Monet-orange overlay
   _showAIActionOverlay(`AI operating: ${message || 'Performing actions...'}`);
