@@ -323,17 +323,17 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 /* Legacy compat: mode-picker-overlay hidden by default (replaced by landing-overlay) */
 .mode-picker-overlay { display:none !important; }
 .mode-picker-overlay.hidden { display:none !important; }
-.mode-cards { display:flex; gap:14px; justify-content:center; }
-.mode-card { flex:1; max-width:200px; background:rgba(30,30,30,0.7); border:1.5px solid rgba(255,255,255,0.08); border-radius:14px;
+.mode-cards { display:flex; gap:16px; justify-content:center; }
+.mode-card { flex:1; max-width:240px; background:rgba(30,30,30,0.7); border:1.5px solid rgba(255,255,255,0.08); border-radius:14px;
   padding:0; cursor:pointer; transition:all 0.25s ease; overflow:hidden; backdrop-filter:blur(12px); }
 .mode-card:hover { border-color:rgba(120,134,165,0.5); transform:translateY(-4px); box-shadow:0 12px 32px rgba(0,0,0,0.4); }
 .mode-card.disabled { opacity:0.45; cursor:default; }
 .mode-card.disabled:hover { border-color:rgba(255,255,255,0.08); transform:none; box-shadow:none; }
-.mode-card-demo { height:120px; background:#1a1a1a; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
-.mode-card-info { padding:14px 12px 16px; }
-.mode-card-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; }
-.mode-card-name { font-size:16px; font-weight:700; color:#e0e0e0; margin-bottom:4px; }
-.mode-card-desc { font-size:11px; color:#888; line-height:1.5; }
+.mode-card-demo { height:150px; background:#1a1a1a; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+.mode-card-info { padding:16px 14px 18px; }
+.mode-card-icon { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; }
+.mode-card-name { font-size:17px; font-weight:700; color:#e0e0e0; margin-bottom:5px; }
+.mode-card-desc { font-size:11.5px; color:#888; line-height:1.5; }
 .mode-card-badge { position:absolute; top:8px; right:8px; font-size:9px; padding:2px 8px; border-radius:10px; font-weight:600; }
 .mode-card-badge.ready { background:rgba(139,158,139,0.25); color:#8B9E8B; }
 .mode-card-badge.soon { background:rgba(180,150,100,0.2); color:#B49664; }
@@ -362,8 +362,8 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mc-sheet-row.header .mc-sheet-cell { color:rgba(255,255,255,0.5); font-weight:600; }
 
 /* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop, centered */
-.mode-card-wide { max-width:640px !important; flex-direction:row; display:flex; margin:14px auto 0; }
-.mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:160px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
+.mode-card-wide { max-width:760px !important; flex-direction:row; display:flex; margin:16px auto 0; }
+.mode-card-wide .mode-card-demo { height:auto; min-height:110px; width:180px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
 .mode-card-wide .mode-card-info { text-align:left; padding:14px 18px; display:flex; flex-direction:column; gap:4px; justify-content:center; }
 .mode-card-wide .mode-card-icon { margin:0; flex-shrink:0; }
 .mode-card-wide .mode-card-name { margin-bottom:0; }
@@ -390,7 +390,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mp-back:hover { border-color:rgba(255,255,255,0.3); color:#ccc; }
 
 /* ─── Mode Picker Inline Chat Panel ─── */
-.mp-chat-panel { width:340px; flex-shrink:0; height:min(600px, 75vh); display:flex; flex-direction:column; background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.08); border-radius:16px; backdrop-filter:blur(16px); overflow:hidden; }
+.mp-chat-panel { width:340px; flex-shrink:0; height:min(560px, 70vh); display:flex; flex-direction:column; background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.08); border-radius:16px; backdrop-filter:blur(16px); overflow:hidden; }
 .mp-chat-header { display:flex; align-items:center; gap:8px; padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:13px; font-weight:600; color:#ccc; font-family:Arial; }
 .mp-chat-messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
 .mp-chat-welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; height:100%; text-align:center; }
@@ -1154,9 +1154,9 @@ body.mode-workspace .chat-panel .input-area textarea::placeholder { color:#4A557
 .ll-tos:hover { color:#9BA8C4; }
 
 /* Right: modes + chat */
-.landing-right { flex:1; display:flex; gap:20px; padding:28px 32px; align-items:flex-start; overflow-y:auto; }
-.landing-modes { flex:1; min-width:0; text-align:center; }
-.lr-tagline { font-size:13px; color:#9BA8C4; font-style:italic; margin-bottom:20px; }
+.landing-right { flex:1; display:flex; gap:20px; padding:28px 32px; align-items:center; justify-content:center; overflow-y:auto; }
+.landing-modes { flex:1; min-width:0; text-align:center; max-width:780px; }
+.lr-tagline { font-size:14px; color:#9BA8C4; font-style:italic; margin-bottom:24px; }
 
 /* API cost warning (shared) */
 .api-cost-warning { display:flex; gap:8px; background:#2e2a1a; border:1.5px solid #5C4D1A; border-radius:8px; padding:8px 10px; text-align:left; }
