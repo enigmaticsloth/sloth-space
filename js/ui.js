@@ -1624,13 +1624,11 @@ async function _mpRouterDetectMode(text) {
     try {
       const ctx = [
         'User is on the landing page (mode picker). No mode is active yet (currentMode is null).',
-        'Available modes: slide (presentations/PPT), doc (documents/reports/articles), sheet (spreadsheets/data), workspace (file manager).',
-        'The user is about to choose a mode. Determine the correct intent and target mode.',
-        'If user wants to create a document/report/article/文件/文檔/報告 → generate with target "doc".',
-        'If user wants to create slides/presentation/簡報/PPT → generate with target "slide".',
-        'If user wants to create a spreadsheet/表格/試算表 → generate with target "sheet".',
-        'If user wants to open/switch to workspace/工作區 → ui_action with modeEnter("workspace").',
-        'If user wants to open/switch to any mode → ui_action with modeEnter.',
+        'Available modes: slide, doc, sheet, workspace.',
+        'Determine the correct intent. Use the ROUTER_PROMPT rules — do NOT guess.',
+        'If the request involves projects, files, or file management → workspace (use modeEnter or wsCreateProject).',
+        'If the request involves creating content → generate with the appropriate target.',
+        'If the request involves switching modes → ui_action with modeEnter.',
       ];
       const msgs = [
         { role: 'system', content: '[Context: ' + ctx.join(' ') + ']' },
@@ -1648,6 +1646,17 @@ async function _mpRouterDetectMode(text) {
       // ── Extract target mode from ANY intent type ──
       let mode = null;
 
+      // Helper: check if an action list contains workspace-specific functions
+      const _wsActionFns = ['wsCreateProject','wsOpenProject','wsDeleteProject','wsRenameProject','wsListProjects'];
+      const _extractModeFromActions = (actions) => {
+        if (!actions) return null;
+        const modeAction = actions.find(a => a.fn === 'modeEnter');
+        if (modeAction?.args?.[0]) return modeAction.args[0];
+        // If actions use workspace-specific functions, infer workspace mode
+        if (actions.some(a => _wsActionFns.includes(a.fn))) return 'workspace';
+        return null;
+      };
+
       if (data.intent === 'generate') {
         if (data.target === 'doc') mode = 'doc';
         else if (data.target === 'sheet') mode = 'sheet';
@@ -1655,16 +1664,15 @@ async function _mpRouterDetectMode(text) {
       }
 
       if (data.intent === 'ui_action') {
-        const modeAction = data.actions?.find(a => a.fn === 'modeEnter');
-        if (modeAction?.args?.[0]) mode = modeAction.args[0];
+        mode = _extractModeFromActions(data.actions);
       }
 
-      // multi_step: scan ALL steps for modeEnter or generate target
+      // multi_step: scan ALL steps for modeEnter, ws functions, or generate target
       if (data.intent === 'multi_step' && data.steps) {
         for (const step of data.steps) {
           if (step.type === 'ui_action' && step.actions) {
-            const modeAction = step.actions.find(a => a.fn === 'modeEnter');
-            if (modeAction?.args?.[0]) { mode = modeAction.args[0]; break; }
+            const m = _extractModeFromActions(step.actions);
+            if (m) { mode = m; break; }
           }
           if (step.type === 'generate' && step.target) {
             mode = step.target; break;
