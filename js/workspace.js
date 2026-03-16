@@ -646,9 +646,12 @@ export function wsSetView(view) {
  * Open a project detail view.
  */
 export function wsOpenProject(projectId) {
-  S.wsActiveProjectId = projectId;
-  S.wsView = 'project-detail';
-  S.wsSelectedIds.clear();
+  // Toggle inline expand instead of navigating to detail page
+  if (S.wsExpandedProjectId === projectId) {
+    S.wsExpandedProjectId = null; // collapse
+  } else {
+    S.wsExpandedProjectId = projectId; // expand
+  }
   renderWorkspaceMode();
 }
 
@@ -675,6 +678,27 @@ export function wsToggleNewMenu(e) {
     // Close on next click anywhere
     const close = () => { menu.classList.remove('show'); document.removeEventListener('click', close); };
     setTimeout(() => document.addEventListener('click', close), 0);
+  }
+}
+
+/** Toggle project edit menu dropdown */
+export function wsToggleProjectMenu(projectId) {
+  // Close all other menus first
+  document.querySelectorAll('.ws-project-edit-menu').forEach(m => {
+    if (m.id !== `wsProjectMenu_${projectId}`) m.style.display = 'none';
+  });
+  const menu = document.getElementById(`wsProjectMenu_${projectId}`);
+  if (!menu) return;
+  menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+  // Close on outside click
+  const closeHandler = (e) => {
+    if (!menu.contains(e.target)) {
+      menu.style.display = 'none';
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  if (menu.style.display === 'flex') {
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
   }
 }
 
@@ -872,11 +896,10 @@ export function renderWorkspaceMode() {
   const canvas = document.getElementById('workspaceCanvas');
   if (!canvas) return;
 
-  const view = S.wsView || 'recent';
+  const view = S.wsView || 'projects';
 
   // Build navigation tabs
   const tabs = [
-    { id: 'recent', label: 'Recent', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
     { id: 'projects', label: 'Projects', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' },
     { id: 'all', label: 'All Files', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
     { id: 'unlinked', label: 'Unlinked', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M5.16 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="2" y1="8" x2="5" y2="8"/><line x1="16" y1="19" x2="16" y2="22"/><line x1="19" y1="16" x2="22" y2="16"/></svg>' }
@@ -887,7 +910,7 @@ export function renderWorkspaceMode() {
 
   // Active project badge
   let projectBadge = '';
-  if (S.wsActiveProjectId && view !== 'project-detail') {
+  if (S.wsActiveProjectId) {
     const proj = wsGetProject(S.wsActiveProjectId);
     if (proj) {
       const c = wsGetProjectColor(proj);
@@ -928,12 +951,10 @@ export function renderWorkspaceMode() {
 
   // Content based on view
   let contentHtml = '';
-  if (view === 'project-detail') {
-    contentHtml = renderProjectDetailView();
-  } else if (view === 'projects') {
+  if (view === 'projects') {
     contentHtml = renderProjectsListView();
   } else {
-    // recent / all / unlinked — file list views
+    // all / unlinked — file list views
     contentHtml = renderFileListView(view);
   }
 
@@ -963,7 +984,7 @@ export function renderWorkspaceMode() {
       ${projectBadge}
       ${navHtml}
       ${batchHtml}
-      ${(view !== 'projects' && view !== 'project-detail') ? renderSearchAndSort() : ''}
+      ${view !== 'projects' ? renderSearchAndSort() : ''}
       <div class="ws-content">${contentHtml}</div>
     </div>
   `;
@@ -1119,13 +1140,11 @@ function renderProjectsListView() {
     </div>`;
   }
 
-  // Filter by search query if present
   const q = (S.wsProjectSearch || '').toLowerCase().trim();
   const projects = q
     ? allProjects.filter(p => (p.name||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q))
     : allProjects;
 
-  // Search bar (show when > 5 projects)
   const searchHtml = allProjects.length > 5
     ? `<div class="ws-project-search-bar">
         <input class="ws-project-search-input" type="text" placeholder="Search ${allProjects.length} projects..." value="${escapeHtml(S.wsProjectSearch||'')}" oninput="wsSetProjectSearch(this.value)">
@@ -1139,29 +1158,88 @@ function renderProjectsListView() {
 
   return `${searchHtml}${noResults}<div class="ws-project-list">${projects.map(p => {
     const fileCount = wsProjectFileCount(p.id);
-    const status = p.status || 'active';
     const date = p.modified ? new Date(p.modified).toLocaleDateString() : '';
     const isActive = S.wsActiveProjectId === p.id;
+    const isExpanded = S.wsExpandedProjectId === p.id;
     const c = wsGetProjectColor(p);
-    const statusLabel = { active:'Active', paused:'Paused', done:'Done' }[status] || status;
-    return `<div class="ws-project-card${isActive ? ' active-context' : ''}" style="border-left:3px solid ${c.dot}" onclick="wsOpenProject('${p.id}')">
-      <div class="ws-project-icon" style="background:${c.bg};color:${c.dot}">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      </div>
-      <div class="ws-project-info">
-        <div class="ws-project-name">${escapeHtml(p.name)}</div>
-        <div class="ws-project-meta">
-          <span class="ws-status-badge ${status}">${statusLabel}</span>
-          ${fileCount} file${fileCount !== 1 ? 's' : ''} · ${date}
+
+    // Expand chevron
+    const chevron = isExpanded
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+
+    // Flat edit button (three dots → dropdown)
+    const editBtn = `<button class="ws-project-edit-btn" onclick="event.stopPropagation();wsToggleProjectMenu('${p.id}')" title="Edit project">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    </button>`;
+
+    // Edit dropdown menu (hidden by default)
+    const editMenu = `<div class="ws-project-edit-menu" id="wsProjectMenu_${p.id}" style="display:none;">
+      <button class="ws-project-menu-item" onclick="event.stopPropagation();wsRenameProject('${p.id}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Rename
+      </button>
+      <button class="ws-project-menu-item" onclick="event.stopPropagation();wsCycleProjectColor('${p.id}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 0 0 0 14 4 4 0 0 1 0 8"/></svg>
+        Change Color
+      </button>
+      <button class="ws-project-menu-item danger" onclick="event.stopPropagation();if(confirm('Delete project \\&quot;${escapeHtml(p.name)}\\&quot;? Files will not be deleted.'))wsDeleteProject('${p.id}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Delete
+      </button>
+    </div>`;
+
+    // Expanded file list
+    let expandedHtml = '';
+    if (isExpanded) {
+      const files = wsGetProjectFiles(p.id);
+      if (files.length === 0) {
+        expandedHtml = `<div class="ws-project-expanded">
+          <div class="ws-empty" style="padding:12px 0;"><div class="ws-empty-text" style="font-size:12px;">No files linked yet</div></div>
+        </div>`;
+      } else {
+        const allFiles = wsLoad();
+        expandedHtml = `<div class="ws-project-expanded">
+          ${files.map(f => {
+            const idx = allFiles.findIndex(af => af.id === f.id);
+            const type = f.type || 'slide';
+            const fDate = f.updated ? new Date(f.updated).toLocaleDateString() : '';
+            const preview = wsRenderFilePreview(f);
+            return `<div class="ws-project-file-row" onclick="openWorkspaceItem(${idx})">
+              ${preview}
+              <div class="ws-file-info">
+                <div class="ws-file-name">${escapeHtml(f.title || 'Untitled')}</div>
+                <div class="ws-file-meta">${type.charAt(0).toUpperCase() + type.slice(1)} · ${fDate}</div>
+              </div>
+              <button class="ws-project-file-unlink" onclick="event.stopPropagation();wsUnlinkFile('${f.id}','${p.id}')" title="Unlink from project">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>`;
+          }).join('')}
+          <button class="ws-project-add-file-btn" onclick="event.stopPropagation();wsShowAddFilePicker('${p.id}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add File
+          </button>
+        </div>`;
+      }
+    }
+
+    return `<div class="ws-project-folder${isExpanded ? ' expanded' : ''}${isActive ? ' active-context' : ''}" style="border-left:3px solid ${c.dot}">
+      <div class="ws-project-card" onclick="wsOpenProject('${p.id}')">
+        <div class="ws-project-chevron">${chevron}</div>
+        <div class="ws-project-icon" style="background:${c.bg};color:${c.dot}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         </div>
-        ${p.description ? `<div class="ws-project-desc">${escapeHtml(p.description)}</div>` : ''}
+        <div class="ws-project-info">
+          <div class="ws-project-name">${escapeHtml(p.name)}</div>
+          <div class="ws-project-meta">${fileCount} file${fileCount !== 1 ? 's' : ''} · ${date}</div>
+        </div>
+        <div class="ws-project-actions">
+          ${editBtn}
+          ${editMenu}
+        </div>
       </div>
-      <div class="ws-project-actions">
-        <button class="ws-color-btn" onclick="event.stopPropagation();wsCycleProjectColor('${p.id}')" title="Change color"><span class="ws-color-dot" style="background:${c.dot}"></span></button>
-        <button class="ws-ctx-btn${isActive ? ' active' : ''}" onclick="event.stopPropagation();${isActive ? 'wsClearActiveProject()' : `wsSetActiveProject('${p.id}')`}" title="${isActive ? 'Clear AI context' : 'Set as AI context'}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4c0 1.1-.5 2.1-1.2 2.8A6 6 0 0 1 18 14v1a3 3 0 0 1-3 3h-1v3h-4v-3H9a3 3 0 0 1-3-3v-1a6 6 0 0 1 3.2-5.2A4 4 0 0 1 8 6a4 4 0 0 1 4-4z"/></svg>${isActive ? ' Active' : ''}
-        </button>
-      </div>
+      ${expandedHtml}
     </div>`;
   }).join('')}</div>`;
 }

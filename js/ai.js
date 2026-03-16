@@ -317,8 +317,8 @@ INTENTS:
 
   Available functions:
   - modeEnter(mode) — switch to 'slide', 'doc', 'sheet', 'workspace'
-  - wsSetView(view) — switch workspace tab: 'recent', 'projects', 'all', 'unlinked'
-  - wsOpenProject(projectNameOrId) — open a project detail view (can use project name)
+  - wsSetView(view) — switch workspace tab: 'projects', 'all', 'unlinked'
+  - wsOpenProject(projectNameOrId) — expand a project to show its files (can use project name)
   - openWorkspaceItem(fileNameOrIndex) — open a file (can use file name, will be resolved)
   - wsNewFile(type) — create empty file: 'slide', 'doc', 'sheet'
   - wsCreateProject(name, description) — create a new project
@@ -2553,7 +2553,7 @@ const ALLOWED_ACTIONS = {
 // Parameter validation schemas (lightweight — type checks only)
 const ACTION_SCHEMA = {
   modeEnter:      [{ type: 'string', enum: ['slide', 'doc', 'sheet', 'workspace'] }],
-  wsSetView:      [{ type: 'string', enum: ['recent', 'projects', 'all', 'unlinked'] }],
+  wsSetView:      [{ type: 'string', enum: ['projects', 'all', 'unlinked'] }],
   wsOpenProject:  [{ type: 'string' }],
   openWorkspaceItem: [{ type: 'number' }],
   wsNewFile:      [{ type: 'string', enum: ['slide', 'doc', 'sheet'] }],
