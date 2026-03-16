@@ -2358,6 +2358,7 @@ function _autoLinkToProject(projectId){
 // ── Slide generation (reusable) ──
 async function doGenerate(statusDiv,wsContext){
   statusDiv.textContent='Generating slides...';
+  _showAIActionOverlay('AI ▸ Generating slides...');
   // Capture template style bank BEFORE generation (if coming from a template preview)
   const isTemplate=S.currentDeck&&S.currentDeck._isTemplate;
   const styleBank=isTemplate?S.currentDeck._styleBank:null;
@@ -2415,6 +2416,8 @@ async function doGenerate(statusDiv,wsContext){
   S.currentDeck=deck;
   S.currentPreset=deck.preset||S.currentPreset;
   S.currentSlide=0;
+  _updateAIActionOverlay(`AI ▸ Generated ${deck.slides.length} slides ✓`);
+  setTimeout(_hideAIActionOverlay, 1200);
   addMessage(`✓ Generated ${deck.slides.length} slides (${S.currentPreset})`,'ai');
   S.chatHistory.push({role:'assistant',content:`[Generated slides: "${deck.title||'Untitled'}" (${deck.slides.length} slides)]`});
   window.renderApp();
@@ -2456,6 +2459,7 @@ Rules:
 
 async function doDocGenerate(statusDiv,userText,wsContext){
   statusDiv.textContent='Writing document...';
+  _showAIActionOverlay('AI ▸ Writing document...');
 
   let editContext='';
   // Only include edit context if the doc has real content (more than just title + empty paragraph)
@@ -2502,6 +2506,8 @@ async function doDocGenerate(statusDiv,userText,wsContext){
   S.currentDoc.updated=new Date().toISOString();
 
   statusDiv.remove();
+  _updateAIActionOverlay(`AI ▸ Generated document ✓`);
+  setTimeout(_hideAIActionOverlay, 1200);
   addMessage(`✓ Generated document "${S.currentDoc.title}" (${newBlocks.length} blocks)`,'ai');
   // Track in chat history for router context memory
   S.chatHistory.push({role:'assistant',content:`[Generated doc: "${S.currentDoc.title}"]`});
@@ -3118,5 +3124,8 @@ export {
   GEN_PROMPT,
   IMAGE_PROMPT,
   DOC_GEN_PROMPT,
-  SHEET_FILL_PROMPT
+  SHEET_FILL_PROMPT,
+  _showAIActionOverlay,
+  _hideAIActionOverlay,
+  _updateAIActionOverlay
 };

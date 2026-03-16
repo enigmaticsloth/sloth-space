@@ -1605,22 +1605,40 @@ async function _mpRouterDetectMode(text) {
   // Try LLM router first
   if (window.callLLM && window.ROUTER_PROMPT) {
     try {
+      const ctx = [
+        'User is on the landing page (mode picker). No mode is active yet (currentMode is null).',
+        'Available modes: slide (presentations/PPT), doc (documents/reports/articles), sheet (spreadsheets/data), workspace (file manager).',
+        'The user is about to choose a mode. Determine the correct intent and target mode.',
+        'If user wants to create a document/report/article/文件/文檔/報告 → generate with target "doc".',
+        'If user wants to create slides/presentation/簡報/PPT → generate with target "slide".',
+        'If user wants to create a spreadsheet/表格/試算表 → generate with target "sheet".',
+        'If user wants to open/switch to workspace/工作區 → ui_action with modeEnter("workspace").',
+        'If user wants to open/switch to any mode → ui_action with modeEnter.',
+      ];
       const msgs = [
-        { role: 'system', content: '[Context: User is on the mode picker (landing page). No mode is active yet. User wants to CREATE content. Determine the correct mode to enter.]' },
+        { role: 'system', content: '[Context: ' + ctx.join(' ') + ']' },
         { role: 'user', content: text }
       ];
       const raw = await window.callLLM(window.ROUTER_PROMPT, msgs, { useRouter: true, temperature: 0, max_tokens: 256, json: true });
-      const data = JSON.parse(raw);
+      let data;
+      try { data = JSON.parse(raw); } catch(pe) {
+        // Try extractJSON fallback
+        if (window.extractJSON) data = window.extractJSON(raw);
+        if (!data) throw pe;
+      }
+      console.log('[Mode picker router]', text, '→', data);
+
       // Extract mode from router response
       if (data.intent === 'generate' || data.intent === 'multi_step') {
         const target = data.target || (data.steps && data.steps.find(s => s.type === 'generate')?.target);
         if (target === 'doc') return 'doc';
         if (target === 'sheet') return 'sheet';
         if (target === 'slide') return 'slide';
+        // generate without explicit target — use keyword fallback below
       }
       if (data.intent === 'ui_action') {
         const modeAction = data.actions?.find(a => a.fn === 'modeEnter');
-        if (modeAction) return modeAction.args[0];
+        if (modeAction && modeAction.args && modeAction.args[0]) return modeAction.args[0];
       }
       // Fallback: if router says generate without target, use keyword detection
     } catch (e) {
@@ -1657,30 +1675,41 @@ function mpSendPrompt(text) {
 
   // Async flow
   (async () => {
-    // Step 1: Ask LLM router which mode to enter
+    // Step 1: Show Monet overlay during routing
+    if (window._showAIActionOverlay) window._showAIActionOverlay('AI ▸ Analyzing request...');
+
+    // Step 2: Ask LLM router which mode to enter
     const mode = await _mpRouterDetectMode(text);
 
-    // Step 2: Update chat
+    // Step 3: Update chat + overlay
     if (thinkingEl) thinkingEl.remove();
+    if (window._updateAIActionOverlay) window._updateAIActionOverlay(`AI ▸ Selecting ${modeNames[mode] || mode}...`);
     mpAddMsg(`Selecting ${modeNames[mode] || mode}...`, 'ai');
     await new Promise(r => setTimeout(r, 200));
 
-    // Step 3: Find and animate clicking the mode card
+    // Step 4: Find and animate clicking the mode card
     const targetCard = _mpFindCard(mode);
     if (targetCard) {
       await _mpClickEffect(targetCard);
       await new Promise(r => setTimeout(r, 400));
     }
 
-    // Step 4: Show entering message
+    // Step 5: Show entering message
+    if (window._updateAIActionOverlay) window._updateAIActionOverlay(`AI ▸ Entering ${modeNames[mode] || mode} mode...`);
     mpAddMsg(`Entering ${modeNames[mode] || mode} mode...`, 'ai');
     await new Promise(r => setTimeout(r, 300));
 
-    // Step 5: Enter the mode (hides overlay, renders mode UI)
+    // Step 6: Hide overlay before entering mode (sendMessage will show its own)
+    if (window._hideAIActionOverlay) window._hideAIActionOverlay();
+
+    // Step 7: Enter the mode (hides overlay, renders mode UI)
     modeEnter(mode);
 
-    // Step 6: After mode renders, inject prompt into main chat and call sendMessage
-    // sendMessage() handles the full AI pipeline: LLM router → intent dispatch → visual operations
+    // Step 8: For workspace mode, no prompt to forward — just enter
+    if (mode === 'workspace') return;
+
+    // Step 9: After mode renders, inject prompt into main chat and call sendMessage
+    // sendMessage() handles the full AI pipeline: LLM router → intent dispatch → visual operations (with overlay)
     setTimeout(() => {
       const chatInput = document.getElementById('chatInput');
       if (chatInput) {
