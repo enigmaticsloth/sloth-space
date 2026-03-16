@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c7';
-import * as slide from './slide.js?v=20260317c7';
-import * as doc from './doc.js?v=20260317c7';
-import * as workspace from './workspace.js?v=20260317c7';
-import * as ai from './ai.js?v=20260317c7';
-import * as ui from './ui.js?v=20260317c7';
-import * as storage from './storage.js?v=20260317c7';
-import * as keys from './keys.js?v=20260317c7';
-import * as sheet from './sheet.js?v=20260317c7';
-import * as bench from './bench.js?v=20260317c7';
+import { S } from './state.js?v=20260317c8';
+import * as slide from './slide.js?v=20260317c8';
+import * as doc from './doc.js?v=20260317c8';
+import * as workspace from './workspace.js?v=20260317c8';
+import * as ai from './ai.js?v=20260317c8';
+import * as ui from './ui.js?v=20260317c8';
+import * as storage from './storage.js?v=20260317c8';
+import * as keys from './keys.js?v=20260317c8';
+import * as sheet from './sheet.js?v=20260317c8';
+import * as bench from './bench.js?v=20260317c8';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -452,6 +452,32 @@ ui.renderApp();
     await wait(200);
   }
 
+  /* ── File link card (AI output attachment) ── */
+  async function showFileLink(opts){
+    // opts: { color, label, name, meta, badge }
+    const c=$('muCanvas');
+    if(!c||!alive()) return;
+    const link=document.createElement('div');
+    link.className='mu-file-link';
+    link.innerHTML=`
+      <div class="mu-fl-icon" style="background:${opts.color}">${opts.label}</div>
+      <div class="mu-fl-info">
+        <div class="mu-fl-name">${opts.name}</div>
+        <div class="mu-fl-meta">${opts.meta}</div>
+      </div>
+      <span class="mu-fl-badge">${opts.badge}</span>
+      <span class="mu-fl-open">↗</span>`;
+    c.appendChild(link);
+    await wait(50);
+    link.classList.add('show');
+    await wait(400);
+    // brief glow to simulate hover
+    link.classList.add('glow');
+    await wait(800);
+    link.classList.remove('glow');
+    await wait(1200);
+  }
+
   /* ── Phase-2 result card (fade out canvas → show card) ── */
   async function showResult(cardHTML){
     if(!alive()) return;
@@ -515,6 +541,8 @@ ui.renderApp();
     await wait(500);
     setStatus('<span class="ds-ok">✓ Pitch deck ready</span>');
     hideCursor();
+
+    await showFileLink({color:'#7886A5',label:'SL',name:'startup-pitch.sloth',meta:'6 slides · Monet theme · just now',badge:'SLIDE'});
 
     await showResult(`
       <div class="demo-result-card">
@@ -588,6 +616,8 @@ ui.renderApp();
     await wait(400);
     setStatus('<span class="ds-ok">✓ Analysis complete</span>');
     hideCursor();
+
+    await showFileLink({color:'#5A9E5A',label:'AI',name:'project-alpha-summary.doc',meta:'4 files analyzed · 5 insights · just now',badge:'DOC'});
 
     await showResult(`
       <div class="demo-result-card">
@@ -665,6 +695,8 @@ ui.renderApp();
     setStatus('<span class="ds-ok">✓ Spreadsheet ready</span>');
     hideCursor();
 
+    await showFileLink({color:'#C8A870',label:'SH',name:'q4-budget.sheet',meta:'4 cols · 5 rows · formulas · just now',badge:'SHEET'});
+
     await showResult(`
       <div class="demo-result-card">
         <div class="demo-rc-header">
@@ -729,6 +761,8 @@ ui.renderApp();
     await wait(500);
     setStatus('<span class="ds-ok">✓ Document ready</span>');
     hideCursor();
+
+    await showFileLink({color:'#A899C4',label:'DC',name:'q1-project-proposal.doc',meta:'8 paragraphs · 1,200 words · just now',badge:'DOC'});
 
     await showResult(`
       <div class="demo-result-card">
@@ -862,6 +896,8 @@ ui.renderApp();
     setMode('Doc');
     setTab('pitch-deck');
     setStatus('<span class="ds-ok">✓ Converted to document</span>');
+
+    await showFileLink({color:'#5A9E5A',label:'DC',name:'pitch-deck.doc',meta:'Converted from .sloth · 6 sections · just now',badge:'DOC'});
 
     await showResult(`
       <div class="demo-result-card">
