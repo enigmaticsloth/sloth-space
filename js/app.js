@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c3';
-import * as slide from './slide.js?v=20260317c3';
-import * as doc from './doc.js?v=20260317c3';
-import * as workspace from './workspace.js?v=20260317c3';
-import * as ai from './ai.js?v=20260317c3';
-import * as ui from './ui.js?v=20260317c3';
-import * as storage from './storage.js?v=20260317c3';
-import * as keys from './keys.js?v=20260317c3';
-import * as sheet from './sheet.js?v=20260317c3';
-import * as bench from './bench.js?v=20260317c3';
+import { S } from './state.js?v=20260317c4';
+import * as slide from './slide.js?v=20260317c4';
+import * as doc from './doc.js?v=20260317c4';
+import * as workspace from './workspace.js?v=20260317c4';
+import * as ai from './ai.js?v=20260317c4';
+import * as ui from './ui.js?v=20260317c4';
+import * as storage from './storage.js?v=20260317c4';
+import * as keys from './keys.js?v=20260317c4';
+import * as sheet from './sheet.js?v=20260317c4';
+import * as bench from './bench.js?v=20260317c4';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -602,7 +602,106 @@ ui.renderApp();
       </div>`);
   }
 
-  const SCENES=[sceneSlides, sceneContext, sceneSheet, sceneDoc];
+  // ──── Scene 5: Convert between formats ────
+  async function sceneConvert(){
+    await typePrompt('Convert my pitch deck to a doc');
+    setStatus('<span class="ds-spin"></span> Analyzing source file...');
+    clearCanvas();
+    const c=el('demoCanvas');
+    if(!c) return;
+
+    const wrap=document.createElement('div');
+    wrap.className='demo-convert';
+
+    // Top row: source file → arrow → target file
+    const row=document.createElement('div');
+    row.className='demo-cv-row';
+    row.innerHTML=`
+      <div class="demo-cv-file" id="cvSrc">
+        <div class="cvf-icon" style="background:#7886A5;">SL</div>
+        <span class="cvf-label">pitch-deck.sloth</span>
+      </div>
+      <div class="demo-cv-arrow" id="cvArrow">→</div>
+      <div class="demo-cv-file" id="cvDst">
+        <div class="cvf-icon" style="background:#5A9E5A;">DC</div>
+        <span class="cvf-label">pitch-deck.doc</span>
+      </div>`;
+    wrap.appendChild(row);
+
+    // Conversion flow steps
+    const flowsDiv=document.createElement('div');
+    flowsDiv.className='demo-cv-flows';
+    const steps=[
+      {from:'6 slides',to:'6 sections',label:'Structure'},
+      {from:'Titles',to:'Headings',label:'Formatting'},
+      {from:'Bullets',to:'Paragraphs',label:'Content'},
+      {from:'Images',to:'Inline images',label:'Assets'},
+      {from:'Theme',to:'Doc styles',label:'Styling'},
+    ];
+    steps.forEach(s=>{
+      const fl=document.createElement('div');
+      fl.className='demo-cv-flow';
+      fl.innerHTML=`<span class="cvfl-from">${s.from}</span><span class="cvfl-arrow">→</span><span class="cvfl-to">${s.to}</span><span class="cvfl-check">✓</span>`;
+      flowsDiv.appendChild(fl);
+    });
+    wrap.appendChild(flowsDiv);
+    c.appendChild(wrap);
+
+    // Animate: show source
+    await wait(200);
+    const src=document.getElementById('cvSrc');
+    if(src) { src.classList.add('show'); src.classList.add('active'); }
+    setStatus('<span class="ds-spin"></span> Reading slides...');
+    await wait(500);
+
+    // Show arrow
+    const arrow=document.getElementById('cvArrow');
+    if(arrow) { arrow.classList.add('show'); }
+    await wait(300);
+
+    // Show target
+    const dst=document.getElementById('cvDst');
+    if(dst) dst.classList.add('show');
+    await wait(400);
+
+    // Animate arrow pulse + conversion steps
+    if(arrow) { arrow.classList.add('active'); arrow.classList.add('pulse'); }
+    if(src) src.classList.remove('active');
+
+    const flows=flowsDiv.querySelectorAll('.demo-cv-flow');
+    for(let i=0;i<flows.length;i++){
+      if(!alive()) return;
+      await wait(300);
+      flows[i].classList.add('show');
+      setStatus(`<span class="ds-spin"></span> Converting ${steps[i].from.toLowerCase()}...`);
+      await wait(250);
+      flows[i].classList.add('done');
+    }
+
+    await wait(300);
+    if(src) src.classList.add('done');
+    if(dst) { dst.classList.add('done'); dst.classList.add('active'); }
+    setStatus('<span class="ds-ok">✓ Converted to document</span>');
+
+    // Phase 2: result card
+    await showResultCard(c,`
+      <div class="demo-result-card">
+        <div class="demo-rc-header">
+          <div class="demo-rc-icon" style="background:rgba(120,134,165,0.2);color:#B8C4D8;">⇄</div>
+          <div><div class="demo-rc-title">Format Conversion</div>
+          <div class="demo-rc-subtitle">Slide → Doc · lossless</div></div>
+        </div>
+        <div class="demo-rc-body">
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#7886A5"></span><span class="demo-rc-text">6 slides → 6 doc sections</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#5A9E5A"></span><span class="demo-rc-text">Images & styles preserved</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#C8A870"></span><span class="demo-rc-text">Layout auto-adapted</span></div>
+          <div class="demo-rc-divider"></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Also supports</span><span class="demo-rc-stat-val">Doc↔Sheet↔Slide</span></div>
+        </div>
+      </div>`);
+  }
+
+  const SCENES=[sceneSlides, sceneContext, sceneSheet, sceneDoc, sceneConvert];
 
   function updateDots(){
     const d=el('llDemoDots');
