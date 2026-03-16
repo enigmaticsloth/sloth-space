@@ -105,10 +105,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .export-btn { background:#E8D5A3; color:#6B5E4A; border:1px solid #E8D5A3; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:10px; font-family:Arial; margin-left:6px; font-weight:600; }
 .export-btn:hover { background:#DECA8E; border-color:#DECA8E; color:#5A4E3A; }
 
-/* ─── Mode Tab Bar (browser-like tabs) ─── */
-/* ─── Mode Tab Bar (single-row) ─── */
+/* ─── Mode Tab Bar (two-row) ─── */
 .mode-tab-bar { display:flex; flex-direction:column; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; overflow:hidden; }
-.mtb-row { display:flex; align-items:center; height:30px; padding:0 4px; gap:0; }
+.mtb-row { display:flex; align-items:center; padding:0 4px; gap:0; }
+.mtb-row1 { height:30px; }
+.mtb-row2 { height:24px; border-top:1px solid rgba(255,255,255,0.04); }
 .mtb-tabs { display:flex; align-items:stretch; min-width:0; overflow-x:auto; gap:0; height:100%; flex-shrink:1; }
 .mtb-tabs::-webkit-scrollbar { display:none; }
 .mtb-tab { display:flex; align-items:center; gap:4px; padding:0 9px; height:100%; cursor:pointer; font-size:11px; font-family:Arial; color:var(--text2); white-space:nowrap; border-right:1px solid var(--border); position:relative; min-width:0; max-width:160px; transition:background 0.15s; user-select:none; flex-shrink:0; }
@@ -165,7 +166,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .ntp-recent-title { font-size:13px; color:var(--text); font-family:Arial; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ntp-recent-meta { font-size:11px; color:var(--text2); font-family:Arial; margin-top:1px; }
 
-/* ─── Middle area: slide left + chat right ─── */
+/* ─── Main layout: content-col + chat side by side ─── */
+.main-layout { display:flex; flex:1; min-height:0; overflow:hidden; }
+.content-col { flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
 .middle { display:flex; flex:1; min-height:0; overflow:hidden; }
 
 /* Slide panel (left) */
@@ -197,7 +200,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .slide-info { font-size:10px; color:#ccc; font-family:'Courier New',monospace; white-space:nowrap; margin-left:8px; }
 
 /* Chat panel (right) — Monet dark rounded sidebar */
-.chat-panel { width:320px; flex-shrink:0; display:flex; flex-direction:column; background:var(--chat-bg); border-left:none; margin:6px 6px 6px 0; border-radius:14px; border:1px solid var(--chat-border); overflow:hidden; box-shadow:0 2px 20px rgba(0,0,0,0.3); }
+.chat-panel { width:320px; flex-shrink:0; display:flex; flex-direction:column; background:var(--chat-bg); border-left:none; margin:6px 6px 6px 0; border-radius:14px; border:1px solid var(--chat-border); overflow:hidden; box-shadow:0 2px 20px rgba(0,0,0,0.3); min-height:0; }
 .chat-header { padding:8px 14px; font-size:10px; color:#9BA8C4; border-bottom:1px solid var(--chat-border); font-weight:600; letter-spacing:0.8px; text-transform:uppercase; flex-shrink:0; display:flex; align-items:center; background:var(--chat-surface); }
 .chat-toggle-icon { display:none; }
 /* Chat Tabs */
@@ -220,7 +223,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .msg.system { background:transparent; color:#4A5570; font-size:10px; text-align:center; align-self:center; }
 
 /* ─── Bottom panel: toolbar + input — Monet warm rounded area ─── */
-.bottom-panel { flex-shrink:0; border-top:none; background:transparent; display:flex; flex-direction:column; padding:0 6px 6px; margin-right:332px; /* leave room for chat panel */ }
+.bottom-panel { flex-shrink:0; border-top:none; background:transparent; display:flex; flex-direction:column; padding:0 6px 6px; }
 .bottom-panel-inner { background:linear-gradient(135deg, rgba(120,134,165,0.12), rgba(168,153,196,0.10), rgba(200,168,112,0.08)); border:1px solid rgba(120,134,165,0.22); border-radius:16px; overflow:hidden; box-shadow:0 2px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04); }
 
 /* Toolbar */
@@ -954,7 +957,7 @@ body.mode-workspace .bench-wrapper { display:none; }
 .workspace-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; }
 
 /* All modes: input merged into chat panel (unified prompt) */
-body.mode-workspace .bottom-panel { display:none; }
+body.mode-workspace .content-col > .bottom-panel { display:none; }
 body.mode-workspace .toolbar { display:none; }
 body.mode-workspace .selection-bar { display:none !important; }
 .chat-panel .img-staging { border-top:1px solid var(--chat-border); }
@@ -1362,12 +1365,13 @@ body.mode-workspace .selection-bar { display:none !important; }
 /* MOBILE RWD                                 */
 /* ═══════════════════════════════════════════ */
 
-/* Tablet: stack chat below slide */
+/* Tablet: stack everything vertically */
 @media(max-width:900px){
+  .main-layout { flex-direction:column; }
+  .content-col { flex:1; }
   .middle { flex-direction:column; }
-  .chat-panel { width:100%; flex:1; min-height:120px; border-left:none; border-top:1px solid var(--border); }
+  .chat-panel { width:100%; flex:0 0 auto; min-height:120px; border-left:none; border-top:1px solid var(--border); margin:0; border-radius:0; }
   .slide-panel { padding:4px 4px 4px; flex:0 0 auto; }
-  .bottom-panel { margin-right:0; }
   .topbar .logo { font-size:22px; }
   .topbar .tagline { display:none; }
   .topbar-ws-btn { display:none; }
@@ -1406,6 +1410,11 @@ body.mode-workspace .selection-bar { display:none !important; }
   .auth-avatar { width:28px; height:28px; font-size:11px; }
   .auth-login-btn { padding:6px 10px; min-height:32px; }
   .product-bar { display:none !important; }
+
+  /* --- Main layout: vertical on mobile --- */
+  .main-layout { flex-direction:column; }
+  .content-col { flex:0 0 auto; min-height:0; }
+  .chat-panel { margin:0 !important; border-radius:0 !important; }
 
   /* --- Middle: vertical column, no horizontal overflow --- */
   .middle {
@@ -1511,7 +1520,7 @@ body.mode-workspace .selection-bar { display:none !important; }
   .msg { font-size:11px; padding:5px 8px; max-width:92%; }
 
   /* --- Bottom panel: toolbar + tall input, extra padding for home bar --- */
-  .bottom-panel { flex-shrink:0; padding:0 0 env(safe-area-inset-bottom,0px); margin-right:0; }
+  .bottom-panel { flex-shrink:0; padding:0 0 env(safe-area-inset-bottom,0px); }
   .bottom-panel-inner { border-radius:0 !important; border:none !important; border-top:1px solid var(--prompt-border) !important; box-shadow:none !important; }
 
   /* --- Toolbar: visible, compact horizontal scroll --- */

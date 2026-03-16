@@ -441,13 +441,15 @@
   </div>
 </div>
 
-<!-- Mode Tab Bar (single-row browser-like tabs + controls) -->
+<!-- Mode Tab Bar (two-row: tabs+filename / controls) -->
 <div class="mode-tab-bar" id="modeTabBar" style="display:none;">
-  <div class="mtb-row">
+  <div class="mtb-row mtb-row1">
     <div class="mtb-tabs" id="modeTabList"></div>
     <button class="mtb-new" id="mtbNewBtn" onclick="window.modeTabNew()" title="New slide tab" style="display:none">+</button>
     <div class="mtb-sep"></div>
     <input type="text" class="mtb-filename" id="mtbFilename" placeholder="Untitled" spellcheck="false">
+  </div>
+  <div class="mtb-row mtb-row2" id="mtbRow2">
     <div class="mtb-presets" id="mtbPresets"></div>
     <div class="mtb-project" id="mtbProjectArea"></div>
     <div class="mtb-spacer"></div>
@@ -459,7 +461,10 @@
   </div>
 </div>
 
-<!-- Middle: slide left + conversation right -->
+<!-- Main layout: content-col (middle+bottom) + chat-panel side by side -->
+<div class="main-layout">
+<div class="content-col">
+<!-- Middle: slide left -->
 <div class="middle">
   <div class="slide-panel">
     <div class="deck-name-bar" id="modeNameBar" style="display:none;">
@@ -498,11 +503,6 @@
       <div class="ntp-recents-label">Recent Files</div>
       <div class="ntp-recents" id="ntpRecentList"></div>
     </div>
-  </div>
-
-  <div class="chat-panel" id="chatPanel">
-    <div class="chat-header" onclick="toggleChatPanel()"><span>Chat</span><span class="chat-toggle-icon" id="chatToggleIcon">▼</span></div>
-    <div class="chat-messages" id="chatMessages"></div>
   </div>
 </div>
 
@@ -639,6 +639,15 @@
   </div>
   </div><!-- /.bottom-panel-inner -->
 </div>
+</div><!-- /.content-col -->
+
+<!-- Chat panel (right column — full height) -->
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header" onclick="toggleChatPanel()"><span>Chat</span><span class="chat-toggle-icon" id="chatToggleIcon">▼</span></div>
+  <div class="chat-messages" id="chatMessages"></div>
+</div>
+</div><!-- /.main-layout -->
+
 <!-- Drag-drop overlay -->
 <div class="drop-overlay" id="dropOverlay">
   <div class="drop-overlay-inner">
@@ -662,6 +671,6 @@ if(location.protocol==='file:'){
   document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
 }
 </script>
-<script type="module" src="js/app.js?v=20260317vvv"></script>
+<script type="module" src="js/app.js?v=20260317xxx"></script>
 </body>
 </html>

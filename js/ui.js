@@ -592,8 +592,7 @@ function modeShowUI(mode){
         if(ev.target===sc) window.shClearSelection();
       });
       const middle=document.querySelector('.middle');
-      const chatPanel=document.getElementById('chatPanel');
-      middle.insertBefore(sc, chatPanel);
+      middle.appendChild(sc);
     }
     // Move name bar into sheet-canvas
     if(nameBar) sc.prepend(nameBar);
@@ -611,10 +610,9 @@ function modeShowUI(mode){
       dc.addEventListener('click',function(ev){
         if(ev.target===dc) window.clearSelection();
       });
-      // Insert into .middle before chat-panel (NOT inside .slide-panel) to avoid touch-action:none
+      // Insert into .middle (chat-panel is now outside .middle in .main-layout)
       const middle=document.querySelector('.middle');
-      const chatPanel=document.getElementById('chatPanel');
-      middle.insertBefore(dc, chatPanel);
+      middle.appendChild(dc);
     }
     // Move name bar into doc-canvas (before content)
     if(nameBar) dc.prepend(nameBar);
@@ -629,8 +627,7 @@ function modeShowUI(mode){
       wc.id='workspaceCanvas';
       wc.className='workspace-canvas';
       const middle2=document.querySelector('.middle');
-      const chatPanel2=document.getElementById('chatPanel');
-      middle2.insertBefore(wc, chatPanel2);
+      middle2.appendChild(wc);
     }
     // Move name bar into workspace-canvas
     if(nameBar) wc.prepend(nameBar);
@@ -707,6 +704,8 @@ function _snapshotCurrentTab(){
   const tab=S.modeTabs.find(t=>t.id===S.activeTabId);
   if(!tab) return;
   tab.title=_getTabTitle(tab.mode);
+  // Track workspace file ID on the tab for dedup
+  tab.wsFileId=S._wsCurrentFileId||null;
   if(tab.mode==='slide'){
     tab.snapshot={
       deck: S.currentDeck ? JSON.parse(JSON.stringify(S.currentDeck)) : null,
@@ -732,8 +731,23 @@ function _snapshotCurrentTab(){
   }
 }
 
+// Find an existing tab by workspace file ID or mode (for workspace dedup)
+function _findTabByFileId(wsFileId){
+  if(!wsFileId) return null;
+  // Snapshot current tab first so wsFileId is up to date
+  const curTab=S.modeTabs.find(t=>t.id===S.activeTabId);
+  if(curTab && curTab.mode!=='newtab' && !curTab.wsFileId) curTab.wsFileId=S._wsCurrentFileId||null;
+  return S.modeTabs.find(t=>t.wsFileId===wsFileId);
+}
+
+function _findTabByMode(mode){
+  return S.modeTabs.find(t=>t.mode===mode);
+}
+
 function _restoreTabSnapshot(tab){
   // Restore mode-specific state from tab's snapshot
+  // Restore workspace file ID tracking
+  S._wsCurrentFileId=tab.wsFileId||null;
   if(!tab.snapshot) return;
   if(tab.mode==='slide'){
     S.currentDeck=tab.snapshot.deck ? JSON.parse(JSON.stringify(tab.snapshot.deck)) : null;
@@ -1138,6 +1152,14 @@ function _modeEnterInternal(mode, fresh){
 
 function modeEnter(mode){
   // Public entry point — creates or reuses a tab
+  // For workspace mode: reuse existing workspace tab if one exists
+  if(mode==='workspace'){
+    const existing=_findTabByMode('workspace');
+    if(existing){
+      modeTabSwitch(existing.id);
+      return;
+    }
+  }
   // Save current tab snapshot before switching
   if(S.activeTabId) _snapshotCurrentTab();
   // Create a new tab for the mode
@@ -1340,6 +1362,10 @@ function updateTopbarForMode(mode){
   // Save/Export buttons: hide for workspace (no file to save)
   const saves=document.getElementById('mtbSaves');
   if(saves) saves.style.display=(mode==='workspace')?'none':'flex';
+
+  // Row 2: hide entirely for workspace (no controls needed)
+  const row2=document.getElementById('mtbRow2');
+  if(row2) row2.style.display=(mode==='workspace')?'none':'flex';
 }
 
 function modeExportPDF(){
@@ -2440,6 +2466,8 @@ export {
   modeTabUpdateTitle,
   _renderTabBar,
   _snapshotCurrentTab,
+  _findTabByFileId,
+  _findTabByMode,
   // New tab page
   ntpPickMode,
   ntpOpenRecent,

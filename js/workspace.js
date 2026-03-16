@@ -1794,6 +1794,15 @@ export function openWorkspaceItem(index) {
   const mode = item.type || 'slide';
   const targetMode = mode === 'slides' ? 'slide' : mode; // normalize 'slides' → 'slide'
 
+  // Check if a tab already has this file open — switch to it instead of opening a new one
+  if (item.id && window._findTabByFileId) {
+    const existingTab = window._findTabByFileId(item.id);
+    if (existingTab) {
+      window.modeTabSwitch(existingTab.id);
+      return;
+    }
+  }
+
   // Save current state before loading new item
   window.modeSaveCurrent();
 
