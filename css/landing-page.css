@@ -65,10 +65,28 @@
 /* Visual canvas — where mockups appear */
 .demo-canvas { flex:1; min-height:0; position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
 /* Status line at bottom */
-.demo-status { font-size:9px; color:#666; text-align:center; min-height:14px; margin-top:6px; transition:opacity 0.3s; }
-.demo-status .ds-ok { color:#5A9E5A; }
-.demo-status .ds-spin { display:inline-block; width:8px; height:8px; border:1.5px solid rgba(120,134,165,0.3); border-top-color:#7886A5; border-radius:50%; animation:ds-spin 0.7s linear infinite; vertical-align:middle; margin-right:4px; }
+.demo-status { font-size:11px; color:#888; text-align:center; min-height:16px; margin-top:6px; transition:opacity 0.3s; }
+.demo-status .ds-ok { color:#5A9E5A; font-weight:600; }
+.demo-status .ds-spin { display:inline-block; width:9px; height:9px; border:1.5px solid rgba(120,134,165,0.3); border-top-color:#7886A5; border-radius:50%; animation:ds-spin 0.7s linear infinite; vertical-align:middle; margin-right:4px; }
 @keyframes ds-spin { to{transform:rotate(360deg)} }
+/* ── Result card (phase 2 of each scene) ── */
+.demo-result-card { width:100%; opacity:0; transform:translateY(8px); transition:all 0.4s ease; }
+.demo-result-card.show { opacity:1; transform:translateY(0); }
+.demo-rc-header { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+.demo-rc-icon { width:22px; height:22px; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:10px; flex-shrink:0; }
+.demo-rc-title { font-size:11px; color:#D8DCEA; font-weight:600; }
+.demo-rc-subtitle { font-size:8px; color:#666; margin-top:1px; }
+.demo-rc-body { display:flex; flex-direction:column; gap:4px; }
+.demo-rc-row { display:flex; align-items:center; gap:6px; padding:3px 0; }
+.demo-rc-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.demo-rc-text { font-size:9px; color:#9BA8C4; }
+.demo-rc-divider { height:1px; background:rgba(120,134,165,0.12); margin:4px 0; }
+.demo-rc-stat { display:flex; justify-content:space-between; padding:2px 0; }
+.demo-rc-stat-label { font-size:9px; color:#666; }
+.demo-rc-stat-val { font-size:9px; color:#B8C4D8; font-weight:600; }
+/* Fade-out animation for phase 1 canvas */
+.demo-canvas.fade-out { opacity:0; transition:opacity 0.3s ease; }
+.demo-canvas.fade-in { opacity:1; transition:opacity 0.3s ease; }
 
 /* ── Mini slide cards ── */
 .demo-slides { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; width:100%; }

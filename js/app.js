@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c2';
-import * as slide from './slide.js?v=20260317c2';
-import * as doc from './doc.js?v=20260317c2';
-import * as workspace from './workspace.js?v=20260317c2';
-import * as ai from './ai.js?v=20260317c2';
-import * as ui from './ui.js?v=20260317c2';
-import * as storage from './storage.js?v=20260317c2';
-import * as keys from './keys.js?v=20260317c2';
-import * as sheet from './sheet.js?v=20260317c2';
-import * as bench from './bench.js?v=20260317c2';
+import { S } from './state.js?v=20260317c3';
+import * as slide from './slide.js?v=20260317c3';
+import * as doc from './doc.js?v=20260317c3';
+import * as workspace from './workspace.js?v=20260317c3';
+import * as ai from './ai.js?v=20260317c3';
+import * as ui from './ui.js?v=20260317c3';
+import * as storage from './storage.js?v=20260317c3';
+import * as keys from './keys.js?v=20260317c3';
+import * as sheet from './sheet.js?v=20260317c3';
+import * as bench from './bench.js?v=20260317c3';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -348,7 +348,22 @@ ui.renderApp();
   }
 
   function setStatus(html){ const s=el('demoStatus'); if(s) s.innerHTML=html; }
-  function clearCanvas(){ const c=el('demoCanvas'); if(c) c.innerHTML=''; }
+  function clearCanvas(){ const c=el('demoCanvas'); if(c){ c.innerHTML=''; c.classList.remove('fade-out'); } }
+
+  // Transition: fade out phase-1 canvas → show result card
+  async function showResultCard(c, cardHTML){
+    if(!alive()) return;
+    c.classList.add('fade-out');
+    await wait(350);
+    if(!alive()) return;
+    c.innerHTML=cardHTML;
+    c.classList.remove('fade-out');
+    // trigger show animation on card
+    await wait(30);
+    const card=c.querySelector('.demo-result-card');
+    if(card) card.classList.add('show');
+    await wait(2800);
+  }
 
   // ──── Scene 1: Generate Slides ────
   async function sceneSlides(){
@@ -357,7 +372,6 @@ ui.renderApp();
     clearCanvas();
     const c=el('demoCanvas');
     if(!c) return;
-    // Build 6 mini slide cards
     const slides=[
       {bars:['title','w1','w2']},
       {bars:['title','w3','w1','w2']},
@@ -379,7 +393,6 @@ ui.renderApp();
       wrap.appendChild(card);
     });
     c.appendChild(wrap);
-    // Stagger reveal
     const cards=wrap.querySelectorAll('.demo-slide');
     for(let i=0;i<cards.length;i++){
       if(!alive()) return;
@@ -387,9 +400,25 @@ ui.renderApp();
       cards[i].classList.add('show');
       setStatus(`<span class="ds-spin"></span> Slide ${i+1} of 6`);
     }
-    await wait(300);
-    setStatus('<span class="ds-ok">✓ 6 slides generated — Monet theme</span>');
-    await wait(3000);
+    await wait(600);
+    setStatus('<span class="ds-ok">✓ Pitch deck ready</span>');
+    // Phase 2: result card
+    await showResultCard(c,`
+      <div class="demo-result-card">
+        <div class="demo-rc-header">
+          <div class="demo-rc-icon" style="background:rgba(120,134,165,0.2);color:#B8C4D8;">▦</div>
+          <div><div class="demo-rc-title">Startup Pitch Deck</div>
+          <div class="demo-rc-subtitle">Monet theme · 6 slides</div></div>
+        </div>
+        <div class="demo-rc-body">
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#7886A5"></span><span class="demo-rc-text">Cover — name & tagline</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#9BA8C4"></span><span class="demo-rc-text">Problem & Solution</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#A899C4"></span><span class="demo-rc-text">Market Opportunity</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#C8A870"></span><span class="demo-rc-text">Revenue Model</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#7886A5"></span><span class="demo-rc-text">Traction & Roadmap</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#5A9E5A"></span><span class="demo-rc-text">Ask & Contact</span></div>
+        </div>
+      </div>`);
   }
 
   // ──── Scene 2: AI reads project files ────
@@ -416,23 +445,39 @@ ui.renderApp();
       wrap.appendChild(row);
     });
     c.appendChild(wrap);
-    // Stagger reveal + scan
     const rows=wrap.querySelectorAll('.demo-file');
     for(let i=0;i<rows.length;i++){
       if(!alive()) return;
       await wait(120);
       rows[i].classList.add('show');
     }
-    await wait(400);
+    await wait(300);
     for(let i=0;i<rows.length;i++){
       if(!alive()) return;
-      await wait(250);
+      await wait(220);
       rows[i].classList.add('scanned');
       setStatus(`<span class="ds-spin"></span> Reading ${files[i].name}...`);
     }
-    await wait(300);
-    setStatus('<span class="ds-ok">✓ 6 files analyzed — 5 insights found</span>');
-    await wait(3000);
+    await wait(500);
+    setStatus('<span class="ds-ok">✓ Analysis complete</span>');
+    // Phase 2: summary result card
+    await showResultCard(c,`
+      <div class="demo-result-card">
+        <div class="demo-rc-header">
+          <div class="demo-rc-icon" style="background:rgba(90,158,90,0.2);color:#5A9E5A;">✦</div>
+          <div><div class="demo-rc-title">Project Alpha Summary</div>
+          <div class="demo-rc-subtitle">6 files · 5 insights</div></div>
+        </div>
+        <div class="demo-rc-body">
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#5A9E5A"></span><span class="demo-rc-text">Revenue up 27% QoQ</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#C8A870"></span><span class="demo-rc-text">Budget on track for Q4</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#7886A5"></span><span class="demo-rc-text">3 action items pending</span></div>
+          <div class="demo-rc-divider"></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Files scanned</span><span class="demo-rc-stat-val">6</span></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Total content</span><span class="demo-rc-stat-val">4,200 words</span></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Cross-refs</span><span class="demo-rc-stat-val">12 found</span></div>
+        </div>
+      </div>`);
   }
 
   // ──── Scene 3: Build a spreadsheet ────
@@ -444,7 +489,6 @@ ui.renderApp();
     if(!c) return;
     const wrap=document.createElement('div');
     wrap.className='demo-sheet';
-    // Header row
     const hdr=document.createElement('div');
     hdr.className='demo-sheet-header';
     ['A','B','C','D'].forEach(l=>{
@@ -453,7 +497,6 @@ ui.renderApp();
       hdr.appendChild(s);
     });
     wrap.appendChild(hdr);
-    // Data rows
     const data=[
       ['Revenue','$48K','$52K','$61K'],
       ['COGS','$18K','$19K','$22K'],
@@ -476,16 +519,31 @@ ui.renderApp();
       rowEls.push(row);
     });
     c.appendChild(wrap);
-    // Stagger rows
     for(let i=0;i<rowEls.length;i++){
       if(!alive()) return;
       await wait(200);
       rowEls[i].classList.add('show');
       setStatus(`<span class="ds-spin"></span> Row ${i+1} of ${data.length}`);
     }
-    await wait(300);
-    setStatus('<span class="ds-ok">✓ Budget sheet ready — 6 rows, 4 columns</span>');
-    await wait(3000);
+    await wait(600);
+    setStatus('<span class="ds-ok">✓ Spreadsheet ready</span>');
+    // Phase 2: result card
+    await showResultCard(c,`
+      <div class="demo-result-card">
+        <div class="demo-rc-header">
+          <div class="demo-rc-icon" style="background:rgba(200,168,112,0.2);color:#C8A870;">⊞</div>
+          <div><div class="demo-rc-title">Q4 Budget</div>
+          <div class="demo-rc-subtitle">4 columns · 6 rows · formulas</div></div>
+        </div>
+        <div class="demo-rc-body">
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Revenue (Oct)</span><span class="demo-rc-stat-val">$48K</span></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Revenue (Dec)</span><span class="demo-rc-stat-val" style="color:#5A9E5A">$61K ▲</span></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">EBITDA growth</span><span class="demo-rc-stat-val" style="color:#5A9E5A">+44%</span></div>
+          <div class="demo-rc-divider"></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#5A9E5A"></span><span class="demo-rc-text">Auto-calculated margins</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#7886A5"></span><span class="demo-rc-text">EBITDA row highlighted</span></div>
+        </div>
+      </div>`);
   }
 
   // ──── Scene 4: Generate a doc ────
@@ -522,9 +580,26 @@ ui.renderApp();
       if(i===3) setStatus('<span class="ds-spin"></span> Key objectives...');
       if(i===6) setStatus('<span class="ds-spin"></span> Timeline...');
     }
-    await wait(300);
-    setStatus('<span class="ds-ok">✓ Proposal ready — 8 paragraphs</span>');
-    await wait(3000);
+    await wait(600);
+    setStatus('<span class="ds-ok">✓ Document ready</span>');
+    // Phase 2: result card
+    await showResultCard(c,`
+      <div class="demo-result-card">
+        <div class="demo-rc-header">
+          <div class="demo-rc-icon" style="background:rgba(168,153,196,0.2);color:#A899C4;">☰</div>
+          <div><div class="demo-rc-title">Q1 Project Proposal</div>
+          <div class="demo-rc-subtitle">8 paragraphs · 1,200 words</div></div>
+        </div>
+        <div class="demo-rc-body">
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#A899C4"></span><span class="demo-rc-text">Executive summary</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#7886A5"></span><span class="demo-rc-text">Goals & key objectives</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#C8A870"></span><span class="demo-rc-text">Budget & resources</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#5A9E5A"></span><span class="demo-rc-text">Timeline & milestones</span></div>
+          <div class="demo-rc-divider"></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Sections</span><span class="demo-rc-stat-val">4</span></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Export</span><span class="demo-rc-stat-val">.docx .pdf</span></div>
+        </div>
+      </div>`);
   }
 
   const SCENES=[sceneSlides, sceneContext, sceneSheet, sceneDoc];
