@@ -487,19 +487,23 @@
       </div>
     </div>
     <div class="mp-chat-input-area">
-      <textarea id="mpChatInput" placeholder="Describe what you want to create..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();mpSendFromInput()}"></textarea>
-      <button class="mp-send-btn" onclick="mpSendFromInput()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-      </button>
+      <div class="mp-input-wrap">
+        <textarea id="mpChatInput" placeholder="Describe what you want to create..." rows="3"></textarea>
+        <button class="mp-send-btn" onclick="mpSendFromInput()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Mobile floating prompt (visible only on small screens) -->
   <div class="mp-mobile-prompt" id="mpMobilePrompt">
-    <textarea id="mpMobileChatInput" placeholder="Tell AI what to create..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();mpSendFromMobile()}"></textarea>
-    <button class="mp-send-btn" onclick="mpSendFromMobile()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-    </button>
+    <div class="mp-input-wrap">
+      <textarea id="mpMobileChatInput" placeholder="Tell AI what to create..." rows="2"></textarea>
+      <button class="mp-send-btn" onclick="mpSendFromMobile()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -711,6 +715,6 @@ if(location.protocol==='file:'){
   document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
 }
 </script>
-<script type="module" src="js/app.js?v=20260316jjj"></script>
+<script type="module" src="js/app.js?v=20260316kkk"></script>
 </body>
 </html>

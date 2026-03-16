@@ -1515,21 +1515,31 @@ function mpShowThinking() {
   return msg;
 }
 
+// ── IME composition tracking for mode picker inputs ──
+let _mpImeComposing = false;
+
 /**
- * Toggle the mode picker chat sidebar open/closed.
+ * Initialize IME + keydown handlers for a mode picker textarea.
  */
-function mpToggleSidebar() {
-  const sidebar = document.getElementById('mpChatSidebar');
-  if (!sidebar) return;
-  sidebar.classList.toggle('open');
-  // Focus input when opening
-  if (sidebar.classList.contains('open')) {
-    setTimeout(() => {
-      const input = document.getElementById('mpChatInput');
-      if (input) input.focus();
-    }, 300);
-  }
+function mpInitInput(inputId, sendFn) {
+  const el = document.getElementById(inputId);
+  if (!el || el._mpInit) return;
+  el._mpInit = true;
+  el.addEventListener('compositionstart', () => { _mpImeComposing = true; });
+  el.addEventListener('compositionend', () => { _mpImeComposing = false; });
+  el.addEventListener('keydown', e => {
+    // keyCode 229 = IME processing key (Chrome/Safari CJK input)
+    if (e.key === 'Enter' && !e.shiftKey && !_mpImeComposing && !e.isComposing && e.keyCode !== 229) {
+      e.preventDefault();
+      sendFn();
+    }
+  });
 }
+
+/**
+ * Toggle the mode picker chat sidebar open/closed (legacy, kept for compat).
+ */
+function mpToggleSidebar() {}
 
 /**
  * Send from the mode picker input box.
@@ -1556,7 +1566,39 @@ function mpSendFromMobile() {
 }
 
 /**
- * Send a prompt from the mode picker — detects mode, enters it, then sends to AI.
+ * Simulate a visual click effect on a DOM element.
+ */
+function _mpClickEffect(el) {
+  return new Promise(resolve => {
+    if (!el) { resolve(); return; }
+    // Scroll into view
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Add glow + press effect
+    el.style.transition = 'transform 0.15s, box-shadow 0.15s';
+    el.style.transform = 'scale(0.96)';
+    el.style.boxShadow = '0 0 20px rgba(168,153,196,0.5), inset 0 0 10px rgba(168,153,196,0.15)';
+    el.style.borderColor = 'rgba(168,153,196,0.7)';
+    // Ripple overlay
+    const ripple = document.createElement('div');
+    ripple.style.cssText = 'position:absolute;top:50%;left:50%;width:10px;height:10px;border-radius:50%;background:rgba(168,153,196,0.4);transform:translate(-50%,-50%) scale(1);pointer-events:none;z-index:9999;transition:transform 0.5s ease-out, opacity 0.5s;';
+    el.style.position = el.style.position || 'relative';
+    el.appendChild(ripple);
+    requestAnimationFrame(() => {
+      ripple.style.transform = 'translate(-50%,-50%) scale(20)';
+      ripple.style.opacity = '0';
+    });
+    setTimeout(() => {
+      el.style.transform = '';
+      el.style.boxShadow = '';
+      el.style.borderColor = '';
+      if (ripple.parentNode) ripple.remove();
+      resolve();
+    }, 500);
+  });
+}
+
+/**
+ * Send a prompt from the mode picker — animate clicking the mode card, then enter mode and send.
  */
 function mpSendPrompt(text) {
   // Show user message in mode picker chat
@@ -1564,29 +1606,57 @@ function mpSendPrompt(text) {
 
   // Detect mode
   const mode = mpDetectMode(text);
-  const modeNames = { slide: 'Slides', doc: 'Document', sheet: 'Spreadsheet' };
+  const modeNames = { slide: 'Slides', doc: 'Document', sheet: 'Spreadsheet', workspace: 'Workspace' };
   const thinkingEl = mpShowThinking();
 
-  // Brief delay so user sees the transition
-  setTimeout(() => {
-    // Remove thinking
+  // Step 1: Show thinking briefly
+  setTimeout(async () => {
     if (thinkingEl) thinkingEl.remove();
-    mpAddMsg(`Opening ${modeNames[mode] || mode}...`, 'ai');
+    mpAddMsg(`Selecting ${modeNames[mode] || mode}...`, 'ai');
 
+    // Step 2: Find the mode card and simulate clicking it
+    const cards = document.querySelectorAll('.mode-card');
+    let targetCard = null;
+    const modeKeywords = { slide: 'Slide', doc: 'Doc', sheet: 'Sheet', workspace: 'Workspace' };
+    for (const card of cards) {
+      const name = card.querySelector('.mode-card-name');
+      if (name && name.textContent.trim() === modeKeywords[mode]) {
+        targetCard = card;
+        break;
+      }
+    }
+
+    // Step 3: Animate the click on the card
+    if (targetCard) {
+      await _mpClickEffect(targetCard);
+      // Pause after click so user sees the effect
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    // Step 4: Show "entering" message
+    mpAddMsg(`Entering ${modeNames[mode] || mode} mode...`, 'ai');
+    await new Promise(r => setTimeout(r, 300));
+
+    // Step 5: Enter the mode (hides the overlay)
+    modeEnter(mode);
+
+    // Step 6: After mode renders, inject prompt and send to AI
     setTimeout(() => {
-      // Enter the mode
-      modeEnter(mode);
-
-      // After mode enters, inject the prompt into the real chat input and send
-      setTimeout(() => {
-        const chatInput = document.getElementById('chatInput');
-        if (chatInput) {
-          chatInput.value = text;
-          if (window.sendMessage) window.sendMessage();
-        }
-      }, 300);
-    }, 500);
+      const chatInput = document.getElementById('chatInput');
+      if (chatInput) {
+        chatInput.value = text;
+        if (window.sendMessage) window.sendMessage();
+      }
+    }, 400);
   }, 600);
+}
+
+/**
+ * Initialize mode picker input handlers (call after DOM ready).
+ */
+function mpInitInputs() {
+  mpInitInput('mpChatInput', mpSendFromInput);
+  mpInitInput('mpMobileChatInput', mpSendFromMobile);
 }
 
 // Export all functions
@@ -1668,5 +1738,6 @@ export {
   mpSendFromMobile,
   mpToggleSidebar,
   mpDetectMode,
-  mpAddMsg
+  mpAddMsg,
+  mpInitInputs
 };

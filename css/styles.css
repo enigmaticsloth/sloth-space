@@ -403,11 +403,12 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mp-chat-examples { display:flex; flex-direction:column; gap:6px; width:100%; margin-top:8px; }
 .mp-chip { padding:8px 12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; color:#aaa; font-size:11px; cursor:pointer; text-align:left; font-family:Arial; transition:all 0.15s; }
 .mp-chip:hover { background:rgba(120,134,165,0.12); border-color:rgba(120,134,165,0.3); color:#ccc; }
-.mp-chat-input-area { display:flex; align-items:flex-end; gap:8px; padding:12px; border-top:1px solid rgba(255,255,255,0.06); }
-.mp-chat-input-area textarea { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:#e0e0e0; font-size:13px; font-family:Arial; padding:10px 12px; resize:none; outline:none; max-height:100px; line-height:1.4; }
-.mp-chat-input-area textarea::placeholder { color:#666; }
-.mp-chat-input-area textarea:focus { border-color:rgba(168,153,196,0.4); }
-.mp-send-btn { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#8B7BA8,#A899C4); border:none; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:opacity 0.15s; }
+.mp-chat-input-area { padding:12px; border-top:1px solid rgba(255,255,255,0.06); }
+.mp-input-wrap { position:relative; display:flex; }
+.mp-input-wrap textarea { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#e0e0e0; font-size:13px; font-family:Arial; padding:10px 44px 10px 12px; resize:none; outline:none; max-height:120px; min-height:60px; line-height:1.5; }
+.mp-input-wrap textarea::placeholder { color:#555; }
+.mp-input-wrap textarea:focus { border-color:rgba(168,153,196,0.4); }
+.mp-send-btn { position:absolute; right:6px; bottom:6px; width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,#8B7BA8,#A899C4); border:none; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:opacity 0.15s; }
 .mp-send-btn:hover { opacity:0.85; }
 .mp-chat-msg { padding:8px 12px; border-radius:10px; font-size:12px; font-family:Arial; line-height:1.5; max-width:90%; word-break:break-word; }
 .mp-chat-msg.user { align-self:flex-end; background:rgba(168,153,196,0.2); color:#d0c8e0; border:1px solid rgba(168,153,196,0.15); }
@@ -1529,10 +1530,7 @@ body.mode-workspace .chat-panel .input-area textarea::placeholder { color:#4A557
   /* Mode picker phone */
   .mode-picker-overlay { flex-direction:column; gap:12px; padding:12px 16px; }
   .mp-chat-panel { display:none; }
-  .mp-mobile-prompt { display:flex; align-items:flex-end; gap:8px; position:fixed; bottom:0; left:0; right:0; padding:12px 16px; background:rgba(18,18,18,0.95); border-top:1px solid rgba(255,255,255,0.08); z-index:600; backdrop-filter:blur(12px); }
-  .mp-mobile-prompt textarea { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:#e0e0e0; font-size:14px; font-family:Arial; padding:10px 12px; resize:none; outline:none; max-height:80px; line-height:1.4; }
-  .mp-mobile-prompt textarea::placeholder { color:#666; }
-  .mp-mobile-prompt textarea:focus { border-color:rgba(168,153,196,0.4); }
+  .mp-mobile-prompt { display:block; position:fixed; bottom:0; left:0; right:0; padding:12px 16px; background:rgba(18,18,18,0.95); border-top:1px solid rgba(255,255,255,0.08); z-index:600; backdrop-filter:blur(12px); }
   .mode-picker { width:100%; padding:0 16px; }
   .mode-picker .mp-logo { font-size:28px; margin-top:20px; }
   .mode-picker .mp-tagline { font-size:12px; margin-bottom:20px; }
