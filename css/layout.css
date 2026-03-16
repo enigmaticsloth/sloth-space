@@ -37,7 +37,7 @@
 .chat-toggle-icon { display:none; }
 /* Chat Tabs */
 .chat-tab-bar { display:flex; align-items:center; gap:0; border-bottom:1px solid var(--chat-border); flex-shrink:0; padding:0 6px; background:var(--chat-surface); min-height:28px; }
-.chat-tab { display:flex; align-items:center; gap:2px; padding:4px 6px; font-size:10px; color:#5A6580; cursor:pointer; border-bottom:2px solid transparent; max-width:80px; min-width:36px; transition:all 0.15s; user-select:none; }
+.chat-tab { display:flex; align-items:center; gap:2px; padding:4px 6px; font-size:10px; color:#5A6580; cursor:pointer; border-bottom:2px solid transparent; max-width:120px; min-width:36px; transition:all 0.15s; user-select:none; }
 .chat-tab:hover { color:#9BA8C4; background:rgba(120,134,165,0.08); }
 .chat-tab.active { color:#B8C4D8; border-bottom-color:#7886A5; font-weight:600; }
 .chat-tab-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }

@@ -376,8 +376,9 @@ export function initKeys(){
     if(S.currentMode==='sheet'&&S.sheet.current){
       try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){}
     }
-    // Always save chat tabs on unload
+    // Always save chat tabs and mode tabs on unload
     if(window.saveChatTabs) window.saveChatTabs();
+    if(window._saveModeTabs) window._saveModeTabs();
   });
 
   window.addEventListener('visibilitychange',function(){

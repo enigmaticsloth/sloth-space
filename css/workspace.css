@@ -7,7 +7,7 @@ body.mode-workspace .toolbar { display:none; }
 body.mode-workspace .selection-bar { display:none !important; }
 .chat-panel .img-staging { border-top:1px solid var(--chat-border); }
 .chat-panel .input-area { border-top:1px solid var(--chat-border); padding:8px 12px 10px; }
-.chat-panel .input-area textarea { height:234px; background:rgba(0,0,0,0.2); color:#B8C4D8; border-color:var(--chat-border); }
+.chat-panel .input-area textarea { height:156px; background:rgba(0,0,0,0.2); color:#B8C4D8; border-color:var(--chat-border); }
 .chat-panel .input-area textarea:focus { border-color:#3A4258; }
 .chat-panel .input-area textarea::placeholder { color:#4A5570; }
 

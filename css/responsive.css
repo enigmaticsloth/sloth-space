@@ -141,7 +141,7 @@
   }
   .chat-panel.collapsed .chat-messages { display:none; }
   .chat-panel.collapsed .chat-tab-bar { display:none; }
-  .chat-tab { max-width:60px; font-size:9px; padding:3px 4px; }
+  .chat-tab { max-width:90px; font-size:9px; padding:3px 4px; }
   .chat-tab-bar { min-height:24px; }
   .chat-toggle-icon { display:inline-block; margin-left:auto; font-size:8px; transition:transform 0.2s; }
   .chat-panel.collapsed .chat-toggle-icon { transform:rotate(180deg); }

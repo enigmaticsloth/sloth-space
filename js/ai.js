@@ -2535,6 +2535,9 @@ async function doGenerate(statusDiv,wsContext){
   addMessage(`✓ Generated ${deck.slides.length} slides (${S.currentPreset})`,'ai');
   S.chatHistory.push({role:'assistant',content:`[Generated slides: "${deck.title||'Untitled'}" (${deck.slides.length} slides)]`});
   window.renderApp();
+  // Sync tab bar filename & tab title after AI generation
+  if(window._syncTabBarFilename) window._syncTabBarFilename('slide');
+  if(window.modeTabUpdateTitle) window.modeTabUpdateTitle();
 }
 
 // ── Doc generation (blocks instead of slides) ──
@@ -2630,6 +2633,9 @@ async function doDocGenerate(statusDiv,userText,wsContext){
   // Track in chat history for router context memory
   S.chatHistory.push({role:'assistant',content:`[Generated doc: "${S.currentDoc.title}"]`});
   window.renderDocMode();
+  // Sync tab bar filename & tab title after AI generation
+  if(window._syncTabBarFilename) window._syncTabBarFilename('doc');
+  if(window.modeTabUpdateTitle) window.modeTabUpdateTitle();
   window.docSaveNow(); // immediate save, not debounced — survives quick refresh
   // Ensure workspace file ID is tracked so _autoLinkToProject can find it
   if(S.currentDoc && S.currentDoc.id) S._wsCurrentFileId = S.currentDoc.id;

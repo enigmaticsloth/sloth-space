@@ -74,10 +74,10 @@ body.mode-workspace .bench-wrapper { display:none; }
 /* Input area — tall textarea */
 .input-area { display:flex; gap:0; padding:6px 10px 8px; align-items:stretch; flex-shrink:0; position:relative; }
 .input-wrap { flex:1; position:relative; display:flex; }
-.input-area textarea { flex:1; background:rgba(0,0,0,0.2); color:#D4C4A8; border:1px solid var(--prompt-border); border-radius:10px; padding:10px 44px 10px 12px; font-size:14px; font-family:Arial; resize:none; height:120px; line-height:1.5; transition:height 0.2s ease; }
+.input-area textarea { flex:1; background:rgba(0,0,0,0.2); color:#D4C4A8; border:1px solid var(--prompt-border); border-radius:10px; padding:10px 44px 10px 12px; font-size:14px; font-family:Arial; resize:none; height:80px; line-height:1.5; transition:height 0.2s ease; }
 .input-area textarea:focus { outline:none; border-color:#4A4230; }
 .input-area textarea::placeholder { color:#5A5040; }
-.input-area.collapsed textarea { height:44px; }
+.input-area.collapsed textarea { height:30px; }
 .input-toggle { position:absolute; top:2px; right:44px; background:var(--prompt-surface); border:1px solid var(--prompt-border); color:#5A5040; width:22px; height:16px; border-radius:3px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; z-index:2; line-height:1; }
 .input-toggle:hover { color:#A09880; border-color:#4A4230; }
 .send-btn { position:absolute; bottom:8px; right:8px; width:32px; height:32px; background:#7886A5; color:#fff; border:none; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s, transform 0.1s; z-index:2; padding:0; }

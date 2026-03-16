@@ -173,6 +173,9 @@ function updateSettingsProviderUI() {
     const def=LLM_DEFAULTS[settingsProvider];
     document.getElementById('settingsKeyLabel').textContent=`${def.label} API Key`;
     document.getElementById('settingsApiKey').placeholder=def.keyPrefix+'...';
+    // Restore saved key when switching back to saved provider
+    const inp=document.getElementById('settingsApiKey');
+    if(inp) inp.value=(settingsProvider===S.llmConfig.provider && S.llmConfig.apiKey) ? S.llmConfig.apiKey : '';
   }
 }
 
@@ -373,7 +376,11 @@ function setLandingProvider(p){
     const lbl=document.getElementById('landingKeyLabel');
     const inp=document.getElementById('landingApiKey');
     if(lbl) lbl.textContent=def.label+' API Key ('+def.keyUrl+')';
-    if(inp){ inp.placeholder=def.keyPrefix+'...'; inp.value=''; }
+    if(inp){
+      inp.placeholder=def.keyPrefix+'...';
+      // Restore saved key if switching back to the saved provider
+      inp.value=(p===S.llmConfig.provider && S.llmConfig.apiKey) ? S.llmConfig.apiKey : '';
+    }
   }
   _updateApiToggleStatus();
 }
@@ -699,6 +706,55 @@ function _getTabTitle(mode){
   return mode;
 }
 
+// ═══════════════════════════════════════════
+// MODE TAB PERSISTENCE — save/load to localStorage
+// ═══════════════════════════════════════════
+const _MODE_TABS_KEY='sloth_mode_tabs';
+
+function _saveModeTabs(){
+  try{
+    // Snapshot current tab before saving
+    if(S.activeTabId) _snapshotCurrentTab();
+    const data={
+      tabs: S.modeTabs.map(t=>({
+        id:t.id, mode:t.mode, title:t.title, wsFileId:t.wsFileId||null,
+        snapshot: t.snapshot ? JSON.parse(JSON.stringify(t.snapshot)) : null
+      })),
+      activeTabId: S.activeTabId,
+      _tabIdCounter: S._tabIdCounter||S.modeTabs.length+1
+    };
+    localStorage.setItem(_MODE_TABS_KEY, JSON.stringify(data));
+  }catch(e){ console.warn('[Tabs] save failed:', e.message); }
+}
+
+function _loadModeTabs(){
+  try{
+    const raw=localStorage.getItem(_MODE_TABS_KEY);
+    if(!raw) return false;
+    const data=JSON.parse(raw);
+    if(!data.tabs || !Array.isArray(data.tabs) || data.tabs.length===0) return false;
+    // Filter out newtab tabs (they don't survive refresh)
+    const validTabs=data.tabs.filter(t=>t.mode && t.mode!=='newtab');
+    if(validTabs.length===0) return false;
+    S.modeTabs=validTabs;
+    S._tabIdCounter=data._tabIdCounter||validTabs.length+1;
+    // Find active tab (prefer saved, fall back to first)
+    const activeTab=validTabs.find(t=>t.id===data.activeTabId) || validTabs[0];
+    S.activeTabId=activeTab.id;
+    return true;
+  }catch(e){ console.warn('[Tabs] load failed:', e.message); return false; }
+}
+
+function _restoreActiveTab(){
+  // Restore the active tab's mode and state after loading from localStorage
+  const tab=S.modeTabs.find(t=>t.id===S.activeTabId);
+  if(!tab) return false;
+  _restoreTabSnapshot(tab);
+  _renderTabBar();
+  _modeEnterInternal(tab.mode, false);
+  return true;
+}
+
 function _snapshotCurrentTab(){
   // Save current mode's state into the active tab's snapshot
   const tab=S.modeTabs.find(t=>t.id===S.activeTabId);
@@ -884,6 +940,7 @@ function modeTabCreate(mode, enterMode){
   S.activeTabId=id;
   _renderTabBar();
   if(enterMode!==false) _modeEnterInternal(mode, true); // true = fresh (new file)
+  _saveModeTabs();
 }
 
 function modeTabSwitch(tabId){
@@ -905,6 +962,7 @@ function modeTabSwitch(tabId){
     _restoreTabSnapshot(target);
     _modeEnterInternal(target.mode, false);
   }
+  _saveModeTabs();
 }
 
 function modeTabClose(tabId){
@@ -915,6 +973,7 @@ function modeTabClose(tabId){
     // No tabs left → show landing
     S.activeTabId=null;
     _renderTabBar();
+    _saveModeTabs();
     showLanding();
     return;
   }
@@ -933,6 +992,7 @@ function modeTabClose(tabId){
   } else {
     _renderTabBar();
   }
+  _saveModeTabs();
 }
 
 function modeTabNew(){
@@ -945,6 +1005,7 @@ function modeTabNew(){
   S.activeTabId=id;
   _renderTabBar();
   _showNewTabPage();
+  _saveModeTabs();
 }
 
 function _showNewTabPage(){
@@ -1105,22 +1166,25 @@ function _modeEnterInternal(mode, fresh){
   updateToolbarForMode(mode);
   // Mode-specific initialization
   if(mode==='slide'){
-    if(fresh && !S.currentDeck){
-      // Will be handled by existing auto-creation in renderApp
+    if(fresh){
+      // New tab = blank deck — clear current state so renderApp creates fresh
+      S.currentDeck=null;
+      S.currentSlide=0;
     }
     updateModeNameBar('slide');
     renderApp();
   } else if(mode==='doc'){
-    if(fresh || !S.currentDoc){
-      if(!S.currentDoc){
-        try{
-          const saved=localStorage.getItem('sloth_current_doc');
-          if(saved){
-            const parsed=JSON.parse(saved);
-            if(parsed&&parsed.blocks&&parsed.blocks.length) S.currentDoc=parsed;
-          }
-        }catch(e){}
-      }
+    if(fresh){
+      // New tab = blank doc
+      S.currentDoc=window.docCreateNew('Untitled Document');
+    } else if(!S.currentDoc){
+      try{
+        const saved=localStorage.getItem('sloth_current_doc');
+        if(saved){
+          const parsed=JSON.parse(saved);
+          if(parsed&&parsed.blocks&&parsed.blocks.length) S.currentDoc=parsed;
+        }
+      }catch(e){}
       if(!S.currentDoc) S.currentDoc=window.docCreateNew('Untitled Document');
     }
     window.docRestoreUndoStacks();
@@ -1128,16 +1192,17 @@ function _modeEnterInternal(mode, fresh){
     window.docUpdateUndoUI();
     window.renderDocMode();
   } else if(mode==='sheet'){
-    if(fresh || !S.sheet.current){
-      if(!S.sheet.current){
-        try{
-          const saved=localStorage.getItem('sloth_current_sheet');
-          if(saved){
-            const parsed=JSON.parse(saved);
-            if(parsed&&parsed.columns&&parsed.rows) S.sheet.current=parsed;
-          }
-        }catch(e){}
-      }
+    if(fresh){
+      // New tab = blank sheet
+      S.sheet.current=window.shCreateNew('Untitled Sheet');
+    } else if(!S.sheet.current){
+      try{
+        const saved=localStorage.getItem('sloth_current_sheet');
+        if(saved){
+          const parsed=JSON.parse(saved);
+          if(parsed&&parsed.columns&&parsed.rows) S.sheet.current=parsed;
+        }
+      }catch(e){}
       if(!S.sheet.current) S.sheet.current=window.shCreateNew('Untitled Sheet');
     }
     updateModeNameBar('sheet');
@@ -1169,6 +1234,7 @@ function modeEnter(mode){
   S.activeTabId=id;
   _renderTabBar();
   _modeEnterInternal(mode, true);
+  _saveModeTabs();
 }
 
 function pickMode(mode){
@@ -1498,14 +1564,24 @@ function checkWelcomeScreen() {
   }
   // Only skip welcome if user was actively working (refresh or restored), not fresh setup
   if (hasConfig && window.isConfigured() && sessionStorage.getItem('sloth_active')) {
-    const savedMode=sessionStorage.getItem('sloth_mode')||'slide';
-    // On refresh, replace (not push) so we don't stack duplicate entries
-    history.replaceState({mode:savedMode},'','#'+savedMode);
-    _isPopState=true; // suppress pushState inside modeEnter for this restore
-    try{
-      if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
-      else { pickMode(savedMode); }
-    }finally{ _isPopState=false; }
+    // Try to restore saved mode tabs first (full tab state)
+    const hadTabs=_loadModeTabs();
+    if(hadTabs){
+      const activeTab=S.modeTabs.find(t=>t.id===S.activeTabId);
+      const restoreMode=activeTab?activeTab.mode:'slide';
+      history.replaceState({mode:restoreMode},'','#'+restoreMode);
+      _isPopState=true;
+      try{ _restoreActiveTab(); }finally{ _isPopState=false; }
+    } else {
+      // Fallback: restore single mode (legacy behavior)
+      const savedMode=sessionStorage.getItem('sloth_mode')||'slide';
+      history.replaceState({mode:savedMode},'','#'+savedMode);
+      _isPopState=true;
+      try{
+        if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
+        else { pickMode(savedMode); }
+      }finally{ _isPopState=false; }
+    }
   }
   // Otherwise show landing page (always — it IS the homepage now)
   else {
@@ -2468,6 +2544,9 @@ export {
   _snapshotCurrentTab,
   _findTabByFileId,
   _findTabByMode,
+  _saveModeTabs,
+  _loadModeTabs,
+  _restoreActiveTab,
   // New tab page
   ntpPickMode,
   ntpOpenRecent,

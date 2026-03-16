@@ -3,8 +3,8 @@
 .file-nav-toggle:hover { color:var(--text); background:var(--surface2); }
 .file-nav-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s; }
 .file-nav-overlay.open { opacity:1; pointer-events:auto; }
-.file-nav { position:fixed; top:0; left:-320px; width:320px; height:100%; background:#161A24; border-right:1px solid #252A38; border-radius:0 16px 16px 0; z-index:501; display:flex; flex-direction:column; transition:left 0.25s ease; box-shadow:6px 0 24px rgba(0,0,0,0.35); overflow:hidden; }
-.file-nav.open { left:0; }
+.file-nav { position:fixed; top:12px; left:-320px; width:308px; height:calc(100% - 24px); background:rgba(22,26,36,0.88); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border:1px solid rgba(120,134,165,0.18); border-radius:16px; z-index:501; display:flex; flex-direction:column; transition:left 0.25s ease; box-shadow:6px 0 32px rgba(0,0,0,0.45); overflow:hidden; }
+.file-nav.open { left:12px; }
 .fn-header { display:flex; align-items:center; padding:14px 16px 10px; gap:10px; }
 .fn-header h3 { flex:1; font-size:14px; color:var(--text); font-weight:600; margin:0; }
 .fn-close { background:none; border:none; color:var(--text2); font-size:18px; cursor:pointer; padding:2px 6px; border-radius:6px; }

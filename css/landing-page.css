@@ -56,6 +56,9 @@
 .ll-footer { margin-top:auto; padding-top:12px; }
 .ll-tos { font-size:10px; color:#555; cursor:pointer; text-align:center; }
 .ll-tos:hover { color:#9BA8C4; }
+.ll-author { font-size:10px; color:#666; text-align:center; margin-top:4px; font-style:italic; letter-spacing:0.3px; }
+.ll-github { display:inline-block; font-size:10px; color:#666; text-align:center; margin-top:6px; text-decoration:none; letter-spacing:0.3px; transition:color 0.15s; }
+.ll-github:hover { color:#9BA8C4; text-decoration:underline; }
 
 /* Right: modes + chat */
 .landing-right { flex:1; display:flex; gap:20px; padding:28px 32px; align-items:center; justify-content:center; overflow-y:auto; }
