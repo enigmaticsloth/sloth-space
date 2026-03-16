@@ -1604,9 +1604,18 @@ ${ABOUT_TEXTS.sheet}
       }
     }
 
+    // ── Smart fallback: ANY intent → chat when user just wants a filename/title suggestion ──
+    // "給這個簡報生成一個檔名" → chat (not generate). Let the LLM suggest a name in chat.
+    const isMetaRequest=/filename|file\s*name|檔名|標題|取名|命名|rename|title/i.test(text)
+      && !/create|write|make|draft|build|建立|新增|寫/i.test(text.replace(/生成.*檔名|generate.*name|取.*名|命.*名/gi,''));
+    if(isMetaRequest && intent!=='chat' && intent!=='describe'){
+      console.log(`Smart fallback: ${intent} → chat (user wants filename/title suggestion, not content creation)`);
+      intent='chat';
+    }
+
     // ── Smart fallback: minimal safety net (router LLM handles most classification) ──
     // If still "chat" and message has substance → generate
-    if(intent==='chat'){
+    if(intent==='chat' && !isMetaRequest){
       const hasSubject=text.length>4&&!/^(hi|hello|hey|what|how|why|who|when|where|help|sup|yo)$/i.test(text.trim());
       const hasGenerateHint=/create|make|write|about|build|draft|pitch|deck|report|article|content|generate|轉成|轉換|convert|turn.*into|extract/i.test(text);
       const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2))||(S.currentMode==='workspace');
@@ -2539,6 +2548,10 @@ async function doDocGenerate(statusDiv,userText,wsContext){
   if(docData.title) S.currentDoc.title=docData.title;
   S.currentDoc.blocks=newBlocks;
   S.currentDoc.updated=new Date().toISOString();
+
+  // Push undo snapshot AFTER generation so user can undo back to the generated state
+  // (without this, undo after a manual edit would skip to pre-generation empty state)
+  window.docPushUndo();
 
   statusDiv.remove();
   _updateAIActionOverlay(`AI ▸ Generated document ✓`);
