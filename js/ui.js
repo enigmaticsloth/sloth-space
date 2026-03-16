@@ -1729,6 +1729,29 @@ function mpSendPrompt(text) {
   // Show user message in mode picker chat
   mpAddMsg(text, 'user');
 
+  // ── Quick check: identity/about questions should NOT enter any mode ──
+  const isAboutQuestion = /who are (you|u)|what are (you|u)|你是(什麼|誰|啥|哪|甚)|自我介紹|介紹一下|introduce yourself|what('s| is) your name|你叫(什麼|啥)|什麼(東西|鬼)/i.test(text);
+  if (isAboutQuestion) {
+    const thinkEl = mpShowThinking();
+    (async () => {
+      try {
+        const src = window.ABOUT_TEXTS?.general || "I'm Sloth 🦥 — your AI creative assistant in Sloth Space!";
+        const isZh = /[\u4e00-\u9fff]/.test(text);
+        let reply = src;
+        if (isZh && window.callLLM && window.ABOUT_TRANSLATE_PROMPT) {
+          reply = await window.callLLM(window.ABOUT_TRANSLATE_PROMPT, [{ role: 'user', content: `Translate to the same language as: "${text}"\n\n${src}` }], { max_tokens: 512 });
+        }
+        if (thinkEl) thinkEl.remove();
+        const msgEl = mpAddMsg('', 'ai');
+        msgEl.innerHTML = reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+      } catch (e) {
+        if (thinkEl) thinkEl.remove();
+        mpAddMsg("I'm Sloth 🦥 — your AI creative assistant in Sloth Space! Just type a topic to get started.", 'ai');
+      }
+    })();
+    return; // Don't enter any mode
+  }
+
   const modeNames = { slide: 'Slides', doc: 'Document', sheet: 'Spreadsheet', workspace: 'Workspace' };
   const thinkingEl = mpShowThinking();
 

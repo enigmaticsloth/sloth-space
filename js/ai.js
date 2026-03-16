@@ -1383,7 +1383,7 @@ async function sendMessage(){
   }
 
   // ── Pending UI action confirmation ──
-  if(S._pendingUIActions && /^(yes|ok|confirm|go|do it|sure|y|是|好|確認|對)$/i.test(trimText)){
+  if(S._pendingUIActions && /^(DELETE|刪除)$/.test(trimText)){
     const { actions, message } = S._pendingUIActions;
     S._pendingUIActions = null;
     executeUIActions(actions, `✓ Confirmed: ${message}`);
@@ -2195,7 +2195,7 @@ ${sourceContent}`;
         if(needsConfirm){
           // Store pending actions for confirmation
           S._pendingUIActions = { actions: resolved, message };
-          addMessage(`⚠️ ${message}\nAI wants to perform a destructive action. Reply "yes" to confirm.`, 'system');
+          addMessage(`⚠️ ${message}\nType DELETE to confirm.`, 'system');
           S.chatHistory.push({role:'assistant',content:`[Waiting for confirmation: ${message}]`});
         } else {
           const results = await executeUIActions(resolved, message);
@@ -3235,5 +3235,6 @@ export {
   _updateAIActionOverlay,
   _showAIBlocker,
   _hideAIBlocker,
-  ABOUT_TEXTS
+  ABOUT_TEXTS,
+  ABOUT_TRANSLATE_PROMPT
 };
