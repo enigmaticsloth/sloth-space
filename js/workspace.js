@@ -430,11 +430,15 @@ export function wsDeleteProject(id) {
   // Also remove all links to this project
   const links = loadLinks().filter(l => l.projectId !== id);
   saveLinks(links);
-  // If this was the active project, clear it
+  // If this was the active/expanded project, clear it
   if (S.wsActiveProjectId === id) {
     S.wsActiveProjectId = null;
-    S.wsView = 'projects';
   }
+  if (S.wsExpandedProjectId === id) {
+    S.wsExpandedProjectId = null;
+  }
+  S.wsView = 'projects';
+  renderWorkspaceMode();
 }
 
 export function wsArchiveProject(id) {

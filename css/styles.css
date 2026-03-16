@@ -320,21 +320,21 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .settings-status.err { display:block; background:#2e1a1a; color:#D55B5B; }
 
 /* ─── Mode Picker (post-welcome) ─── */
-.mode-picker-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:590; display:flex; align-items:center; justify-content:center;
+.mode-picker-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:590; display:flex; align-items:center; justify-content:center; gap:28px; padding:24px 36px;
   background:linear-gradient(135deg, #0e0e0e 0%, #2a1f3a 15%, #2a4060 30%, #4a2a50 50%, #2a4a3a 70%, #3a2a40 85%, #0e0e0e 100%);
   background-size:400% 400%; animation:monet-shift 12s ease infinite; }
 .mode-picker-overlay.hidden { display:none; }
-.mode-picker { text-align:center; width:96%; max-width:960px; }
-.mode-picker .mp-logo { font-size:38px; font-weight:700; color:#e0e0e0; letter-spacing:-1px; margin-bottom:4px; }
-.mode-picker .mp-tagline { font-size:13px; color:#9BA8C4; font-style:italic; margin-bottom:32px; }
-.mode-cards { display:flex; gap:20px; justify-content:center; }
-.mode-card { flex:1; max-width:280px; background:rgba(30,30,30,0.7); border:1.5px solid rgba(255,255,255,0.08); border-radius:14px;
+.mode-picker { text-align:center; flex:1; min-width:0; max-width:640px; }
+.mode-picker .mp-logo { font-size:32px; font-weight:700; color:#e0e0e0; letter-spacing:-1px; margin-bottom:4px; }
+.mode-picker .mp-tagline { font-size:12px; color:#9BA8C4; font-style:italic; margin-bottom:24px; }
+.mode-cards { display:flex; gap:14px; justify-content:center; }
+.mode-card { flex:1; max-width:200px; background:rgba(30,30,30,0.7); border:1.5px solid rgba(255,255,255,0.08); border-radius:14px;
   padding:0; cursor:pointer; transition:all 0.25s ease; overflow:hidden; backdrop-filter:blur(12px); }
 .mode-card:hover { border-color:rgba(120,134,165,0.5); transform:translateY(-4px); box-shadow:0 12px 32px rgba(0,0,0,0.4); }
 .mode-card.disabled { opacity:0.45; cursor:default; }
 .mode-card.disabled:hover { border-color:rgba(255,255,255,0.08); transform:none; box-shadow:none; }
-.mode-card-demo { height:160px; background:#1a1a1a; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
-.mode-card-info { padding:18px 16px 20px; }
+.mode-card-demo { height:120px; background:#1a1a1a; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+.mode-card-info { padding:14px 12px 16px; }
 .mode-card-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; margin:0 auto 10px; }
 .mode-card-name { font-size:16px; font-weight:700; color:#e0e0e0; margin-bottom:4px; }
 .mode-card-desc { font-size:11px; color:#888; line-height:1.5; }
@@ -366,9 +366,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mc-sheet-row.header .mc-sheet-cell { color:rgba(255,255,255,0.5); font-weight:600; }
 
 /* Workspace card: slightly wider than others (1.3x), horizontal layout on desktop, centered */
-.mode-card-wide { max-width:880px !important; flex-direction:row; display:flex; margin:20px auto 0; }
-.mode-card-wide .mode-card-demo { height:auto; min-height:140px; width:200px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
-.mode-card-wide .mode-card-info { text-align:left; padding:20px 24px; display:flex; flex-direction:column; gap:6px; justify-content:center; }
+.mode-card-wide { max-width:640px !important; flex-direction:row; display:flex; margin:14px auto 0; }
+.mode-card-wide .mode-card-demo { height:auto; min-height:100px; width:160px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:14px 0 0 14px; }
+.mode-card-wide .mode-card-info { text-align:left; padding:14px 18px; display:flex; flex-direction:column; gap:4px; justify-content:center; }
 .mode-card-wide .mode-card-icon { margin:0; flex-shrink:0; }
 .mode-card-wide .mode-card-name { margin-bottom:0; }
 .mode-card-wide .mode-card-desc { margin-top:2px; }
@@ -393,16 +393,9 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mp-back { display:inline-flex; align-items:center; gap:6px; margin-top:24px; padding:8px 18px; background:transparent; border:1px solid rgba(255,255,255,0.12); border-radius:8px; color:#888; font-size:12px; cursor:pointer; font-family:Arial; transition:all 0.2s; }
 .mp-back:hover { border-color:rgba(255,255,255,0.3); color:#ccc; }
 
-/* ─── Mode Picker Chat Sidebar (collapsible right edge) ─── */
-.mp-chat-sidebar { position:fixed; top:0; right:0; height:100%; z-index:600; display:flex; align-items:stretch; pointer-events:none; transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); transform:translateX(calc(100% - 48px)); }
-.mp-chat-sidebar.open { transform:translateX(0); }
-.mp-chat-toggle { pointer-events:auto; width:48px; display:flex; align-items:center; justify-content:center; background:rgba(30,30,30,0.85); border:1px solid rgba(255,255,255,0.08); border-right:none; border-radius:12px 0 0 12px; color:#A899C4; cursor:pointer; backdrop-filter:blur(12px); transition:all 0.2s; flex-shrink:0; }
-.mp-chat-toggle:hover { background:rgba(50,50,50,0.9); color:#ccc; }
-.mp-chat-sidebar.open .mp-chat-toggle { opacity:0; pointer-events:none; width:0; min-width:0; padding:0; border:none; }
-.mp-chat-body { pointer-events:auto; width:360px; display:flex; flex-direction:column; background:rgba(18,18,18,0.92); border-left:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(16px); }
+/* ─── Mode Picker Inline Chat Panel ─── */
+.mp-chat-panel { width:340px; flex-shrink:0; height:min(600px, 75vh); display:flex; flex-direction:column; background:rgba(20,20,20,0.8); border:1px solid rgba(255,255,255,0.08); border-radius:16px; backdrop-filter:blur(16px); overflow:hidden; }
 .mp-chat-header { display:flex; align-items:center; gap:8px; padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:13px; font-weight:600; color:#ccc; font-family:Arial; }
-.mp-chat-close { margin-left:auto; background:none; border:none; color:#666; cursor:pointer; padding:4px; border-radius:4px; display:flex; align-items:center; transition:color 0.15s; }
-.mp-chat-close:hover { color:#ccc; }
 .mp-chat-messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
 .mp-chat-welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; height:100%; text-align:center; }
 .mp-chat-sloth { font-size:36px; }
@@ -424,11 +417,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mp-chat-msg.ai .mp-thinking .mp-dots span:nth-child(2) { animation-delay:0.2s; }
 .mp-chat-msg.ai .mp-thinking .mp-dots span:nth-child(3) { animation-delay:0.4s; }
 @keyframes mp-blink { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
-
-/* Mobile floating prompt (only visible on small screens) */
 .mp-mobile-prompt { display:none; }
-
-/* Sidebar is a child of mode-picker-overlay, so it hides automatically via display:none on parent */
 
 /* ─── Mode Badge (toolbar) ─── */
 .mode-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(120,134,165,0.15); border:1px solid rgba(120,134,165,0.25); border-radius:6px; color:#9BA8C4; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.2s; margin-left:6px; position:relative; }
@@ -1538,7 +1527,8 @@ body.mode-workspace .chat-panel .input-area textarea::placeholder { color:#4A557
   @keyframes ctx-slide-up { from{transform:translateY(100%);} to{transform:translateY(0);} }
   .text-sel-tooltip button { font-size:13px; padding:8px 14px; }
   /* Mode picker phone */
-  .mp-chat-sidebar { display:none !important; }
+  .mode-picker-overlay { flex-direction:column; gap:12px; padding:12px 16px; }
+  .mp-chat-panel { display:none; }
   .mp-mobile-prompt { display:flex; align-items:flex-end; gap:8px; position:fixed; bottom:0; left:0; right:0; padding:12px 16px; background:rgba(18,18,18,0.95); border-top:1px solid rgba(255,255,255,0.08); z-index:600; backdrop-filter:blur(12px); }
   .mp-mobile-prompt textarea { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:#e0e0e0; font-size:14px; font-family:Arial; padding:10px 12px; resize:none; outline:none; max-height:80px; line-height:1.4; }
   .mp-mobile-prompt textarea::placeholder { color:#666; }
