@@ -393,6 +393,43 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .mp-back { display:inline-flex; align-items:center; gap:6px; margin-top:24px; padding:8px 18px; background:transparent; border:1px solid rgba(255,255,255,0.12); border-radius:8px; color:#888; font-size:12px; cursor:pointer; font-family:Arial; transition:all 0.2s; }
 .mp-back:hover { border-color:rgba(255,255,255,0.3); color:#ccc; }
 
+/* ─── Mode Picker Chat Sidebar (collapsible right edge) ─── */
+.mp-chat-sidebar { position:fixed; top:0; right:0; height:100%; z-index:600; display:flex; align-items:stretch; pointer-events:none; transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); transform:translateX(calc(100% - 48px)); }
+.mp-chat-sidebar.open { transform:translateX(0); }
+.mp-chat-toggle { pointer-events:auto; width:48px; display:flex; align-items:center; justify-content:center; background:rgba(30,30,30,0.85); border:1px solid rgba(255,255,255,0.08); border-right:none; border-radius:12px 0 0 12px; color:#A899C4; cursor:pointer; backdrop-filter:blur(12px); transition:all 0.2s; flex-shrink:0; }
+.mp-chat-toggle:hover { background:rgba(50,50,50,0.9); color:#ccc; }
+.mp-chat-sidebar.open .mp-chat-toggle { opacity:0; pointer-events:none; width:0; min-width:0; padding:0; border:none; }
+.mp-chat-body { pointer-events:auto; width:360px; display:flex; flex-direction:column; background:rgba(18,18,18,0.92); border-left:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(16px); }
+.mp-chat-header { display:flex; align-items:center; gap:8px; padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:13px; font-weight:600; color:#ccc; font-family:Arial; }
+.mp-chat-close { margin-left:auto; background:none; border:none; color:#666; cursor:pointer; padding:4px; border-radius:4px; display:flex; align-items:center; transition:color 0.15s; }
+.mp-chat-close:hover { color:#ccc; }
+.mp-chat-messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+.mp-chat-welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; height:100%; text-align:center; }
+.mp-chat-sloth { font-size:36px; }
+.mp-chat-hint { color:#888; font-size:12px; line-height:1.6; font-family:Arial; }
+.mp-chat-examples { display:flex; flex-direction:column; gap:6px; width:100%; margin-top:8px; }
+.mp-chip { padding:8px 12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; color:#aaa; font-size:11px; cursor:pointer; text-align:left; font-family:Arial; transition:all 0.15s; }
+.mp-chip:hover { background:rgba(120,134,165,0.12); border-color:rgba(120,134,165,0.3); color:#ccc; }
+.mp-chat-input-area { display:flex; align-items:flex-end; gap:8px; padding:12px; border-top:1px solid rgba(255,255,255,0.06); }
+.mp-chat-input-area textarea { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:#e0e0e0; font-size:13px; font-family:Arial; padding:10px 12px; resize:none; outline:none; max-height:100px; line-height:1.4; }
+.mp-chat-input-area textarea::placeholder { color:#666; }
+.mp-chat-input-area textarea:focus { border-color:rgba(168,153,196,0.4); }
+.mp-send-btn { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#8B7BA8,#A899C4); border:none; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:opacity 0.15s; }
+.mp-send-btn:hover { opacity:0.85; }
+.mp-chat-msg { padding:8px 12px; border-radius:10px; font-size:12px; font-family:Arial; line-height:1.5; max-width:90%; word-break:break-word; }
+.mp-chat-msg.user { align-self:flex-end; background:rgba(168,153,196,0.2); color:#d0c8e0; border:1px solid rgba(168,153,196,0.15); }
+.mp-chat-msg.ai { align-self:flex-start; background:rgba(255,255,255,0.05); color:#bbb; border:1px solid rgba(255,255,255,0.06); }
+.mp-chat-msg.ai .mp-thinking { display:flex; align-items:center; gap:6px; color:#888; }
+.mp-chat-msg.ai .mp-thinking .mp-dots span { display:inline-block; width:4px; height:4px; border-radius:50%; background:#888; animation:mp-blink 1.2s infinite; }
+.mp-chat-msg.ai .mp-thinking .mp-dots span:nth-child(2) { animation-delay:0.2s; }
+.mp-chat-msg.ai .mp-thinking .mp-dots span:nth-child(3) { animation-delay:0.4s; }
+@keyframes mp-blink { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+
+/* Mobile floating prompt (only visible on small screens) */
+.mp-mobile-prompt { display:none; }
+
+/* Sidebar is a child of mode-picker-overlay, so it hides automatically via display:none on parent */
+
 /* ─── Mode Badge (toolbar) ─── */
 .mode-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(120,134,165,0.15); border:1px solid rgba(120,134,165,0.25); border-radius:6px; color:#9BA8C4; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.2s; margin-left:6px; position:relative; }
 .mode-badge:hover { background:rgba(120,134,165,0.25); border-color:rgba(120,134,165,0.4); color:#B8C9DA; }
@@ -1501,6 +1538,11 @@ body.mode-workspace .chat-panel .input-area textarea::placeholder { color:#4A557
   @keyframes ctx-slide-up { from{transform:translateY(100%);} to{transform:translateY(0);} }
   .text-sel-tooltip button { font-size:13px; padding:8px 14px; }
   /* Mode picker phone */
+  .mp-chat-sidebar { display:none !important; }
+  .mp-mobile-prompt { display:flex; align-items:flex-end; gap:8px; position:fixed; bottom:0; left:0; right:0; padding:12px 16px; background:rgba(18,18,18,0.95); border-top:1px solid rgba(255,255,255,0.08); z-index:600; backdrop-filter:blur(12px); }
+  .mp-mobile-prompt textarea { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:#e0e0e0; font-size:14px; font-family:Arial; padding:10px 12px; resize:none; outline:none; max-height:80px; line-height:1.4; }
+  .mp-mobile-prompt textarea::placeholder { color:#666; }
+  .mp-mobile-prompt textarea:focus { border-color:rgba(168,153,196,0.4); }
   .mode-picker { width:100%; padding:0 16px; }
   .mode-picker .mp-logo { font-size:28px; margin-top:20px; }
   .mode-picker .mp-tagline { font-size:12px; margin-bottom:20px; }
@@ -1618,7 +1660,7 @@ body.mode-workspace .chat-panel .input-area textarea::placeholder { color:#4A557
 }
 
 /* ═══ Workspace Project Folder (inline expand) ═══ */
-.ws-project-folder { border-radius:10px; overflow:hidden; transition:all 0.2s; background:rgba(30,30,30,0.6); border:1px solid rgba(255,255,255,0.06); margin-bottom:2px; }
+.ws-project-folder { border-radius:10px; overflow:visible; transition:all 0.2s; background:rgba(30,30,30,0.6); border:1px solid rgba(255,255,255,0.06); margin-bottom:2px; }
 .ws-project-folder:hover { background:rgba(40,40,40,0.8); border-color:rgba(255,255,255,0.1); }
 .ws-project-folder.expanded { background:rgba(35,35,35,0.8); border-color:rgba(255,255,255,0.1); }
 .ws-project-folder.active-context { border-color:rgba(120,134,165,0.3); }
@@ -1632,7 +1674,7 @@ body.mode-workspace .chat-panel .input-area textarea::placeholder { color:#4A557
 .ws-project-edit-btn:hover { color:#ccc; background:rgba(255,255,255,0.08); }
 
 /* Edit dropdown menu */
-.ws-project-edit-menu { display:none; flex-direction:column; position:absolute; right:0; top:100%; z-index:100; background:#1e1e1e; border:1px solid rgba(255,255,255,0.1); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.5); min-width:140px; padding:4px; overflow:hidden; }
+.ws-project-edit-menu { display:none; flex-direction:column; position:absolute; left:100%; top:0; z-index:200; background:#1e1e1e; border:1px solid rgba(255,255,255,0.12); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.6); min-width:150px; padding:4px; overflow:visible; margin-left:4px; }
 .ws-project-menu-item { display:flex; align-items:center; gap:8px; padding:8px 12px; background:none; border:none; color:#ccc; font-size:12px; cursor:pointer; white-space:nowrap; border-radius:4px; transition:background 0.15s; width:100%; text-align:left; }
 .ws-project-menu-item:hover { background:rgba(255,255,255,0.08); color:#fff; }
 .ws-project-menu-item.danger { color:#e57373; }

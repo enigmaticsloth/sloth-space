@@ -1467,6 +1467,128 @@ function loadFileFromNav(id){
 }
 
 
+// ═══════════════════════════════════════════
+// MODE PICKER CHAT PANEL
+// ═══════════════════════════════════════════
+
+/**
+ * Detect which mode to enter based on prompt text.
+ */
+function mpDetectMode(text) {
+  const t = text.toLowerCase();
+  if (/slide|deck|presentation|pitch|ppt/i.test(t)) return 'slide';
+  if (/sheet|spreadsheet|budget|table|csv|excel|data/i.test(t)) return 'sheet';
+  if (/doc|document|report|essay|letter|memo|article|proposal|write|blog/i.test(t)) return 'doc';
+  // Default to slide for general "create" requests
+  return 'slide';
+}
+
+/**
+ * Add a message bubble to the mode picker chat.
+ */
+function mpAddMsg(text, role) {
+  const container = document.getElementById('mpChatMessages');
+  if (!container) return;
+  // Clear welcome on first message
+  const welcome = container.querySelector('.mp-chat-welcome');
+  if (welcome) welcome.remove();
+  const msg = document.createElement('div');
+  msg.className = `mp-chat-msg ${role}`;
+  msg.textContent = text;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  return msg;
+}
+
+/**
+ * Show a thinking indicator in the mode picker chat.
+ */
+function mpShowThinking() {
+  const container = document.getElementById('mpChatMessages');
+  if (!container) return null;
+  const msg = document.createElement('div');
+  msg.className = 'mp-chat-msg ai';
+  msg.id = 'mpThinking';
+  msg.innerHTML = '<div class="mp-thinking"><span>Thinking</span><span class="mp-dots"><span></span><span></span><span></span></span></div>';
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  return msg;
+}
+
+/**
+ * Toggle the mode picker chat sidebar open/closed.
+ */
+function mpToggleSidebar() {
+  const sidebar = document.getElementById('mpChatSidebar');
+  if (!sidebar) return;
+  sidebar.classList.toggle('open');
+  // Focus input when opening
+  if (sidebar.classList.contains('open')) {
+    setTimeout(() => {
+      const input = document.getElementById('mpChatInput');
+      if (input) input.focus();
+    }, 300);
+  }
+}
+
+/**
+ * Send from the mode picker input box.
+ */
+function mpSendFromInput() {
+  const input = document.getElementById('mpChatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  mpSendPrompt(text);
+}
+
+/**
+ * Send from the mobile floating prompt.
+ */
+function mpSendFromMobile() {
+  const input = document.getElementById('mpMobileChatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  mpSendPrompt(text);
+}
+
+/**
+ * Send a prompt from the mode picker — detects mode, enters it, then sends to AI.
+ */
+function mpSendPrompt(text) {
+  // Show user message in mode picker chat
+  mpAddMsg(text, 'user');
+
+  // Detect mode
+  const mode = mpDetectMode(text);
+  const modeNames = { slide: 'Slides', doc: 'Document', sheet: 'Spreadsheet' };
+  const thinkingEl = mpShowThinking();
+
+  // Brief delay so user sees the transition
+  setTimeout(() => {
+    // Remove thinking
+    if (thinkingEl) thinkingEl.remove();
+    mpAddMsg(`Opening ${modeNames[mode] || mode}...`, 'ai');
+
+    setTimeout(() => {
+      // Enter the mode
+      modeEnter(mode);
+
+      // After mode enters, inject the prompt into the real chat input and send
+      setTimeout(() => {
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput) {
+          chatInput.value = text;
+          if (window.sendMessage) window.sendMessage();
+        }
+      }, 300);
+    }, 500);
+  }, 600);
+}
+
 // Export all functions
 export {
   renderApp,
@@ -1540,5 +1662,11 @@ export {
   getLocalFiles,
   getCloudFiles,
   refreshFileList,
-  loadFileFromNav
+  loadFileFromNav,
+  mpSendPrompt,
+  mpSendFromInput,
+  mpSendFromMobile,
+  mpToggleSidebar,
+  mpDetectMode,
+  mpAddMsg
 };
