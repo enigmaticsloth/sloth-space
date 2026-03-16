@@ -1496,8 +1496,11 @@ function mpDetectMode(text) {
   if (/doc|document|report|essay|letter|memo|article|proposal|blog/i.test(t)) return 'doc';
   // Default to doc for general "create/write" requests (doc is more common than slide)
   if (/write|draft|create|make/i.test(t)) return 'doc';
-  // Final fallback
-  return 'slide';
+  // project/file keywords → workspace
+  if (/project|file|folder|manage/i.test(t)) return 'workspace';
+  // Final fallback: doc is a safer default than slide for non-English input
+  // (slide should only be chosen when explicitly requested)
+  return 'doc';
 }
 
 /**
@@ -1681,7 +1684,21 @@ async function _mpRouterDetectMode(text) {
       }
 
       if (mode) return mode;
-      // Fallback: if router returned intent but no extractable mode, use keyword detection
+
+      // ── Intent-based fallback: router returned valid JSON but mode extraction failed ──
+      // This happens when the router model understands intent but uses unexpected format
+      console.warn('[Mode picker router] mode extraction returned null, trying intent fallback. data:', JSON.stringify(data));
+      if (data.intent === 'ui_action') return 'workspace';          // ui_action from landing → most likely workspace navigation
+      if (data.intent === 'generate') return data.target || 'doc';  // generate without recognized target → default doc
+      if (data.intent === 'multi_step') return 'workspace';         // multi_step from landing → project + content
+      if (data.intent === 'chat') return null;                      // let keyword fallback handle greetings
+      // For any other recognized intent, try data.target or data.message for hints
+      if (data.target === 'doc' || data.target === 'sheet' || data.target === 'slide') return data.target;
+      // If router returned SOMETHING but we can't extract mode, still better than blind fallback
+      if (data.intent) {
+        console.warn('[Mode picker router] Unhandled intent:', data.intent, '— defaulting to doc');
+        return 'doc';
+      }
     } catch (e) {
       console.warn('Mode picker LLM router failed, using keyword fallback:', e);
     }
