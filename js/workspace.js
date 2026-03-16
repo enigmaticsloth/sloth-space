@@ -220,6 +220,9 @@ export function wsCreateImage(title, dataUrl, meta = {}) {
 export function wsDeleteFile(id) {
   const files = wsLoad().filter(f => f.id !== id);
   wsSave(files);
+  // Clean up links referencing this deleted file
+  const links = loadLinks().filter(l => l.fileId !== id);
+  saveLinks(links);
   // Track deleted IDs so cloud sync never restores them
   try {
     const deleted = JSON.parse(localStorage.getItem('sloth_ws_deleted') || '[]');
@@ -564,7 +567,11 @@ export function wsGetUnlinkedFiles() {
 
 /** Get project file count */
 export function wsProjectFileCount(projectId) {
-  return loadLinks().filter(l => l.projectId === projectId).length;
+  const links = loadLinks().filter(l => l.projectId === projectId);
+  // Only count links where the file still exists
+  const files = wsLoad();
+  const fileIds = new Set(files.map(f => f.id));
+  return links.filter(l => fileIds.has(l.fileId)).length;
 }
 
 // ═══════════════════════════════════════════
@@ -652,6 +659,9 @@ export function wsOpenProject(projectId) {
   } else {
     S.wsExpandedProjectId = projectId; // expand
   }
+  // Exit select mode when switching projects
+  S.wsSelectMode = false;
+  S.wsSelectedIds.clear();
   renderWorkspaceMode();
 }
 
@@ -924,9 +934,9 @@ export function renderWorkspaceMode() {
     }
   }
 
-  // Batch bar
+  // Batch bar (only in select mode)
   let batchHtml = '';
-  if (S.wsSelectedIds.size > 0) {
+  if (S.wsSelectMode && S.wsSelectedIds.size > 0) {
     const projects = wsListProjects();
     let moveMenu = '';
     if (projects.length > 0) {
@@ -945,7 +955,7 @@ export function renderWorkspaceMode() {
       <button class="ws-batch-btn" onclick="wsBatchUnlink()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M5.16 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71"/></svg> Unlink</button>
       <button class="ws-batch-btn" onclick="wsBatchDuplicate()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Duplicate</button>
       <button class="ws-batch-btn danger" onclick="wsBatchDelete()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>
-      <button class="ws-batch-cancel" onclick="wsClearSelection()">✕</button>
+      <button class="ws-batch-cancel" onclick="wsExitSelectMode()">✕</button>
     </div>`;
   }
 
@@ -1095,6 +1105,7 @@ function renderFileCard(item) {
   const allFiles = wsLoad();
   const idx = allFiles.findIndex(f => f.id === item.id);
   const type = item.type || 'slide';
+  const inSelectMode = S.wsSelectMode;
   const isSelected = S.wsSelectedIds.has(item.id);
   const selClass = isSelected ? ' ws-selected' : '';
   const date = item.updated ? new Date(item.updated).toLocaleDateString() : '';
@@ -1111,8 +1122,8 @@ function renderFileCard(item) {
     }).join('')}</div>`;
   }
 
-  return `<div class="ws-file-card${selClass}" data-ws-id="${item.id}">
-    <div class="ws-check" onclick="event.stopPropagation();wsToggleSelect('${item.id}')">${isSelected ? '✓' : ''}</div>
+  return `<div class="ws-file-card${selClass}${inSelectMode ? ' ws-select-mode' : ''}" data-ws-id="${item.id}">
+    ${inSelectMode ? `<div class="ws-check" onclick="event.stopPropagation();wsToggleSelect('${item.id}')">${isSelected ? '✓' : ''}</div>` : ''}
     <div onclick="openWorkspaceItem(${idx})" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer;">
       ${preview}
       <div class="ws-file-info">
@@ -1199,27 +1210,54 @@ function renderProjectsListView() {
         </div>`;
       } else {
         const allFiles = wsLoad();
+        const inSelectMode = S.wsSelectMode;
+        const selCount = files.filter(f => S.wsSelectedIds.has(f.id)).length;
+        // Batch action bar (shown when in select mode and files are selected)
+        const batchBar = inSelectMode && selCount > 0 ? `<div class="ws-project-batch-bar">
+          <span class="ws-batch-count">${selCount} selected</span>
+          <button class="ws-project-batch-btn" onclick="event.stopPropagation();wsProjectSelectAll('${p.id}')">Select All</button>
+          <button class="ws-project-batch-btn" onclick="event.stopPropagation();wsBatchUnlinkFromProject('${p.id}')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18.84 12.25l1.72-1.71a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M5.16 11.75l-1.72 1.71a5 5 0 0 0 7.07 7.07l1.72-1.71"/></svg> Unlink
+          </button>
+          <button class="ws-project-batch-btn danger" onclick="event.stopPropagation();wsBatchDeleteSelected()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete
+          </button>
+          <button class="ws-project-batch-cancel" onclick="event.stopPropagation();wsExitSelectMode()">✕</button>
+        </div>` : '';
+        // Select Files toggle button
+        const selectBtn = inSelectMode
+          ? ''
+          : `<button class="ws-project-select-btn" onclick="event.stopPropagation();wsEnterSelectMode()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              Select Files
+            </button>`;
         expandedHtml = `<div class="ws-project-expanded">
+          ${batchBar}
           ${files.map(f => {
             const idx = allFiles.findIndex(af => af.id === f.id);
             const type = f.type || 'slide';
             const fDate = f.updated ? new Date(f.updated).toLocaleDateString() : '';
             const preview = wsRenderFilePreview(f);
-            return `<div class="ws-project-file-row" onclick="openWorkspaceItem(${idx})">
+            const isSel = S.wsSelectedIds.has(f.id);
+            return `<div class="ws-project-file-row${isSel ? ' ws-selected' : ''}${inSelectMode ? ' ws-select-mode' : ''}" onclick="${inSelectMode ? `event.stopPropagation();wsToggleSelect('${f.id}')` : `openWorkspaceItem(${idx})`}">
+              ${inSelectMode ? `<div class="ws-check" onclick="event.stopPropagation();wsToggleSelect('${f.id}')">${isSel ? '✓' : ''}</div>` : ''}
               ${preview}
               <div class="ws-file-info">
                 <div class="ws-file-name">${escapeHtml(f.title || 'Untitled')}</div>
                 <div class="ws-file-meta">${type.charAt(0).toUpperCase() + type.slice(1)} · ${fDate}</div>
               </div>
-              <button class="ws-project-file-unlink" onclick="event.stopPropagation();wsUnlinkFile('${f.id}','${p.id}')" title="Unlink from project">
+              ${inSelectMode ? '' : `<button class="ws-project-file-unlink" onclick="event.stopPropagation();wsUnlinkFile('${f.id}','${p.id}')" title="Unlink from project">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+              </button>`}
             </div>`;
           }).join('')}
-          <button class="ws-project-add-file-btn" onclick="event.stopPropagation();wsShowAddFilePicker('${p.id}')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add File
-          </button>
+          <div class="ws-project-expanded-footer">
+            <button class="ws-project-add-file-btn" onclick="event.stopPropagation();wsShowAddFilePicker('${p.id}')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add File
+            </button>
+            ${selectBtn}
+          </div>
         </div>`;
       }
     }
@@ -1465,11 +1503,62 @@ export function wsToggleSelect(id) {
 }
 
 /**
+ * Enter select mode — show checkboxes.
+ */
+export function wsEnterSelectMode() {
+  S.wsSelectMode = true;
+  renderWorkspaceMode();
+}
+
+/**
+ * Exit select mode — hide checkboxes and clear selection.
+ */
+export function wsExitSelectMode() {
+  S.wsSelectMode = false;
+  S.wsSelectedIds.clear();
+  renderWorkspaceMode();
+}
+
+/**
  * Clear all selections in workspace.
  */
 export function wsClearSelection() {
   S.wsSelectedIds.clear();
+  S.wsSelectMode = false;
   renderWorkspaceMode();
+}
+
+/** Select all files in a specific expanded project */
+export function wsProjectSelectAll(projectId) {
+  const files = wsGetProjectFiles(projectId);
+  files.forEach(f => S.wsSelectedIds.add(f.id));
+  renderWorkspaceMode();
+}
+
+/** Batch unlink selected files from a specific project */
+export function wsBatchUnlinkFromProject(projectId) {
+  if (S.wsSelectedIds.size === 0) return;
+  let count = 0;
+  for (const id of S.wsSelectedIds) {
+    wsUnlinkFile(id, projectId);
+    count++;
+  }
+  S.wsSelectedIds.clear();
+  renderWorkspaceMode();
+  window.addMessage(`✓ Unlinked ${count} file${count > 1 ? 's' : ''} from project`, 'system');
+}
+
+/** Batch delete all currently selected files (single confirm) */
+export function wsBatchDeleteSelected() {
+  if (S.wsSelectedIds.size === 0) return;
+  const count = S.wsSelectedIds.size;
+  if (!confirm(`Delete ${count} file${count > 1 ? 's' : ''}? This cannot be undone.`)) return;
+  for (const id of S.wsSelectedIds) {
+    wsDeleteFile(id);
+  }
+  S.wsSelectedIds.clear();
+  renderWorkspaceMode();
+  window.addMessage(`✓ Deleted ${count} file${count > 1 ? 's' : ''}`, 'system');
 }
 
 /**
@@ -1591,6 +1680,11 @@ function renderSearchAndSort() {
       <button class="ws-sort-btn${sortBy==='date'?' active':''}" onclick="wsSetSort('date')">Date ${sortBy==='date'?arrow:''}</button>
       <button class="ws-sort-btn${sortBy==='name'?' active':''}" onclick="wsSetSort('name')">Name ${sortBy==='name'?arrow:''}</button>
       <button class="ws-sort-btn${sortBy==='type'?' active':''}" onclick="wsSetSort('type')">Type ${sortBy==='type'?arrow:''}</button>
+      ${!S.wsSelectMode ? `<button class="ws-sort-btn ws-select-files-btn" onclick="wsEnterSelectMode()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Select
+      </button>` : `<button class="ws-sort-btn ws-select-files-btn active" onclick="wsExitSelectMode()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel
+      </button>`}
     </div>
   </div>`;
 }

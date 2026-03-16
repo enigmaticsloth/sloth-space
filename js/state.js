@@ -186,6 +186,7 @@ export const S = {
 
   // ── Workspace ──
   wsSelectedIds: new Set(),
+  wsSelectMode: false,
   wsModalType: 'doc',
   wsActiveProjectId: null,   // currently viewing/working in this project
   _wsCurrentFileId: null,    // workspace file ID of file currently being edited
@@ -198,7 +199,7 @@ export const S = {
     { id:'monet-ochre',   bg:'rgba(168,145,100,0.15)', border:'rgba(168,145,100,0.35)', text:'#C4B48F', dot:'#A89164' },
     { id:'monet-mist',    bg:'rgba(130,155,160,0.15)', border:'rgba(130,155,160,0.35)', text:'#A8BFC4', dot:'#829BA0' },
   ],
-  wsView: 'recent',          // 'recent' | 'projects' | 'all' | 'unlinked' | 'project-detail'
+  wsView: 'projects',        // 'projects' | 'all' | 'unlinked'
   wsTypeFilters: { slide: true, doc: true, sheet: true, image: true },  // file type filter checkboxes
   wsSearchQuery: '',         // search bar text
   wsProjectSearch: '',       // project list search text

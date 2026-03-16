@@ -1651,5 +1651,23 @@ body.mode-workspace .chat-panel .input-area textarea::placeholder { color:#4A557
 .ws-project-file-unlink { background:none; border:none; color:#666; padding:4px; border-radius:4px; cursor:pointer; flex-shrink:0; display:flex; opacity:0; transition:opacity 0.15s, color 0.15s; }
 .ws-project-file-row:hover .ws-project-file-unlink { opacity:1; }
 .ws-project-file-unlink:hover { color:#e57373; }
-.ws-project-add-file-btn { display:flex; align-items:center; gap:6px; padding:6px 10px; margin-top:4px; background:none; border:1px dashed rgba(255,255,255,0.1); border-radius:6px; color:#888; font-size:11px; cursor:pointer; transition:all 0.15s; width:100%; }
+.ws-project-add-file-btn { display:flex; align-items:center; gap:6px; padding:6px 10px; background:none; border:1px dashed rgba(255,255,255,0.1); border-radius:6px; color:#888; font-size:11px; cursor:pointer; transition:all 0.15s; }
 .ws-project-add-file-btn:hover { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.2); color:#bbb; }
+.ws-project-expanded-footer { display:flex; align-items:center; gap:8px; margin-top:4px; }
+.ws-project-select-btn { display:flex; align-items:center; gap:4px; padding:6px 10px; background:none; border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#888; font-size:11px; cursor:pointer; transition:all 0.15s; }
+.ws-project-select-btn:hover { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.2); color:#bbb; }
+.ws-select-files-btn { gap:4px !important; }
+.ws-select-files-btn.active { color:#A899C4 !important; border-color:rgba(168,153,196,0.4) !important; }
+
+/* Project expanded batch bar */
+.ws-project-batch-bar { display:flex; align-items:center; gap:6px; padding:6px 8px; margin-bottom:4px; background:rgba(120,134,165,0.1); border-radius:6px; flex-wrap:wrap; }
+.ws-project-batch-btn { display:flex; align-items:center; gap:4px; padding:4px 8px; background:none; border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:#bbb; font-size:11px; cursor:pointer; transition:all 0.15s; }
+.ws-project-batch-btn:hover { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.2); color:#fff; }
+.ws-project-batch-btn.danger { color:#e57373; border-color:rgba(229,115,115,0.2); }
+.ws-project-batch-btn.danger:hover { background:rgba(229,115,115,0.1); border-color:rgba(229,115,115,0.4); }
+.ws-project-batch-cancel { background:none; border:none; color:#888; font-size:12px; cursor:pointer; padding:2px 6px; margin-left:auto; }
+.ws-project-batch-cancel:hover { color:#fff; }
+.ws-project-file-row .ws-check { width:18px; height:18px; border:1.5px solid rgba(255,255,255,0.15); border-radius:4px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:10px; color:#7886A5; cursor:pointer; transition:all 0.15s; }
+.ws-project-file-row .ws-check:hover { border-color:rgba(255,255,255,0.3); }
+.ws-project-file-row.ws-selected .ws-check { background:rgba(120,134,165,0.3); border-color:rgba(120,134,165,0.6); }
+.ws-project-file-row.ws-selected { background:rgba(120,134,165,0.08); }
