@@ -371,6 +371,14 @@ INTENTS:
   - "clear the bench" → {"intent":"ui_action","actions":[{"fn":"benchClear","args":[]}],"message":"Clearing the Bench"}
   - "remove X from bench" → {"intent":"ui_action","actions":[{"fn":"benchRemove","args":[id]}],"message":"Removing X from Bench"}
 
+  SAVE OPERATIONS:
+  - modeSave() — save current file to localStorage (quick save)
+  - modeSaveCloud() — save current file to cloud storage
+  - modeNew() — add a new blank slide (slide mode only)
+  - "save" / "存檔" → {"intent":"ui_action","actions":[{"fn":"modeSave","args":[]}],"message":"Saving file"}
+  - "save to cloud" / "存到雲端" → {"intent":"ui_action","actions":[{"fn":"modeSaveCloud","args":[]}],"message":"Saving to cloud"}
+  - "add a new slide" / "新增空白投影片" → {"intent":"ui_action","actions":[{"fn":"modeNew","args":[]}],"message":"Adding new blank slide"}
+
   CRITICAL DISTINCTION — "create project" vs "create document":
   - "create a PROJECT" → ui_action (wsCreateProject). A project is an organizational container, NOT content.
   - "create/write a DOCUMENT/FILE/REPORT/SLIDES" → generate. This is content creation.
@@ -2671,6 +2679,10 @@ const ALLOWED_ACTIONS = {
   ntpPickMode:        { confirm: false, label: 'Pick mode on new tab page' },
   benchRemove:        { confirm: false, label: 'Remove file from Bench' },
   benchClear:         { confirm: true,  label: 'Clear all Bench files' },
+  // ── Save operations ──
+  modeSave:           { confirm: false, label: 'Save file' },
+  modeSaveCloud:      { confirm: false, label: 'Save to cloud' },
+  modeNew:            { confirm: false, label: 'Add new slide' },
 };
 
 // Parameter validation schemas (lightweight — type checks only)
@@ -2701,6 +2713,10 @@ const ACTION_SCHEMA = {
   // Bench operations
   benchRemove:    [{ type: 'number' }],
   benchClear:     [],
+  // Save operations
+  modeSave:       [],
+  modeSaveCloud:  [],
+  modeNew:        [],
 };
 
 // ══════════════════════════════════════════════════════════
@@ -2872,6 +2888,9 @@ async function _aiAnimateBeforeAction(fnName, args) {
     ntpPickMode:        { icon: _svgI('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'), label: () => `Selecting ${args[0]}` },
     benchRemove:        { icon: _svgI('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'), label: () => { const b=S.bench.find(b=>b.id===args[0]); return `Removing "${b?.name||'file'}" from Bench` } },
     benchClear:         { icon: _svgI('<path d="M3 6h18"/><path d="M8 6V4h8v2"/>'), label: () => `Clearing Bench` },
+    modeSave:           { icon: _svgI('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/>'), label: () => `Saving` },
+    modeSaveCloud:      { icon: _svgI('<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>'), label: () => `Saving to cloud` },
+    modeNew:            { icon: _svgI('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'), label: () => `Adding new slide` },
   };
 
   // Try to find the actual DOM element to animate
@@ -2938,6 +2957,9 @@ async function _aiAnimateBeforeAction(fnName, args) {
     return card ? card.querySelector('.bench-card-del') : null;
   };
   elFinders.benchClear = () => document.getElementById('benchClearBtn');
+  elFinders.modeSave = () => document.querySelector('.mtb-save-btn');
+  elFinders.modeSaveCloud = () => { const btns = document.querySelectorAll('.mtb-save-btn'); return btns[1] || btns[0]; };
+  elFinders.modeNew = () => document.getElementById('mtbNewBtn');
 
   const finder = elFinders[fnName];
   const el = finder ? finder() : null;

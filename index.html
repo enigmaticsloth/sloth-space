@@ -109,7 +109,10 @@
     <button class="file-nav-toggle" onclick="openFileNav()" title="My Files">&#9776;</button>
     <div class="logo" onclick="showModePicker()" style="cursor:pointer;" title="Home">Sloth Space</div>
     <div class="tagline" style="color:#777;">Type what you want. Sloth will design it.</div>
-    <!-- mode badge removed — tab bar handles mode indication -->
+    <button class="topbar-ws-btn" onclick="window.modeEnter('workspace')" title="Open Workspace">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Workspace
+    </button>
   </div>
   <!-- preset pills moved to tab bar row2 -->
   <div class="topbar-center" id="presetPills" style="display:none;"></div>
@@ -438,22 +441,20 @@
   </div>
 </div>
 
-<!-- Mode Tab Bar (browser-like tabs) -->
+<!-- Mode Tab Bar (single-row browser-like tabs + controls) -->
 <div class="mode-tab-bar" id="modeTabBar" style="display:none;">
-  <div class="mtb-row1">
+  <div class="mtb-row">
     <div class="mtb-tabs" id="modeTabList"></div>
     <button class="mtb-new" id="mtbNewBtn" onclick="window.modeTabNew()" title="New slide tab" style="display:none">+</button>
-    <div class="mtb-spacer"></div>
-    <div class="mtb-row1-actions" id="mtbRow1Actions">
-      <button class="mtb-action-btn" onclick="window.modeSave()" title="Save locally">Save</button>
-      <button class="mtb-action-btn primary" onclick="window.modeSaveCloud()" title="Save to cloud">Save to Cloud</button>
-    </div>
-  </div>
-  <div class="mtb-row2" id="mtbRow2">
+    <div class="mtb-sep"></div>
     <input type="text" class="mtb-filename" id="mtbFilename" placeholder="Untitled" spellcheck="false">
     <div class="mtb-presets" id="mtbPresets"></div>
-    <div class="mtb-row2-project" id="mtbProjectArea"></div>
+    <div class="mtb-project" id="mtbProjectArea"></div>
     <div class="mtb-spacer"></div>
+    <div class="mtb-saves" id="mtbSaves">
+      <button class="mtb-save-btn" onclick="window.modeSave()" title="Save">Save</button>
+      <button class="mtb-save-btn" onclick="window.modeSaveCloud()" title="Save to Cloud">Cloud</button>
+    </div>
     <div class="mtb-exports" id="mtbExports"></div>
   </div>
 </div>
@@ -461,8 +462,8 @@
 <!-- Middle: slide left + conversation right -->
 <div class="middle">
   <div class="slide-panel">
-    <div class="deck-name-bar" id="modeNameBar">
-      <input type="text" id="deckNameInput" class="deck-name-input" placeholder="Untitled Presentation" spellcheck="false">
+    <div class="deck-name-bar" id="modeNameBar" style="display:none;">
+      <input type="text" id="deckNameInput" class="deck-name-input" placeholder="Untitled Presentation" spellcheck="false" style="display:none;">
       <div class="deck-actions" id="modeActions">
         <button class="deck-action-btn" id="btnModeNew" onclick="modeNew()" style="display:none">+ New Slide</button>
       </div>
@@ -611,10 +612,11 @@
   <!-- Bench: context staging area -->
   <div class="bench-wrapper" id="benchWrapper">
     <div class="bench-header">
-      <span class="bench-label">📂 Bench</span>
+      <svg class="bench-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7886A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span class="bench-label">Bench</span>
+      <button class="bench-add-btn" onclick="window.benchTriggerFileInput()" title="Add file to Bench">+ Add</button>
       <span class="bench-count" id="benchCount"></span>
       <div class="bench-header-spacer"></div>
-      <button class="bench-add-btn" onclick="window.benchTriggerFileInput()" title="Add file to Bench">+ Add</button>
       <button class="bench-clear-btn" id="benchClearBtn" onclick="window.benchClear()" title="Clear all" style="display:none;">Clear</button>
     </div>
     <div class="bench-area" id="benchArea">
@@ -660,6 +662,6 @@ if(location.protocol==='file:'){
   document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
 }
 </script>
-<script type="module" src="js/app.js?v=20260317ttt"></script>
+<script type="module" src="js/app.js?v=20260317vvv"></script>
 </body>
 </html>

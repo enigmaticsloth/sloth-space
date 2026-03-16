@@ -567,8 +567,8 @@ function modeShowUI(mode){
   const sp=document.querySelector('.slide-panel');
   if(sp) sp.style.display='';
 
-  // Name bar always visible
-  if(nameBar) nameBar.style.display='';
+  // Name bar: hidden (filename now in tab bar)
+  if(nameBar) nameBar.style.display='none';
 
   // Also hide sheet canvas
   const sheetCanvas=document.getElementById('sheetCanvas');
@@ -1217,9 +1217,19 @@ function modeImport(){
 }
 
 function modeSave(){
-  // Save as .sloth file locally (download)
-  if(window.saveSloth) window.saveSloth();
-  else window.addMessage('Save not available for this mode yet.','system');
+  // Save to localStorage (and workspace sync) — NOT a download
+  if(S.currentMode==='slide'){
+    if(window.autoSave) window.autoSave();
+    window.addMessage('✓ Saved.','system');
+  } else if(S.currentMode==='doc'){
+    if(window.docSaveNow) window.docSaveNow();
+    window.addMessage('✓ Saved.','system');
+  } else if(S.currentMode==='sheet'){
+    if(window.shAutoSave) window.shAutoSave();
+    window.addMessage('✓ Saved.','system');
+  } else {
+    window.addMessage('Nothing to save in this mode.','system');
+  }
 }
 
 function modeSaveCloud(){
@@ -1312,7 +1322,7 @@ function updateTopbarForMode(mode){
   // Sync tab bar filename input
   _syncTabBarFilename(mode);
 
-  // Project badge: render into tab bar row2 (mtbProjectArea)
+  // Project badge: render into tab bar (mtbProjectArea)
   const mtbProj=document.getElementById('mtbProjectArea');
   if(mtbProj){
     if(mode==='workspace'||!window.wsRenderTopbarProjectInfo){
@@ -1327,9 +1337,9 @@ function updateTopbarForMode(mode){
   const oldProj=document.getElementById('topbarProjectArea');
   if(oldProj){ oldProj.style.display='none'; oldProj.innerHTML=''; }
 
-  // Save buttons: hide for workspace (no file to save)
-  const row1Actions=document.getElementById('mtbRow1Actions');
-  if(row1Actions) row1Actions.style.display=(mode==='workspace')?'none':'flex';
+  // Save/Export buttons: hide for workspace (no file to save)
+  const saves=document.getElementById('mtbSaves');
+  if(saves) saves.style.display=(mode==='workspace')?'none':'flex';
 }
 
 function modeExportPDF(){
