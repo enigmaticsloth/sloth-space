@@ -241,8 +241,10 @@ export function autoLoad(){
       }catch(e){}
     }
     // Restore last mode to localStorage (backup for sessionStorage)
+    // BUT only if user isn't on the mode picker (showModePicker clears session state)
     const lastMode=localStorage.getItem('sloth_last_mode');
-    if(lastMode&&!sessionStorage.getItem('sloth_mode')){
+    const modePickerVisible=!document.getElementById('modePickerOverlay')?.classList.contains('hidden');
+    if(lastMode&&!sessionStorage.getItem('sloth_mode')&&!modePickerVisible){
       sessionStorage.setItem('sloth_mode',lastMode);
       sessionStorage.setItem('sloth_active','1');
     }

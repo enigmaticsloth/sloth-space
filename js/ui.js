@@ -502,6 +502,10 @@ function skipWelcome() {
 function showModePicker(){
   document.getElementById('welcomeOverlay').classList.add('hidden');
   document.getElementById('modePickerOverlay').classList.remove('hidden');
+  // Clear session state so refresh stays on mode picker (not auto-enters last mode)
+  sessionStorage.removeItem('sloth_active');
+  sessionStorage.removeItem('sloth_mode');
+  sessionStorage.setItem('sloth_on_picker','1');
 }
 
 function showWelcomeFromPicker(){
@@ -644,6 +648,7 @@ function modeEnter(mode){
   document.getElementById('modePickerOverlay').classList.add('hidden');
   sessionStorage.setItem('sloth_active','1');
   sessionStorage.setItem('sloth_mode',mode);
+  sessionStorage.removeItem('sloth_on_picker');
   if(window.saveCurrentMode) window.saveCurrentMode(); // persist to localStorage too
   updateModeBadge(mode);
   modeShowUI(mode);
@@ -989,10 +994,15 @@ function checkWelcomeScreen() {
   // Must happen here BEFORE the check, since autoLoad runs after this
   if(hasConfig && !sessionStorage.getItem('sloth_active')){
     const lastMode=localStorage.getItem('sloth_last_mode');
-    if(lastMode){
+    // Only restore last mode if user was NOT on the mode picker when they refreshed
+    // (showModePicker sets a flag in sessionStorage to indicate the user was browsing the picker)
+    const wasOnPicker=sessionStorage.getItem('sloth_on_picker')==='1';
+    if(lastMode && !wasOnPicker){
       sessionStorage.setItem('sloth_mode',lastMode);
       sessionStorage.setItem('sloth_active','1');
     }
+    // Clear the picker flag after checking
+    sessionStorage.removeItem('sloth_on_picker');
   }
   // Only skip welcome if user was actively working (refresh or restored), not fresh setup
   if (hasConfig && window.isConfigured() && sessionStorage.getItem('sloth_active')) {
@@ -1000,7 +1010,10 @@ function checkWelcomeScreen() {
     if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
     else { pickMode(savedMode); }
   }
-  // Otherwise welcome/demo stays visible
+  // Otherwise welcome/demo stays visible — show mode picker if configured
+  else if(hasConfig && window.isConfigured()){
+    showModePicker();
+  }
 }
 
 function getOS(){
@@ -1475,11 +1488,15 @@ function loadFileFromNav(id){
  * Detect which mode to enter based on prompt text.
  */
 function mpDetectMode(text) {
+  // English-only fast-path keywords (per project directive: no translations, LLM router handles other languages)
   const t = text.toLowerCase();
+  if (/workspace/i.test(t)) return 'workspace';
   if (/slide|deck|presentation|pitch|ppt/i.test(t)) return 'slide';
-  if (/sheet|spreadsheet|budget|table|csv|excel|data/i.test(t)) return 'sheet';
-  if (/doc|document|report|essay|letter|memo|article|proposal|write|blog/i.test(t)) return 'doc';
-  // Default to slide for general "create" requests
+  if (/sheet|spreadsheet|budget|csv|excel/i.test(t)) return 'sheet';
+  if (/doc|document|report|essay|letter|memo|article|proposal|blog/i.test(t)) return 'doc';
+  // Default to doc for general "create/write" requests (doc is more common than slide)
+  if (/write|draft|create|make/i.test(t)) return 'doc';
+  // Final fallback
   return 'slide';
 }
 
@@ -1628,19 +1645,35 @@ async function _mpRouterDetectMode(text) {
       }
       console.log('[Mode picker router]', text, '→', data);
 
-      // Extract mode from router response
-      if (data.intent === 'generate' || data.intent === 'multi_step') {
-        const target = data.target || (data.steps && data.steps.find(s => s.type === 'generate')?.target);
-        if (target === 'doc') return 'doc';
-        if (target === 'sheet') return 'sheet';
-        if (target === 'slide') return 'slide';
-        // generate without explicit target — use keyword fallback below
+      // ── Extract target mode from ANY intent type ──
+      let mode = null;
+
+      if (data.intent === 'generate') {
+        if (data.target === 'doc') mode = 'doc';
+        else if (data.target === 'sheet') mode = 'sheet';
+        else if (data.target === 'slide') mode = 'slide';
       }
+
       if (data.intent === 'ui_action') {
         const modeAction = data.actions?.find(a => a.fn === 'modeEnter');
-        if (modeAction && modeAction.args && modeAction.args[0]) return modeAction.args[0];
+        if (modeAction?.args?.[0]) mode = modeAction.args[0];
       }
-      // Fallback: if router says generate without target, use keyword detection
+
+      // multi_step: scan ALL steps for modeEnter or generate target
+      if (data.intent === 'multi_step' && data.steps) {
+        for (const step of data.steps) {
+          if (step.type === 'ui_action' && step.actions) {
+            const modeAction = step.actions.find(a => a.fn === 'modeEnter');
+            if (modeAction?.args?.[0]) { mode = modeAction.args[0]; break; }
+          }
+          if (step.type === 'generate' && step.target) {
+            mode = step.target; break;
+          }
+        }
+      }
+
+      if (mode) return mode;
+      // Fallback: if router returned intent but no extractable mode, use keyword detection
     } catch (e) {
       console.warn('Mode picker LLM router failed, using keyword fallback:', e);
     }
@@ -1705,11 +1738,9 @@ function mpSendPrompt(text) {
     // Step 7: Enter the mode (hides overlay, renders mode UI)
     modeEnter(mode);
 
-    // Step 8: For workspace mode, no prompt to forward — just enter
-    if (mode === 'workspace') return;
-
-    // Step 9: After mode renders, inject prompt into main chat and call sendMessage
-    // sendMessage() handles the full AI pipeline: LLM router → intent dispatch → visual operations (with overlay)
+    // Step 8: Forward prompt to sendMessage — it handles the full AI pipeline
+    // (LLM router → intent dispatch → visual operations with overlay)
+    // This works for ALL modes including workspace (create project, open file, etc.)
     setTimeout(() => {
       const chatInput = document.getElementById('chatInput');
       if (chatInput) {
