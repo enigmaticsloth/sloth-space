@@ -1,17 +1,17 @@
 /* Sloth Space - Modular CSS Architecture */
 /* This file imports all CSS modules in dependency order */
 
-@import url('./base.css');
-@import url('./nav.css');
-@import url('./topbar.css');
-@import url('./tabbar.css');
-@import url('./layout.css');
-@import url('./bench.css');
-@import url('./contextmenu.css');
-@import url('./landing.css');
-@import url('./doc.css');
-@import url('./sheet.css');
-@import url('./workspace.css');
-@import url('./landing-page.css');
-@import url('./responsive.css');
-@import url('./animations.css');
+@import url('./base.css?v=20260317c1');
+@import url('./nav.css?v=20260317c1');
+@import url('./topbar.css?v=20260317c1');
+@import url('./tabbar.css?v=20260317c1');
+@import url('./layout.css?v=20260317c1');
+@import url('./bench.css?v=20260317c1');
+@import url('./contextmenu.css?v=20260317c1');
+@import url('./landing.css?v=20260317c1');
+@import url('./doc.css?v=20260317c1');
+@import url('./sheet.css?v=20260317c1');
+@import url('./workspace.css?v=20260317c1');
+@import url('./landing-page.css?v=20260317c1');
+@import url('./responsive.css?v=20260317c1');
+@import url('./animations.css?v=20260317c1');
