@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c5';
-import * as slide from './slide.js?v=20260317c5';
-import * as doc from './doc.js?v=20260317c5';
-import * as workspace from './workspace.js?v=20260317c5';
-import * as ai from './ai.js?v=20260317c5';
-import * as ui from './ui.js?v=20260317c5';
-import * as storage from './storage.js?v=20260317c5';
-import * as keys from './keys.js?v=20260317c5';
-import * as sheet from './sheet.js?v=20260317c5';
-import * as bench from './bench.js?v=20260317c5';
+import { S } from './state.js?v=20260317c6';
+import * as slide from './slide.js?v=20260317c6';
+import * as doc from './doc.js?v=20260317c6';
+import * as workspace from './workspace.js?v=20260317c6';
+import * as ai from './ai.js?v=20260317c6';
+import * as ui from './ui.js?v=20260317c6';
+import * as storage from './storage.js?v=20260317c6';
+import * as keys from './keys.js?v=20260317c6';
+import * as sheet from './sheet.js?v=20260317c6';
+import * as bench from './bench.js?v=20260317c6';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -376,6 +376,16 @@ ui.renderApp();
     await wait(250);
   }
 
+  /* ── AI activity indicator (Monet orange) ── */
+  function aiActive(on){
+    const frame=$('muFrame');
+    const bar=$('muAiBar');
+    const badge=$('muAiBadge');
+    if(frame){ if(on) frame.classList.add('ai-active'); else frame.classList.remove('ai-active'); }
+    if(bar){ if(on) bar.classList.add('active'); else bar.classList.remove('active'); }
+    if(badge){ if(on) badge.classList.add('show'); else badge.classList.remove('show'); }
+  }
+
   /* ── UI helpers ── */
   function setMode(text){
     const m=$('muMode');
@@ -417,19 +427,21 @@ ui.renderApp();
     await wait(300);
   }
 
-  /* ── Click the send button ── */
+  /* ── Click the send button (auto-activates AI indicator) ── */
   async function clickSend(){
     const btn=$('muSend');
     if(!btn) return;
     await clickEl(btn);
     lightSend(false);
     clearPrompt();
+    aiActive(true);
     await wait(200);
   }
 
   /* ── Phase-2 result card (fade out canvas → show card) ── */
   async function showResult(cardHTML){
     if(!alive()) return;
+    aiActive(false);
     const c=$('muCanvas');
     if(!c) return;
     // Fade out existing content
@@ -793,6 +805,7 @@ ui.renderApp();
     await wait(200);
     ctx.remove();
 
+    aiActive(true);
     setStatus('<span class="ds-spin"></span> Converting slides → doc...');
     hideCursor();
 
@@ -877,6 +890,7 @@ ui.renderApp();
       clearPrompt();
       lightSend(false);
       hideCursor();
+      aiActive(false);
       setStatus('');
       // Reset cursor position to bottom-right
       const cur=$('muCursor');
