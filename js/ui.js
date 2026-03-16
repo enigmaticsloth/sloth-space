@@ -265,151 +265,174 @@ async function testConnection() {
 }
 
 // ═══════════════════════════════════════════
-// WELCOME SCREEN
+// LANDING PAGE (unified homepage)
 // ═══════════════════════════════════════════
-let welcomeProvider = 'groq';
 
-function showMobileForm(){
-  const box=document.getElementById('welcomeBox');
-  if(box) box.classList.add('mobile-form-active');
+let landingProvider = 'groq';
+let _landingApiOpen = false;
+
+function showLanding(){
+  const overlay=document.getElementById('landingOverlay');
+  if(overlay) overlay.classList.remove('hidden');
+  sessionStorage.removeItem('sloth_active');
+  sessionStorage.setItem('sloth_on_picker','1');
+  _initLandingProviderGrid();
+  _prefillLandingFromConfig();
 }
 
-function toggleWelcomeProviders(){
-  const configPanel=document.getElementById('wbConfigPanel');
-  const btn=document.getElementById('wbConnectBtn');
-  const isOpen=configPanel.classList.contains('active');
-  if(!isOpen){
-    configPanel.classList.add('active');
-    btn.textContent='Configuring...';
-    btn.style.opacity='0.6';
-    // Build provider grid dynamically
-    const grid=document.getElementById('welcomeProviderGrid');
-    grid.innerHTML=Object.entries(LLM_DEFAULTS).map(([key,def])=>
-      `<div class="wb-pgrid-item${key===welcomeProvider?' active':''}" data-provider="${key}" onclick="window.setWelcomeProvider('${key}')">
-        <div class="wpg-dot" style="background:${def.color}"></div>
-        <div class="wpg-name">${def.label}</div>
-        <div class="wpg-desc">${def.desc}</div>
-      </div>`
-    ).join('');
-  }else{
-    configPanel.classList.remove('active');
-    btn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4m-7-11H1m22 0h-4m-2.3-6.7-2.8 2.8m-5.8 5.8-2.8 2.8m0-11.4 2.8 2.8m5.8 5.8 2.8 2.8"/><circle cx="12" cy="12" r="3"/></svg> Connect your LLM to get started';
-    btn.style.opacity='';
+function hideLanding(){
+  const overlay=document.getElementById('landingOverlay');
+  if(overlay) overlay.classList.add('hidden');
+}
+
+function _initLandingProviderGrid(){
+  const grid=document.getElementById('landingProviderGrid');
+  if(!grid) return;
+  grid.innerHTML=Object.entries(LLM_DEFAULTS).map(([key,def])=>
+    `<div class="ll-pgrid-item${key===landingProvider?' active':''}" data-provider="${key}" onclick="window.setLandingProvider('${key}')">
+      <div class="lpg-dot" style="background:${def.color}"></div>
+      <div class="lpg-name">${def.label}</div>
+      <div class="lpg-desc">${def.desc}</div>
+    </div>`
+  ).join('');
+}
+
+function _prefillLandingFromConfig(){
+  if(window.isConfigured&&window.isConfigured()){
+    landingProvider=S.llmConfig.provider||'groq';
+    _initLandingProviderGrid();
+    setLandingProvider(landingProvider);
+    const isCloud=CLOUD_PROVIDERS.includes(landingProvider);
+    if(isCloud){
+      const el=document.getElementById('landingApiKey');
+      if(el) el.value=S.llmConfig.apiKey||'';
+    }else if(landingProvider==='ollama'){
+      const u=document.getElementById('landingOllamaUrl');
+      const m=document.getElementById('landingOllamaModel');
+      if(u) u.value=S.llmConfig.url||'http://localhost:11434';
+      if(m) m.value=S.llmConfig.model||'llama3.1:8b';
+    }else if(landingProvider==='custom'){
+      const u=document.getElementById('landingCustomUrl'); if(u) u.value=S.llmConfig.url||'';
+      const k=document.getElementById('landingCustomKey'); if(k) k.value=S.llmConfig.apiKey||'';
+      const m=document.getElementById('landingCustomModel'); if(m) m.value=S.llmConfig.model||'';
+      const r=document.getElementById('landingCustomRouter'); if(r) r.value=S.llmConfig.router||'';
+    }
+    const dn=document.getElementById('landingDisplayName');
+    if(dn) dn.value=S.llmConfig.displayName||'';
+    _updateApiToggleStatus();
   }
 }
 
-function confirmWelcomeProvider(){
-  // Validate the selected provider fields
-  const isCloud=CLOUD_PROVIDERS.includes(welcomeProvider);
-  if(isCloud){
-    const key=document.getElementById('welcomeApiKey').value.trim();
-    if(!key){
-      const input=document.getElementById('welcomeApiKey');
-      const def=LLM_DEFAULTS[welcomeProvider];
-      input.style.border='2px solid #e74c3c';
-      input.placeholder=`API Key required — get at ${def.keyUrl}`;
-      input.focus();
-      input.addEventListener('input',()=>{input.style.border='';},{once:true});
-      return;
-    }
-  }else if(welcomeProvider==='ollama'){
-    const statusEl=document.getElementById('ollamaDetectStatus');
-    if(!statusEl||!statusEl.classList.contains('ok')){
-      window.detectOllama();
-      return;
-    }
-  }else if(welcomeProvider==='custom'){
-    const url=document.getElementById('welcomeCustomUrl').value.trim();
-    if(!url){
-      document.getElementById('welcomeCustomUrl').style.border='2px solid #e74c3c';
-      document.getElementById('welcomeCustomUrl').focus();
-      return;
-    }
+function _updateApiToggleStatus(){
+  const btn=document.getElementById('llApiToggle');
+  const txt=document.getElementById('llApiStatusText');
+  if(!btn||!txt) return;
+  const def=LLM_DEFAULTS[landingProvider]||{};
+  if(window.isConfigured&&window.isConfigured()){
+    txt.textContent=def.label+' · Connected';
+    btn.classList.add('connected');
+  } else {
+    txt.textContent=(def.label||'Groq')+' · '+(def.desc||'Select provider');
+    btn.classList.remove('connected');
   }
-  // Close config panel, update button to Connected
-  const configPanel=document.getElementById('wbConfigPanel');
-  configPanel.classList.remove('active');
-  const btn=document.getElementById('wbConnectBtn');
-  const def=LLM_DEFAULTS[welcomeProvider]||{};
-  btn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${def.color||'#8B9E8B'};margin-right:6px;"></span> Connected to ${def.label||welcomeProvider}`;
-  btn.style.opacity='';
-  btn.style.color='#fff';
-  btn.style.borderColor=def.color||'#8B9E8B';
-  btn.classList.add('connected');
-  // Mark that provider panel was "opened" so finishWelcome won't re-prompt
-  btn._providerConfirmed=true;
 }
 
-function setWelcomeProvider(p) {
-  welcomeProvider = p;
+function toggleLandingApi(){
+  _landingApiOpen=!_landingApiOpen;
+  const body=document.getElementById('llApiBody');
+  const toggle=document.getElementById('llApiToggle');
+  if(body) body.classList.toggle('open',_landingApiOpen);
+  if(toggle) toggle.classList.toggle('open',_landingApiOpen);
+}
+
+function setLandingProvider(p){
+  landingProvider=p;
   const def=LLM_DEFAULTS[p];
-  document.querySelectorAll('#welcomeProviderGrid .wb-pgrid-item').forEach(c => {
-    c.classList.toggle('active', c.dataset.provider === p);
+  document.querySelectorAll('#landingProviderGrid .ll-pgrid-item').forEach(c=>{
+    c.classList.toggle('active',c.dataset.provider===p);
   });
-  // Show/hide appropriate fields
   const isCloud=CLOUD_PROVIDERS.includes(p);
   const isOllama=p==='ollama';
   const isCustom=p==='custom';
-  document.getElementById('welcomeKeyFields').style.display=isCloud?'':'none';
-  document.getElementById('welcomeOllamaFields').style.display=isOllama?'':'none';
-  document.getElementById('welcomeCustomFields').style.display=isCustom?'':'none';
-  if(isCloud){
-    document.getElementById('welcomeKeyLabel').textContent=`${def.label} API Key (get at ${def.keyUrl})`;
-    document.getElementById('welcomeApiKey').placeholder=def.keyPrefix+'...';
-    document.getElementById('welcomeApiKey').value='';
+  const kf=document.getElementById('landingKeyFields'); if(kf) kf.style.display=isCloud?'':'none';
+  const of=document.getElementById('landingOllamaFields'); if(of) of.style.display=isOllama?'':'none';
+  const cf=document.getElementById('landingCustomFields'); if(cf) cf.style.display=isCustom?'':'none';
+  if(isCloud&&def){
+    const lbl=document.getElementById('landingKeyLabel');
+    const inp=document.getElementById('landingApiKey');
+    if(lbl) lbl.textContent=def.label+' API Key ('+def.keyUrl+')';
+    if(inp){ inp.placeholder=def.keyPrefix+'...'; inp.value=''; }
   }
+  _updateApiToggleStatus();
 }
 
-function finishWelcome() {
-  // If provider was never confirmed, prompt user to connect LLM first
-  const btn=document.getElementById('wbConnectBtn');
-  if(!btn._providerConfirmed && !window.isConfigured()){
-    btn.style.animation='none';
-    btn.offsetHeight;
-    btn.style.animation='pulse-warn 0.5s ease 3';
-    toggleWelcomeProviders();
-    return;
+function confirmLandingProvider(){
+  const isCloud=CLOUD_PROVIDERS.includes(landingProvider);
+  const defaults=LLM_DEFAULTS[landingProvider];
+  if(isCloud){
+    const key=document.getElementById('landingApiKey').value.trim();
+    if(!key){
+      const inp=document.getElementById('landingApiKey');
+      inp.style.border='2px solid #e74c3c';
+      inp.placeholder='Key required — get at '+defaults.keyUrl;
+      inp.focus();
+      inp.addEventListener('input',()=>{inp.style.border='';},{once:true});
+      return;
+    }
+  }else if(landingProvider==='ollama'){
+    const statusEl=document.getElementById('ollamaDetectStatus');
+    if(!statusEl||!statusEl.classList.contains('ok')){ window.detectOllama(); return; }
+  }else if(landingProvider==='custom'){
+    const url=document.getElementById('landingCustomUrl').value.trim();
+    if(!url){ document.getElementById('landingCustomUrl').style.border='2px solid #e74c3c'; return; }
   }
-  // If already configured (returning user), read values from current config
-  const isCloud=CLOUD_PROVIDERS.includes(welcomeProvider);
-
-  const defaults = LLM_DEFAULTS[welcomeProvider];
-  S.llmConfig.provider = welcomeProvider;
-  S.llmConfig.displayName = document.getElementById('welcomeDisplayName').value.trim();
-
-  if (isCloud) {
-    S.llmConfig.apiKey = document.getElementById('welcomeApiKey').value.trim();
-    S.llmConfig.url = defaults.url;
-    S.llmConfig.model = defaults.model;
-    S.llmConfig.router = defaults.router;
-  } else if (welcomeProvider === 'ollama') {
-    S.llmConfig.url = document.getElementById('welcomeOllamaUrl').value.trim() || defaults.url;
-    S.llmConfig.model = document.getElementById('welcomeOllamaModel').value.trim() || defaults.model;
-    S.llmConfig.router = defaults.router;
-    S.llmConfig.apiKey = '';
-  } else if (welcomeProvider === 'custom') {
-    S.llmConfig.url = document.getElementById('welcomeCustomUrl').value.trim();
-    S.llmConfig.apiKey = document.getElementById('welcomeCustomKey').value.trim();
-    S.llmConfig.model = document.getElementById('welcomeCustomModel').value.trim() || 'gpt-4o';
-    S.llmConfig.router = document.getElementById('welcomeCustomRouter').value.trim() || S.llmConfig.model;
+  S.llmConfig.provider=landingProvider;
+  S.llmConfig.displayName=(document.getElementById('landingDisplayName')||{}).value?.trim()||'';
+  if(isCloud){
+    S.llmConfig.apiKey=document.getElementById('landingApiKey').value.trim();
+    S.llmConfig.url=defaults.url; S.llmConfig.model=defaults.model; S.llmConfig.router=defaults.router;
+  }else if(landingProvider==='ollama'){
+    S.llmConfig.url=document.getElementById('landingOllamaUrl').value.trim()||defaults.url;
+    S.llmConfig.model=document.getElementById('landingOllamaModel').value.trim()||defaults.model;
+    S.llmConfig.router=defaults.router; S.llmConfig.apiKey='';
+  }else if(landingProvider==='custom'){
+    S.llmConfig.url=document.getElementById('landingCustomUrl').value.trim();
+    S.llmConfig.apiKey=document.getElementById('landingCustomKey').value.trim();
+    S.llmConfig.model=document.getElementById('landingCustomModel').value.trim()||'gpt-4o';
+    S.llmConfig.router=document.getElementById('landingCustomRouter').value.trim()||S.llmConfig.model;
   }
-
-  // For cloud providers, show cost confirmation before saving (skip if already accepted)
   if(isCloud && !localStorage.getItem('sloth_api_warning_accepted')){
     showApiCostConfirm(function(){
       localStorage.setItem('sloth_api_warning_accepted','1');
-      _commitWelcomeConfig(defaults, isCloud);
+      _commitLandingConfig();
     });
     return;
   }
-  _commitWelcomeConfig(defaults, isCloud);
+  _commitLandingConfig();
 }
 
-function _commitWelcomeConfig(defaults, isCloud){
+function _commitLandingConfig(){
   window.saveConfig();
   window.syncConfigToCloud();
-  showModePicker();
+  _updateApiToggleStatus();
+  _landingApiOpen=false;
+  const body=document.getElementById('llApiBody');
+  const toggle=document.getElementById('llApiToggle');
+  if(body) body.classList.remove('open');
+  if(toggle) toggle.classList.remove('open');
+  if(window.addMessage) window.addMessage('Provider saved.','system');
 }
+
+// Legacy compat aliases
+function showModePicker(){ showLanding(); }
+function showWelcomeFromPicker(){ showLanding(); }
+function skipWelcome(){ showLanding(); }
+function finishWelcome(){}
+function toggleWelcomeProviders(){ toggleLandingApi(); }
+function confirmWelcomeProvider(){ confirmLandingProvider(); }
+function setWelcomeProvider(p){ setLandingProvider(p); }
+function showMobileForm(){}
+function doLandingSignOut(){ window.doWelcomeSignOut(); }
 
 function showApiCostConfirm(onConfirm){
   const providerLabel=LLM_DEFAULTS[welcomeProvider||settingsProvider]?.label||'LLM';
@@ -495,27 +518,9 @@ function restoreConfigFromCloud(user){
   return true;
 }
 
-function skipWelcome() {
-  showModePicker();
-}
-
-function showModePicker(){
-  document.getElementById('welcomeOverlay').classList.add('hidden');
-  document.getElementById('modePickerOverlay').classList.remove('hidden');
-  // Clear session state so refresh stays on mode picker (not auto-enters last mode)
-  sessionStorage.removeItem('sloth_active');
-  sessionStorage.removeItem('sloth_mode');
-  sessionStorage.setItem('sloth_on_picker','1');
-}
-
-function showWelcomeFromPicker(){
-  document.getElementById('modePickerOverlay').classList.add('hidden');
-  window.showWelcome();
-}
-
 function enterSlides(){
   // Legacy compat — go through mode picker or directly to slides
-  document.getElementById('welcomeOverlay').classList.add('hidden');
+  hideLanding();
   sessionStorage.setItem('sloth_active','1');
   enterSlideMode();
 }
@@ -645,7 +650,7 @@ function modeEnter(mode){
   // Set body class for mode-specific CSS (touch-action, layout, etc.)
   document.body.classList.remove('mode-slide','mode-doc','mode-sheet','mode-workspace');
   document.body.classList.add('mode-'+mode);
-  document.getElementById('modePickerOverlay').classList.add('hidden');
+  hideLanding();
   sessionStorage.setItem('sloth_active','1');
   sessionStorage.setItem('sloth_mode',mode);
   sessionStorage.removeItem('sloth_on_picker');
@@ -1010,9 +1015,9 @@ function checkWelcomeScreen() {
     if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
     else { pickMode(savedMode); }
   }
-  // Otherwise welcome/demo stays visible — show mode picker if configured
-  else if(hasConfig && window.isConfigured()){
-    showModePicker();
+  // Otherwise show landing page (always — it IS the homepage now)
+  else {
+    showLanding();
   }
 }
 
@@ -1125,7 +1130,7 @@ async function detectOllama(){
   statusEl.className='og-status checking';
   statusEl.textContent='Detecting...';
 
-  const url=(document.getElementById('welcomeOllamaUrl')?.value||'http://localhost:11434').trim();
+  const url=(document.getElementById('landingOllamaUrl')?.value||document.getElementById('settingsOllamaUrl')?.value||'http://localhost:11434').trim();
 
   try{
     const res=await fetch(url+'/api/tags',{signal:AbortSignal.timeout(3000)});
@@ -1140,7 +1145,7 @@ async function detectOllama(){
     }else{
       statusEl.className='og-status ok';
       statusEl.textContent='Connected! Found: '+models.slice(0,3).join(', ');
-      const modelInput=document.getElementById('welcomeOllamaModel');
+      const modelInput=document.getElementById('landingOllamaModel')||document.getElementById('settingsOllamaModel');
       if(modelInput&&(!modelInput.value||modelInput.value==='llama3.1:8b')){
         modelInput.value=models[0];
       }
@@ -1855,11 +1860,18 @@ export {
   _commitSettings,
   testConnection,
   showMobileForm,
+  showLanding,
+  hideLanding,
+  toggleLandingApi,
+  setLandingProvider,
+  confirmLandingProvider,
+  _commitLandingConfig,
+  doLandingSignOut,
+  // Legacy aliases
   toggleWelcomeProviders,
   confirmWelcomeProvider,
   setWelcomeProvider,
   finishWelcome,
-  _commitWelcomeConfig,
   showApiCostConfirm,
   showTerms,
   closeTerms,

@@ -59,6 +59,10 @@ export const LLM_DEFAULTS = {
     url:'https://api.anthropic.com/v1/messages', model:'claude-sonnet-4-20250514', router:'claude-haiku-3-20240307',
     keyPrefix:'sk-ant-', label:'Claude', desc:'Anthropic · Smart reasoning', color:'#D97757', keyUrl:'console.anthropic.com'
   },
+  gemini: {
+    url:'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model:'gemini-2.5-flash', router:'gemini-2.0-flash-lite',
+    keyPrefix:'AI', label:'Gemini', desc:'Google · Free tier available', color:'#4285F4', keyUrl:'aistudio.google.com/apikey'
+  },
   grok: {
     url:'https://api.x.ai/v1/chat/completions', model:'grok-3', router:'grok-3-mini',
     keyPrefix:'xai-', label:'Grok', desc:'xAI · Real-time knowledge', color:'#1DA1F2', keyUrl:'console.x.ai'
@@ -73,7 +77,7 @@ export const LLM_DEFAULTS = {
   }
 };
 
-export const CLOUD_PROVIDERS = ['groq','openai','claude','grok'];
+export const CLOUD_PROVIDERS = ['groq','openai','claude','gemini','grok'];
 
 // ── Supabase Config ──
 export const SUPABASE_URL = 'https://kfqmaztaxghbruhifeve.supabase.co';

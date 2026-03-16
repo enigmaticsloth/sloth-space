@@ -194,307 +194,198 @@
   </div>
 </div>
 
-<!-- Welcome screen (first-time setup, Monet theme) -->
-<div class="welcome-overlay" id="welcomeOverlay">
-  <div class="welcome-box" id="welcomeBox">
-    <!-- Mobile splash: demo preview shown first on mobile -->
-    <div class="wb-mobile-splash" id="wbMobileSplash">
-      <div class="splash-content">
-        <div style="text-align:center;padding:20px 16px 8px;">
-          <div style="font-size:36px;font-weight:700;color:#e0e0e0;letter-spacing:-1px;">Sloth Space</div>
-          <div style="font-size:12px;color:#9BA8C4;font-style:italic;margin-top:4px;">Type what you want. Sloth will design it.</div>
-        </div>
-        <div class="demo-panel" id="demoPanelMobile" style="flex:1;min-height:0;">
-          <div class="demo-label">Live Preview</div>
-          <div class="demo-slide-area" id="demoSlideAreaMobile">
-            <div class="demo-slide-inner" id="demoSlideInnerMobile">
-              <div class="ds-icon" id="demoSlideIconMobile"></div>
-              <div class="ds-title" id="demoSlideTitleMobile"></div>
-              <div class="ds-subtitle" id="demoSlideSubtitleMobile"></div>
-              <div class="ds-body" id="demoSlideBodyMobile"></div>
-            </div>
-            <div class="demo-page-dots" id="demoPageDotsMobile"></div>
-          </div>
-          <div class="demo-chat-area">
-            <div class="demo-messages" id="demoMessagesMobile"></div>
-            <div class="demo-prompt-bar">
-              <span class="demo-prompt-text" id="demoPromptTextMobile"></span>
-              <span class="demo-prompt-cursor"></span>
-            </div>
-          </div>
-        </div>
-        <div class="splash-cta">
-          <button class="splash-cta-btn" onclick="showMobileForm()">Get Started</button>
-          <div class="splash-skip" onclick="skipWelcome()">Skip setup</div>
-        </div>
-      </div>
-    </div>
+<!-- ═══ Landing Page (unified homepage — login + mode picker + AI chat) ═══ -->
+<div class="landing-overlay" id="landingOverlay">
 
-    <!-- Config panel (direct child of welcome-box so mobile position:fixed works) -->
-    <div class="wb-config" id="wbConfigPanel">
-      <div class="wrc-title">Choose your AI provider</div>
-      <div class="wb-provider-grid" id="welcomeProviderGrid"></div>
+  <!-- Left sidebar: branding, auth, API config -->
+  <div class="landing-left">
+    <div class="ll-logo">🦥 Sloth Space</div>
+    <div class="ll-tagline">Type what you want. Sloth will design it.</div>
 
-      <div id="welcomeKeyFields" style="display:none;">
-        <div class="wb-input-group">
-          <label id="welcomeKeyLabel">API Key</label>
-          <input type="password" id="welcomeApiKey" placeholder="">
-        </div>
-        <div class="api-cost-warning">
-          <div class="acw-icon">&#9888;</div>
-          <div class="acw-text">
-            <b>API calls cost real money.</b> Each slide edit / generation consumes tokens from your account.
-            We strongly recommend setting a <b>monthly spending cap</b> on your provider's dashboard before using Sloth Space.
-            We are not responsible for any charges incurred.
-          </div>
-        </div>
-      </div>
-
-      <div id="welcomeOllamaFields" style="display:none;">
-        <div class="ollama-guide" id="ollamaGuide"></div>
-        <div class="wb-inline-row" style="margin-top:10px;">
-          <div class="wb-input-group">
-            <label>URL</label>
-            <input type="text" id="welcomeOllamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434" style="margin-bottom:0;">
-          </div>
-          <div class="wb-input-group">
-            <label>Model</label>
-            <input type="text" id="welcomeOllamaModel" placeholder="llama3.1:8b" value="llama3.1:8b" style="margin-bottom:0;">
-          </div>
-        </div>
-      </div>
-
-      <div id="welcomeCustomFields" style="display:none;">
-        <div class="wb-input-group">
-          <label>API URL</label>
-          <input type="text" id="welcomeCustomUrl" placeholder="https://api.example.com/v1/chat/completions">
-        </div>
-        <div class="wb-input-group">
-          <label>API Key</label>
-          <input type="password" id="welcomeCustomKey" placeholder="your-api-key">
-        </div>
-        <div class="wb-inline-row">
-          <div class="wb-input-group">
-            <label>Model</label>
-            <input type="text" id="welcomeCustomModel" placeholder="model-name">
-          </div>
-          <div class="wb-input-group">
-            <label>Router Model</label>
-            <input type="text" id="welcomeCustomRouter" placeholder="small-model">
-          </div>
-        </div>
-      </div>
-
-      <button class="wrc-done-btn" onclick="confirmWelcomeProvider()">Confirm</button>
-    </div><!-- end wb-config -->
-
-    <!-- Left glow column (transparent, shows gradient behind) -->
-    <div class="wb-glow"></div>
-
-    <div class="wb-left">
-    <div class="wb-logo">Sloth Space</div>
-    <div class="wb-tagline">Type what you want. Sloth will design it.</div>
-
-    <div class="wb-products">
-      <div class="wb-product active" style="transform:scale(1.05);">
-        <div class="wb-product-icon" style="background:linear-gradient(135deg,#7886A5,#9BA8C4);">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-        </div>
-        <div class="wb-product-name">Slides</div>
-        <div class="wb-product-status">Ready</div>
-      </div>
-    </div>
-
-    <!-- Connect LLM button — click to expand provider grid -->
-    <button class="wb-connect-btn" id="wbConnectBtn" onclick="toggleWelcomeProviders()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4m-7-11H1m22 0h-4m-2.3-6.7-2.8 2.8m-5.8 5.8-2.8 2.8m0-11.4 2.8 2.8m5.8 5.8 2.8 2.8"/><circle cx="12" cy="12" r="3"/></svg>
-      Connect your LLM to get started
-    </button>
-
-    <!-- Provider config panel moved to wb-right -->
-
-    <div class="wb-input-group" style="margin-top:10px;">
-      <label>Your Name</label>
-      <input type="text" id="welcomeDisplayName" placeholder="Optional" style="margin-bottom:0;">
-    </div>
-
-    <div id="welcomeAuthSection" style="margin-top:12px; padding-top:12px; border-top:1px solid #333;">
-      <div id="welcomeAuthStatus" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">
-        <button onclick="doLogin()" style="display:flex;align-items:center;gap:8px;padding:9px 20px;background:#24292e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:Arial;font-weight:500;">
+    <!-- Auth section -->
+    <div class="ll-section">
+      <div class="ll-section-label">Account</div>
+      <div id="landingAuthStatus">
+        <button class="ll-github-btn" onclick="doLogin()">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           Sign in with GitHub
         </button>
-        <span style="font-size:10px;color:#666;">sync your settings</span>
+        <!-- Space for future login methods -->
+        <div class="ll-future-auth"></div>
       </div>
-      <div id="welcomeAuthLoggedIn" style="display:none;text-align:center;">
-        <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;background:rgba(139,158,139,0.15);border:1px solid rgba(139,158,139,0.3);border-radius:6px;font-size:12px;color:#8B9E8B;">
-          <span>Signed in as</span><b id="welcomeAuthName"></b>
+      <div id="landingAuthLoggedIn" style="display:none;">
+        <div class="ll-auth-badge">
+          <span>Signed in as</span><b id="landingAuthName"></b>
         </div>
-      </div>
-    </div>
-
-    <button class="wb-start-btn" onclick="finishWelcome()">Start Creating</button>
-    <div id="welcomeSignOutRow" style="display:none;text-align:center;margin-top:8px;">
-      <button onclick="doWelcomeSignOut()" style="background:transparent;border:1px solid #444;color:#888;padding:5px 16px;border-radius:5px;font-size:11px;cursor:pointer;font-family:Arial;">Sign Out</button>
-    </div>
-    <div class="wb-skip" onclick="skipWelcome()">Skip &mdash; configure later in Settings</div>
-    <div class="wb-tos-link" onclick="showTerms()">Terms of Service &amp; Disclaimer</div>
-    </div><!-- end wb-left -->
-
-    <div class="wb-right">
-      <div class="demo-panel" id="demoPanel">
-        <div class="demo-label">Live Preview</div>
-        <div class="demo-slide-area" id="demoSlideArea">
-          <div class="demo-slide-inner" id="demoSlideInner">
-            <div class="ds-icon" id="demoSlideIcon"></div>
-            <div class="ds-title" id="demoSlideTitle"></div>
-            <div class="ds-subtitle" id="demoSlideSubtitle"></div>
-            <div class="ds-body" id="demoSlideBody"></div>
-          </div>
-          <div class="demo-page-dots" id="demoPageDots"></div>
-        </div>
-        <div class="demo-chat-area">
-          <div class="demo-messages" id="demoMessages"></div>
-          <div class="demo-prompt-bar">
-            <span class="demo-prompt-text" id="demoPromptText"></span>
-            <span class="demo-prompt-cursor" id="demoCursor"></span>
-          </div>
-        </div>
-      </div>
-    </div><!-- end wb-right -->
-  </div>
-</div>
-
-<!-- Mode Picker (shown after welcome, before entering editor) -->
-<div class="mode-picker-overlay hidden" id="modePickerOverlay">
-  <div class="mode-picker">
-    <div class="mp-logo">Sloth Space</div>
-    <div class="mp-tagline">What would you like to create?</div>
-    <div class="mode-cards">
-
-      <!-- Doc (Monet Blue) -->
-      <div class="mode-card" onclick="pickMode('doc')">
-        <div class="mode-card-demo">
-          <div class="mc-doc-preview">
-            <div class="mc-dh"></div>
-            <div class="mc-dp w90"></div>
-            <div class="mc-dp w80"></div>
-            <div class="mc-dp w70"></div>
-            <div class="mc-dimg"></div>
-            <div class="mc-dcap"></div>
-            <div class="mc-dp w90"></div>
-            <div class="mc-dp w60"></div>
-          </div>
-        </div>
-        <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#4A6FA5,#6B8FC5);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </div>
-          <div class="mode-card-name">Doc</div>
-          <div class="mode-card-desc">Block-based documents. Drag to reorder, auto figure numbering, paper-quality layout.</div>
-        </div>
-      </div>
-
-      <!-- Slide (Monet Orange) -->
-      <div class="mode-card" onclick="pickMode('slide')">
-        <div class="mode-card-demo">
-          <div class="mc-slide-preview">
-            <div class="mc-title"></div>
-            <div class="mc-subtitle"></div>
-            <div class="mc-body"><div class="mc-body-line"></div><div class="mc-body-line"></div></div>
-          </div>
-        </div>
-        <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#C4783A,#D9945A);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-          </div>
-          <div class="mode-card-name">Slide</div>
-          <div class="mode-card-desc">Presentations with AI-powered design. Free-form canvas, smart layouts, style presets.</div>
-        </div>
-      </div>
-
-      <!-- Sheet (Monet Green) -->
-      <div class="mode-card" onclick="pickMode('sheet')">
-        <div class="mode-card-demo">
-          <div class="mc-sheet-preview">
-            <div class="mc-sheet-row header"><div class="mc-sheet-cell">A</div><div class="mc-sheet-cell">B</div><div class="mc-sheet-cell">C</div><div class="mc-sheet-cell">D</div></div>
-            <div class="mc-sheet-row"><div class="mc-sheet-cell">12.4</div><div class="mc-sheet-cell">8.7</div><div class="mc-sheet-cell">15.2</div><div class="mc-sheet-cell">9.1</div></div>
-            <div class="mc-sheet-row"><div class="mc-sheet-cell">6.3</div><div class="mc-sheet-cell">11.5</div><div class="mc-sheet-cell">7.8</div><div class="mc-sheet-cell">14.6</div></div>
-            <div class="mc-sheet-row"><div class="mc-sheet-cell">18.1</div><div class="mc-sheet-cell">5.2</div><div class="mc-sheet-cell">10.9</div><div class="mc-sheet-cell">3.7</div></div>
-            <div class="mc-sheet-row"><div class="mc-sheet-cell">9.6</div><div class="mc-sheet-cell">13.8</div><div class="mc-sheet-cell">4.5</div><div class="mc-sheet-cell">16.3</div></div>
-          </div>
-        </div>
-        <div class="mode-card-info">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#5A8A5A,#7AAF7A);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-          </div>
-          <div class="mode-card-name">Sheet</div>
-          <div class="mode-card-desc">Spreadsheets with formulas, charts, and AI data analysis. Cross-references to docs and slides.</div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Workspace card (full width below the three) -->
-    <div class="mode-card mode-card-wide" onclick="pickMode('workspace')">
-      <div class="mode-card-demo">
-        <div class="mc-ws-preview">
-          <div class="mc-ws-sidebar">
-            <div class="mc-ws-dot active"></div>
-            <div class="mc-ws-dot"></div>
-            <div class="mc-ws-dot"></div>
-            <div class="mc-ws-dot dim"></div>
-          </div>
-          <div class="mc-ws-main">
-            <div class="mc-ws-row"><div class="mc-ws-thumb slide"></div><div class="mc-ws-meta"><div class="mc-ws-name"></div><div class="mc-ws-date"></div></div></div>
-            <div class="mc-ws-row"><div class="mc-ws-thumb doc"></div><div class="mc-ws-meta"><div class="mc-ws-name w60"></div><div class="mc-ws-date"></div></div></div>
-            <div class="mc-ws-row"><div class="mc-ws-thumb sheet"></div><div class="mc-ws-meta"><div class="mc-ws-name w80"></div><div class="mc-ws-date"></div></div></div>
-          </div>
-        </div>
-      </div>
-      <div class="mode-card-info">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div class="mode-card-icon" style="background:linear-gradient(135deg,#8B7BA8,#A899C4);width:32px;height:32px;border-radius:8px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="mode-card-name">Workspace</div>
-        </div>
-        <div class="mode-card-desc">Your project hub. Manage all docs, slides, and sheets in one place.</div>
+        <button class="ll-signout-btn" onclick="doLandingSignOut()">Sign Out</button>
       </div>
     </div>
 
-    <button class="mp-back" onclick="showWelcomeFromPicker()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
-      Settings
-    </button>
-  </div>
-
-  <!-- Inline Chat Panel (always visible on desktop, right side) -->
-  <div class="mp-chat-panel" id="mpChatPanel">
-    <div class="mp-chat-header">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A899C4" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <span>AI Assistant</span>
-    </div>
-    <div class="mp-chat-messages" id="mpChatMessages">
-      <div class="mp-chat-welcome">
-        <div class="mp-chat-sloth">🦥</div>
-        <div class="mp-chat-hint">Tell me what you want to create.<br>I'll pick the right tool and build it for you.</div>
-        <div class="mp-chat-examples">
-          <button class="mp-chip" onclick="mpSendPrompt('Create a 5-slide pitch deck about AI trends')">Pitch deck about AI</button>
-          <button class="mp-chip" onclick="mpSendPrompt('Write a project proposal document')">Project proposal</button>
-          <button class="mp-chip" onclick="mpSendPrompt('Build a monthly budget spreadsheet')">Budget spreadsheet</button>
-        </div>
-      </div>
-    </div>
-    <div class="mp-chat-input-area">
-      <textarea id="mpChatInput" placeholder="Describe what you want to create..." rows="1"></textarea>
-      <button class="mp-send-btn" onclick="mpSendFromInput()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+    <!-- API Config section (collapsible) -->
+    <div class="ll-section">
+      <div class="ll-section-label">AI Provider</div>
+      <button class="ll-api-toggle" id="llApiToggle" onclick="toggleLandingApi()">
+        <span id="llApiStatusText">Groq · Free &amp; Fast</span>
+        <svg class="ll-chevron" id="llChevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-    </div>
-  </div>
+      <div class="ll-api-body" id="llApiBody">
+        <div class="ll-provider-grid" id="landingProviderGrid"></div>
 
-  <!-- Mobile floating prompt (visible only on small screens) -->
+        <div id="landingKeyFields" style="display:none;">
+          <div class="ll-input-group">
+            <label id="landingKeyLabel">API Key</label>
+            <input type="password" id="landingApiKey" placeholder="">
+          </div>
+          <div class="api-cost-warning" style="margin-top:6px;">
+            <div class="acw-icon">&#9888;</div>
+            <div class="acw-text"><b>API calls may cost money.</b> Set a spending cap on your provider's dashboard.</div>
+          </div>
+        </div>
+
+        <div id="landingOllamaFields" style="display:none;">
+          <div class="ollama-guide" id="ollamaGuide"></div>
+          <div class="ll-input-row">
+            <div class="ll-input-group"><label>URL</label><input type="text" id="landingOllamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434"></div>
+            <div class="ll-input-group"><label>Model</label><input type="text" id="landingOllamaModel" placeholder="llama3.1:8b" value="llama3.1:8b"></div>
+          </div>
+        </div>
+
+        <div id="landingCustomFields" style="display:none;">
+          <div class="ll-input-group"><label>API URL</label><input type="text" id="landingCustomUrl" placeholder="https://api.example.com/v1/chat/completions"></div>
+          <div class="ll-input-group"><label>API Key</label><input type="password" id="landingCustomKey" placeholder="your-api-key"></div>
+          <div class="ll-input-row">
+            <div class="ll-input-group"><label>Model</label><input type="text" id="landingCustomModel" placeholder="model-name"></div>
+            <div class="ll-input-group"><label>Router</label><input type="text" id="landingCustomRouter" placeholder="small-model"></div>
+          </div>
+        </div>
+
+        <button class="ll-save-btn" onclick="confirmLandingProvider()">Save Provider</button>
+      </div>
+    </div>
+
+    <!-- Display name -->
+    <div class="ll-section">
+      <div class="ll-input-group">
+        <label>Display Name</label>
+        <input type="text" id="landingDisplayName" placeholder="Optional">
+      </div>
+    </div>
+
+    <div class="ll-footer">
+      <div class="ll-tos" onclick="showTerms()">Terms of Service &amp; Disclaimer</div>
+    </div>
+  </div><!-- end landing-left -->
+
+  <!-- Right: mode cards + AI chat -->
+  <div class="landing-right">
+    <div class="landing-modes">
+      <div class="lr-tagline">What would you like to create?</div>
+      <div class="mode-cards">
+
+        <!-- Doc -->
+        <div class="mode-card" onclick="pickMode('doc')">
+          <div class="mode-card-demo">
+            <div class="mc-doc-preview">
+              <div class="mc-dh"></div><div class="mc-dp w90"></div><div class="mc-dp w80"></div><div class="mc-dp w70"></div><div class="mc-dimg"></div><div class="mc-dcap"></div><div class="mc-dp w90"></div><div class="mc-dp w60"></div>
+            </div>
+          </div>
+          <div class="mode-card-info">
+            <div class="mode-card-icon" style="background:linear-gradient(135deg,#4A6FA5,#6B8FC5);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </div>
+            <div class="mode-card-name">Doc</div>
+            <div class="mode-card-desc">Block-based documents with drag reorder and paper-quality layout.</div>
+          </div>
+        </div>
+
+        <!-- Slide -->
+        <div class="mode-card" onclick="pickMode('slide')">
+          <div class="mode-card-demo">
+            <div class="mc-slide-preview">
+              <div class="mc-title"></div><div class="mc-subtitle"></div><div class="mc-body"><div class="mc-body-line"></div><div class="mc-body-line"></div></div>
+            </div>
+          </div>
+          <div class="mode-card-info">
+            <div class="mode-card-icon" style="background:linear-gradient(135deg,#C4783A,#D9945A);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+            </div>
+            <div class="mode-card-name">Slide</div>
+            <div class="mode-card-desc">AI-powered presentations with free-form canvas and smart layouts.</div>
+          </div>
+        </div>
+
+        <!-- Sheet -->
+        <div class="mode-card" onclick="pickMode('sheet')">
+          <div class="mode-card-demo">
+            <div class="mc-sheet-preview">
+              <div class="mc-sheet-row header"><div class="mc-sheet-cell">A</div><div class="mc-sheet-cell">B</div><div class="mc-sheet-cell">C</div><div class="mc-sheet-cell">D</div></div>
+              <div class="mc-sheet-row"><div class="mc-sheet-cell">12.4</div><div class="mc-sheet-cell">8.7</div><div class="mc-sheet-cell">15.2</div><div class="mc-sheet-cell">9.1</div></div>
+              <div class="mc-sheet-row"><div class="mc-sheet-cell">6.3</div><div class="mc-sheet-cell">11.5</div><div class="mc-sheet-cell">7.8</div><div class="mc-sheet-cell">14.6</div></div>
+              <div class="mc-sheet-row"><div class="mc-sheet-cell">18.1</div><div class="mc-sheet-cell">5.2</div><div class="mc-sheet-cell">10.9</div><div class="mc-sheet-cell">3.7</div></div>
+            </div>
+          </div>
+          <div class="mode-card-info">
+            <div class="mode-card-icon" style="background:linear-gradient(135deg,#5A8A5A,#7AAF7A);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            </div>
+            <div class="mode-card-name">Sheet</div>
+            <div class="mode-card-desc">Spreadsheets with formulas, AI data analysis, and cross-references.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Workspace card -->
+      <div class="mode-card mode-card-wide" onclick="pickMode('workspace')">
+        <div class="mode-card-demo">
+          <div class="mc-ws-preview">
+            <div class="mc-ws-sidebar"><div class="mc-ws-dot active"></div><div class="mc-ws-dot"></div><div class="mc-ws-dot"></div><div class="mc-ws-dot dim"></div></div>
+            <div class="mc-ws-main">
+              <div class="mc-ws-row"><div class="mc-ws-thumb slide"></div><div class="mc-ws-meta"><div class="mc-ws-name"></div><div class="mc-ws-date"></div></div></div>
+              <div class="mc-ws-row"><div class="mc-ws-thumb doc"></div><div class="mc-ws-meta"><div class="mc-ws-name w60"></div><div class="mc-ws-date"></div></div></div>
+              <div class="mc-ws-row"><div class="mc-ws-thumb sheet"></div><div class="mc-ws-meta"><div class="mc-ws-name w80"></div><div class="mc-ws-date"></div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="mode-card-info">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="mode-card-icon" style="background:linear-gradient(135deg,#8B7BA8,#A899C4);width:32px;height:32px;border-radius:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div class="mode-card-name">Workspace</div>
+          </div>
+          <div class="mode-card-desc">Your project hub. Manage all docs, slides, and sheets in one place.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inline Chat Panel -->
+    <div class="mp-chat-panel" id="mpChatPanel">
+      <div class="mp-chat-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A899C4" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>AI Assistant</span>
+      </div>
+      <div class="mp-chat-messages" id="mpChatMessages">
+        <div class="mp-chat-welcome">
+          <div class="mp-chat-sloth">🦥</div>
+          <div class="mp-chat-hint">Tell me what you want to create.<br>I'll pick the right tool and build it for you.</div>
+          <div class="mp-chat-examples">
+            <button class="mp-chip" onclick="mpSendPrompt('Create a 5-slide pitch deck about AI trends')">Pitch deck about AI</button>
+            <button class="mp-chip" onclick="mpSendPrompt('Write a project proposal document')">Project proposal</button>
+            <button class="mp-chip" onclick="mpSendPrompt('Build a monthly budget spreadsheet')">Budget spreadsheet</button>
+          </div>
+        </div>
+      </div>
+      <div class="mp-chat-input-area">
+        <textarea id="mpChatInput" placeholder="Describe what you want to create..." rows="1"></textarea>
+        <button class="mp-send-btn" onclick="mpSendFromInput()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </button>
+      </div>
+    </div>
+  </div><!-- end landing-right -->
+
+  <!-- Mobile floating prompt -->
   <div class="mp-mobile-prompt" id="mpMobilePrompt">
     <textarea id="mpMobileChatInput" placeholder="Tell AI what to create..." rows="1"></textarea>
     <button class="mp-send-btn" onclick="mpSendFromMobile()">
@@ -711,6 +602,6 @@ if(location.protocol==='file:'){
   document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
 }
 </script>
-<script type="module" src="js/app.js?v=20260317eee"></script>
+<script type="module" src="js/app.js?v=20260317fff"></script>
 </body>
 </html>

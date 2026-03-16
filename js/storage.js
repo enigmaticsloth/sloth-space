@@ -243,7 +243,7 @@ export function autoLoad(){
     // Restore last mode to localStorage (backup for sessionStorage)
     // BUT only if user isn't on the mode picker (showModePicker clears session state)
     const lastMode=localStorage.getItem('sloth_last_mode');
-    const modePickerVisible=!document.getElementById('modePickerOverlay')?.classList.contains('hidden');
+    const modePickerVisible=!document.getElementById('landingOverlay')?.classList.contains('hidden');
     const onPicker=sessionStorage.getItem('sloth_on_picker')==='1';
     if(lastMode&&!sessionStorage.getItem('sloth_mode')&&!modePickerVisible&&!onPicker){
       sessionStorage.setItem('sloth_mode',lastMode);
@@ -713,19 +713,17 @@ export function setAuthUser(user){
         </div>
       </div>
     `;
-    // Update welcome page auth section if visible
-    const wStatus=document.getElementById('welcomeAuthStatus');
-    const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
-    const wName=document.getElementById('welcomeAuthName');
-    if(wStatus&&wLoggedIn){
-      wStatus.style.display='none';
-      wLoggedIn.style.display='block';
-      if(wName)wName.textContent=name;
-      const soRow=document.getElementById('welcomeSignOutRow');
-      if(soRow)soRow.style.display='block';
+    // Update landing page auth section if visible
+    const lStatus=document.getElementById('landingAuthStatus');
+    const lLoggedIn=document.getElementById('landingAuthLoggedIn');
+    const lName=document.getElementById('landingAuthName');
+    if(lStatus&&lLoggedIn){
+      lStatus.style.display='none';
+      lLoggedIn.style.display='block';
+      if(lName)lName.textContent=name;
     }
-    // Auto-fill welcome name field
-    const nameInput=document.getElementById('welcomeDisplayName');
+    // Auto-fill landing name field
+    const nameInput=document.getElementById('landingDisplayName');
     if(nameInput&&!nameInput.value)nameInput.value=name;
     // Restore LLM config from cloud on login (cloud takes priority)
     if(!S._authSyncDone){
@@ -737,11 +735,11 @@ export function setAuthUser(user){
       }
       if(window.isConfigured&&window.isConfigured()){
         const savedMode=sessionStorage.getItem('sloth_mode');
-        const pickerActive=sessionStorage.getItem('sloth_on_picker')==='1'||!document.getElementById('modePickerOverlay')?.classList.contains('hidden');
+        const pickerActive=sessionStorage.getItem('sloth_on_picker')==='1'||!document.getElementById('landingOverlay')?.classList.contains('hidden');
         if(pickerActive){
-          // User was on the mode picker — don't auto-enter any mode
+          // User was on the landing page — don't auto-enter any mode
         } else if(savedMode&&savedMode!=='slide'){
-          document.getElementById('welcomeOverlay')?.classList.add('hidden');
+          if(window.hideLanding) window.hideLanding();
           sessionStorage.setItem('sloth_active','1');
         } else if(savedMode==='slide'||!savedMode){
           if(window.enterSlides) window.enterSlides();
@@ -816,50 +814,8 @@ document.addEventListener('click',function(e){
 });
 
 export function showWelcome(){
-  const overlay=document.getElementById('welcomeOverlay');
-  overlay.classList.remove('hidden');
-  sessionStorage.removeItem('sloth_active');
-  // On mobile: reset to splash view (demo first)
-  const box=document.getElementById('welcomeBox');
-  if(box) box.classList.remove('mobile-form-active');
-  // Make sure config panel is hidden
-  const configPanel=document.getElementById('wbConfigPanel');
-  if(configPanel)configPanel.classList.remove('active');
-  // If already configured, pre-fill and show Connected state
-  if(window.isConfigured()){
-    window.welcomeProvider=S.llmConfig.provider;
-    // Pre-fill the config panel fields (in case user clicks to re-configure)
-    const grid=document.getElementById('welcomeProviderGrid');
-    grid.innerHTML=Object.entries(LLM_DEFAULTS).map(([key,def])=>
-      `<div class="wb-pgrid-item${key===S.llmConfig.provider?' active':''}" data-provider="${key}" onclick="setWelcomeProvider('${key}')">
-        <div class="wpg-dot" style="background:${def.color}"></div>
-        <div class="wpg-name">${def.label}</div>
-        <div class="wpg-desc">${def.desc}</div>
-      </div>`
-    ).join('');
-    window.setWelcomeProvider(S.llmConfig.provider);
-    // Fill saved values after setWelcomeProvider clears them
-    const isCloud=CLOUD_PROVIDERS.includes(S.llmConfig.provider);
-    if(isCloud){
-      document.getElementById('welcomeApiKey').value=S.llmConfig.apiKey||'';
-    }else if(S.llmConfig.provider==='ollama'){
-      document.getElementById('welcomeOllamaUrl').value=S.llmConfig.url||'http://localhost:11434';
-      document.getElementById('welcomeOllamaModel').value=S.llmConfig.model||'llama3.1:8b';
-    }else if(S.llmConfig.provider==='custom'){
-      document.getElementById('welcomeCustomUrl').value=S.llmConfig.url||'';
-      document.getElementById('welcomeCustomKey').value=S.llmConfig.apiKey||'';
-      document.getElementById('welcomeCustomModel').value=S.llmConfig.model||'';
-      document.getElementById('welcomeCustomRouter').value=S.llmConfig.router||'';
-    }
-    document.getElementById('welcomeDisplayName').value=S.llmConfig.displayName||'';
-    // Show Connected on button
-    const btn=document.getElementById('wbConnectBtn');
-    const def=LLM_DEFAULTS[S.llmConfig.provider]||{};
-    btn.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${def.color||'#8B9E8B'};margin-right:6px;"></span> Connected to ${def.label||S.llmConfig.provider}`;
-    btn.style.color='#fff'; btn.style.borderColor=def.color||'#8B9E8B';
-    btn.classList.add('connected');
-    btn._providerConfirmed=true;
-  }
+  // Redirect to the unified landing page
+  if(window.showLanding) window.showLanding();
 }
 
 export async function doLogout(){
@@ -888,24 +844,14 @@ export async function doWelcomeSignOut(){
   await S.supabaseClient.auth.signOut();
   clearAuthUser();
   clearLocalConfig();
-  // Reset welcome auth section
-  const wStatus=document.getElementById('welcomeAuthStatus');
-  const wLoggedIn=document.getElementById('welcomeAuthLoggedIn');
-  if(wStatus)wStatus.style.display='flex';
-  if(wLoggedIn)wLoggedIn.style.display='none';
-  const soRow=document.getElementById('welcomeSignOutRow');
-  if(soRow)soRow.style.display='none';
-  // Reset connect button
-  const btn=document.getElementById('wbConnectBtn');
-  if(btn){
-    btn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4m-7-11H1m22 0h-4m-2.3-6.7-2.8 2.8m-5.8 5.8-2.8 2.8m0-11.4 2.8 2.8m5.8 5.8 2.8 2.8"/><circle cx="12" cy="12" r="3"/></svg> Connect your LLM to get started';
-    btn.style.opacity=''; btn.style.color=''; btn.style.borderColor='';
-    btn.classList.remove('connected');
-    btn._providerConfirmed=false;
-  }
-  // Clear welcome config fields
-  const k=document.getElementById('welcomeApiKey'); if(k)k.value='';
-  const n=document.getElementById('welcomeDisplayName'); if(n)n.value='';
+  // Reset landing page auth section
+  const lStatus=document.getElementById('landingAuthStatus');
+  const lLoggedIn=document.getElementById('landingAuthLoggedIn');
+  if(lStatus)lStatus.style.display='block';
+  if(lLoggedIn)lLoggedIn.style.display='none';
+  // Clear landing config fields
+  const k=document.getElementById('landingApiKey'); if(k)k.value='';
+  const n=document.getElementById('landingDisplayName'); if(n)n.value='';
 }
 
 // ═══════════════════════════════════════════
