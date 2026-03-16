@@ -53,11 +53,34 @@
 .ll-save-btn { width:100%; padding:9px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; font-family:Arial; margin-top:8px; transition:transform 0.15s; }
 .ll-save-btn:hover { transform:translateY(-1px); }
 
-.ll-footer { margin-top:auto; padding-top:12px; }
-.ll-tos { font-size:10px; color:#555; cursor:pointer; text-align:center; }
+/* Demo showcase */
+.ll-demo { flex:1; display:flex; flex-direction:column; margin-top:16px; min-height:0; }
+.ll-demo-label { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; font-weight:600; }
+.ll-demo-screen { flex:1; min-height:80px; background:rgba(0,0,0,0.35); border:1px solid rgba(120,134,165,0.15); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:8px; overflow:hidden; }
+.ll-demo-prompt { font-size:11px; color:#9BA8C4; line-height:1.5; min-height:18px; }
+.ll-demo-prompt .dp-label { font-size:9px; color:#555; margin-bottom:3px; }
+.ll-demo-prompt .dp-text { color:#B8C4D8; }
+.ll-demo-prompt .dp-cursor { display:inline-block; width:1px; height:12px; background:#9BA8C4; margin-left:1px; animation:dp-blink 0.8s infinite; vertical-align:middle; }
+@keyframes dp-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.ll-demo-result { flex:1; min-height:0; overflow:hidden; }
+.ll-demo-result .dr-action { font-size:10px; color:#7886A5; margin-bottom:6px; display:flex; align-items:center; gap:5px; }
+.ll-demo-result .dr-action .dr-spinner { display:inline-block; width:10px; height:10px; border:1.5px solid rgba(120,134,165,0.3); border-top-color:#7886A5; border-radius:50%; animation:dr-spin 0.8s linear infinite; }
+@keyframes dr-spin { to{transform:rotate(360deg)} }
+.ll-demo-result .dr-preview { background:rgba(120,134,165,0.08); border:1px solid rgba(120,134,165,0.15); border-radius:6px; padding:8px 10px; }
+.ll-demo-result .dr-title { font-size:11px; color:#B8C4D8; font-weight:600; margin-bottom:4px; }
+.ll-demo-result .dr-items { font-size:9px; color:#777; line-height:1.6; }
+.ll-demo-result .dr-items .dr-item { display:flex; align-items:center; gap:4px; }
+.ll-demo-result .dr-items .dr-dot { width:4px; height:4px; border-radius:50%; flex-shrink:0; }
+.ll-demo-result .dr-done { font-size:10px; color:#5A9E5A; margin-top:6px; }
+.ll-demo-dots { display:flex; justify-content:center; gap:6px; padding:8px 0 4px; }
+.ll-demo-dots span { width:6px; height:6px; border-radius:50%; background:#333; transition:background 0.3s; }
+.ll-demo-dots span.active { background:#7886A5; }
+
+.ll-footer { margin-top:auto; padding-top:12px; text-align:center; }
+.ll-tos { font-size:12px; color:#777; cursor:pointer; text-align:center; }
 .ll-tos:hover { color:#9BA8C4; }
-.ll-author { font-size:10px; color:#666; text-align:center; margin-top:4px; font-style:italic; letter-spacing:0.3px; }
-.ll-github { display:inline-block; font-size:10px; color:#666; text-align:center; margin-top:6px; text-decoration:none; letter-spacing:0.3px; transition:color 0.15s; }
+.ll-author { font-size:12px; color:#888; text-align:center; margin-top:6px; font-style:italic; letter-spacing:0.3px; }
+.ll-github { display:block; font-size:12px; color:#888; text-align:center; margin-top:8px; text-decoration:none; letter-spacing:0.3px; transition:color 0.15s; }
 .ll-github:hover { color:#9BA8C4; text-decoration:underline; }
 
 /* Right: modes + chat */

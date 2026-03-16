@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317bbb2';
-import * as slide from './slide.js?v=20260317bbb2';
-import * as doc from './doc.js?v=20260317bbb2';
-import * as workspace from './workspace.js?v=20260317bbb2';
-import * as ai from './ai.js?v=20260317bbb2';
-import * as ui from './ui.js?v=20260317bbb2';
-import * as storage from './storage.js?v=20260317bbb2';
-import * as keys from './keys.js?v=20260317bbb2';
-import * as sheet from './sheet.js?v=20260317bbb2';
-import * as bench from './bench.js?v=20260317bbb2';
+import { S } from './state.js?v=20260317bbb3';
+import * as slide from './slide.js?v=20260317bbb3';
+import * as doc from './doc.js?v=20260317bbb3';
+import * as workspace from './workspace.js?v=20260317bbb3';
+import * as ai from './ai.js?v=20260317bbb3';
+import * as ui from './ui.js?v=20260317bbb3';
+import * as storage from './storage.js?v=20260317bbb3';
+import * as keys from './keys.js?v=20260317bbb3';
+import * as sheet from './sheet.js?v=20260317bbb3';
+import * as bench from './bench.js?v=20260317bbb3';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -325,4 +325,113 @@ ui.renderApp();
     typePrompt();
   }
   setTimeout(runDemo,1200);
+})();
+
+// ─── Left sidebar demo showcase animation ───
+(function(){
+  const SCENES=[
+    {
+      prompt:'Create a pitch deck for our startup',
+      action:'Generating 6 slides with Monet theme...',
+      title:'Startup Pitch Deck',
+      icon:'doc',
+      items:[
+        {dot:'#7886A5',text:'Cover — company name & tagline'},
+        {dot:'#9BA8C4',text:'Problem & Solution'},
+        {dot:'#A899C4',text:'Market Opportunity ($4.2B TAM)'},
+        {dot:'#C8A870',text:'Revenue Model & Pricing'},
+      ],
+      done:'6 slides generated'
+    },
+    {
+      prompt:'Summarize all files in Project Alpha',
+      action:'Reading 12 files from Project Alpha...',
+      title:'Project Alpha Summary',
+      icon:'ctx',
+      items:[
+        {dot:'#5A9E5A',text:'pitch-deck.sloth — 8 slides, Monet'},
+        {dot:'#7886A5',text:'market-research.doc — 2,400 words'},
+        {dot:'#C8A870',text:'budget-q4.sheet — 3 tabs, 140 rows'},
+        {dot:'#A899C4',text:'AI cross-referenced all 12 files'},
+      ],
+      done:'Summary ready — 5 key insights found'
+    },
+    {
+      prompt:'Set up a new project and add a doc',
+      action:'Creating project & document...',
+      title:'New Project Created',
+      icon:'auto',
+      items:[
+        {dot:'#7886A5',text:'Created project "Q1 Planning"'},
+        {dot:'#5A9E5A',text:'Created "Kickoff Notes" doc'},
+        {dot:'#C8A870',text:'Linked doc to project'},
+        {dot:'#9BA8C4',text:'Opened doc in editor'},
+      ],
+      done:'Project ready — start editing'
+    }
+  ];
+  let sceneIdx=0, timer=null;
+
+  function el(id){ return document.getElementById(id); }
+
+  function updateDots(total,current){
+    const d=el('llDemoDots');
+    if(!d) return;
+    d.innerHTML=Array.from({length:total},(_,i)=>`<span class="${i===current?'active':''}"></span>`).join('');
+  }
+
+  function typeText(target,text,speed,cb){
+    let i=0;
+    function tick(){
+      if(!el('llDemo')) return;
+      if(i<=text.length){
+        target.innerHTML=`<div class="dp-label">You type:</div><div class="dp-text">${text.slice(0,i)}<span class="dp-cursor"></span></div>`;
+        i++;
+        timer=setTimeout(tick,speed+Math.random()*15);
+      } else {
+        target.innerHTML=`<div class="dp-label">You type:</div><div class="dp-text">${text}</div>`;
+        if(cb) timer=setTimeout(cb,400);
+      }
+    }
+    tick();
+  }
+
+  function showAction(scene,cb){
+    const r=el('llDemoResult');
+    if(!r) return;
+    r.innerHTML=`<div class="dr-action"><span class="dr-spinner"></span>${scene.action}</div>`;
+    timer=setTimeout(cb,1200);
+  }
+
+  function showResult(scene,cb){
+    const r=el('llDemoResult');
+    if(!r) return;
+    let html=`<div class="dr-preview"><div class="dr-title">${scene.title}</div><div class="dr-items">`;
+    scene.items.forEach(it=>{
+      html+=`<div class="dr-item"><span class="dr-dot" style="background:${it.dot}"></span>${it.text}</div>`;
+    });
+    html+=`</div></div><div class="dr-done">✓ ${scene.done}</div>`;
+    r.innerHTML=html;
+    timer=setTimeout(cb,3500);
+  }
+
+  function runScene(){
+    const overlay=document.getElementById('landingOverlay');
+    if(!overlay||overlay.classList.contains('hidden')){
+      timer=setTimeout(runScene,2000);
+      return;
+    }
+    const p=el('llDemoPrompt'), r=el('llDemoResult');
+    if(!p||!r){ timer=setTimeout(runScene,2000); return; }
+    const scene=SCENES[sceneIdx%SCENES.length];
+    updateDots(SCENES.length,sceneIdx%SCENES.length);
+    sceneIdx++;
+    p.innerHTML=''; r.innerHTML='';
+    typeText(p,scene.prompt,25,function(){
+      showAction(scene,function(){
+        showResult(scene,runScene);
+      });
+    });
+  }
+  setTimeout(runScene,2000);
 })();

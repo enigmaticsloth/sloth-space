@@ -1539,13 +1539,19 @@ function checkWelcomeScreen() {
   const hasConfig = window.loadConfig();
 
   // History API: check URL hash for deep-linking (e.g. #doc, #slide)
+  // BUT skip if we have saved tabs to restore (refresh scenario)
   const validModes=['slide','doc','sheet','workspace'];
   const hashMode=location.hash.replace('#','');
   if(hasConfig && window.isConfigured() && validModes.includes(hashMode)){
-    // Replace current history entry so initial load has correct state
-    history.replaceState({mode:hashMode},'','#'+hashMode);
-    pickMode(hashMode);
-    return;
+    // Check if we have saved tabs — if so, fall through to tab restore logic below
+    const hasSavedTabs=!!localStorage.getItem(_MODE_TABS_KEY);
+    if(!hasSavedTabs){
+      // True deep link (no prior session) — create fresh tab
+      history.replaceState({mode:hashMode},'','#'+hashMode);
+      pickMode(hashMode);
+      return;
+    }
+    // Otherwise fall through — tab restore will handle it
   }
 
   // Restore sessionStorage from localStorage backup (survives tab close)

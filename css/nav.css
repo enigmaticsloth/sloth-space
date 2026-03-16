@@ -73,6 +73,6 @@
 .fn-action-btn.monet-plum:hover { background:rgba(150,120,170,0.26); color:#C0A8D4; border-color:#A088B0; }
 .fn-action-btn.primary { background:#7886A5; color:#fff; border-color:#7886A5; }
 .fn-action-btn.primary:hover { background:#6775A0; }
-.fn-select-toggle { margin-left:auto; }
+.fn-select-toggle { width:100%; text-align:center; }
 .fn-select-toggle.active { background:#7886A5; color:#fff; border-color:#7886A5; }
 
