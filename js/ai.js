@@ -725,7 +725,7 @@ Rules:
 - Each content/two-column slide must have 3-5 detailed bullet items
 - Use varied layouts: mix content, two-column, quote, data-table. NOT all bullet lists
 - Include speaker notes on every slide
-- data-table must have realistic numbers
+- data-table: ONLY use when the source material contains actual numerical data. NEVER fabricate statistics, sales figures, or metrics that do not exist in the source content. If there is no data, do NOT include a data-table slide.
 - The user expects a COMPLETE, PRESENTABLE deck — not an outline
 
 ## OUTPUT SCHEMA
@@ -1488,6 +1488,9 @@ ${ABOUT_TEXTS.sheet}
 `;
   }
 
+  // Block user interaction during AI operations
+  _showAIBlocker();
+
   try{
     // ── If user attached images, go to image path ──
     if(pendingImages.length>0){
@@ -1631,10 +1634,19 @@ ${ABOUT_TEXTS.sheet}
       }
     }
 
+    // ── Smart fallback: generate → describe when user just wants a summary (not a file) ──
+    // "總結這個專案" / "summarize this" → should show summary in chat, not generate a doc
+    const isSummarizeOnly=/^(summarize|summary|sum up|overview|recap|總結|摘要|概述|整理|歸納)/i.test(text.trim())
+      && !/file|document|doc|report|slide|presentation|sheet|檔案|文件|文檔|簡報|報告|投影片|試算表/i.test(text);
+    if(intent==='generate' && isSummarizeOnly){
+      console.log('Smart fallback: generate → describe (user wants summary, not file creation)');
+      intent='describe';
+    }
+
     // ── Smart fallback: describe → generate when user asks to CREATE a file ──
     // This catches cases where the router picks "describe" but the user actually
     // wants to create a document/report/slides (e.g. "做份文件解釋" / "make a doc explaining")
-    if(intent==='describe'){
+    if(intent==='describe' && !isSummarizeOnly){
       // Check if router detected a target (doc/slide) — means it saw creation intent
       if(routerData.target){
         console.log('Smart fallback: describe → generate (router detected target:'+routerData.target+')');
@@ -1790,6 +1802,26 @@ ${ABOUT_TEXTS.sheet}
           const descDiv=addMessage('','ai');
           descDiv.textContent=summary;
           S.chatHistory.push({role:'assistant',content:summary});
+
+          // Offer to generate a file from the summary
+          const isZh=/[\u4e00-\u9fff]/.test(text);
+          const followUp=addMessage('','system');
+          followUp.innerHTML=isZh
+            ? '需要產生檔案嗎？ <span class="ai-action-btn" data-gen="doc">📄 文件</span> <span class="ai-action-btn" data-gen="slide">📊 投影片</span> <span class="ai-action-btn" data-gen="sheet">📋 試算表</span>'
+            : 'Generate a file? <span class="ai-action-btn" data-gen="doc">📄 Doc</span> <span class="ai-action-btn" data-gen="slide">📊 Slides</span> <span class="ai-action-btn" data-gen="sheet">📋 Sheet</span>';
+          followUp.querySelectorAll('.ai-action-btn').forEach(btn=>{
+            btn.style.cssText='cursor:pointer;padding:4px 12px;border-radius:6px;background:#f0f0f0;margin:0 4px;display:inline-block;font-size:0.9em;transition:background 0.2s';
+            btn.onmouseenter=()=>btn.style.background='#e0e0e0';
+            btn.onmouseleave=()=>btn.style.background='#f0f0f0';
+            btn.onclick=()=>{
+              followUp.remove();
+              const target=btn.dataset.gen;
+              const genPrompt=isZh
+                ? `根據上面的總結，產生一份${target==='doc'?'文件':target==='slide'?'投影片':'試算表'}`
+                : `Based on the summary above, generate a ${target==='doc'?'document':target==='slide'?'presentation':'spreadsheet'}`;
+              window.sendMessage(genPrompt);
+            };
+          });
         }catch(e){
           console.error('Describe failed:',e);
           statusDiv.remove();
@@ -1998,7 +2030,8 @@ CRITICAL RULES:
 - If there are budget items, list each item as a row with columns like "Item", "Amount", "Category".
 - If there are projections, list each projection as a row with "Metric", "Q1", "Q2", etc.
 - NEVER make rows like {"Title":"Introduction","Description":"..."} — that's useless. Extract the DATA inside.
-- If no structured data can be found, try to extract quantitative claims from the prose.
+- NEVER fabricate or invent data that does not exist in the source content. Do NOT create fake statistics, sales figures, or metrics.
+- If no structured numerical data can be found, extract key text-based information (names, categories, descriptions) into a useful table. Do NOT invent numbers.
 
 SOURCE CONTENT:
 ${sourceContent}`;
@@ -2048,7 +2081,7 @@ ${sourceContent}`;
       }else if(S.currentMode==='slide' && S.currentDeck){
         const slideContent=getCurrentContentText();
         if(slideContent){
-          docWsContext+=`\n\n## SOURCE SLIDE DATA\nThe user wants to convert these slides into a document. Use the slide content below to create a well-structured document.\n\n${slideContent}`;
+          docWsContext+=`\n\n## SOURCE SLIDE DATA\nThe user wants to convert these slides into a document. Use the slide content below to create a well-structured document.\n\nCRITICAL: Use ONLY the information from these slides. Do NOT invent data, statistics, or content that is not present in the source.\n\n${slideContent}`;
           addMessage(`📊 Converting slides to document...`,'system');
         }
       }
@@ -2072,7 +2105,7 @@ ${sourceContent}`;
       }else if(S.currentMode==='doc' && S.currentDoc){
         const docContent=getCurrentContentText();
         if(docContent){
-          slideWsContext+=`\n\n## SOURCE DOCUMENT DATA\nThe user wants to convert this document into a presentation. Use the document content below to create well-structured slides.\n\n${docContent}`;
+          slideWsContext+=`\n\n## SOURCE DOCUMENT DATA\nThe user wants to convert this document into a presentation. Use the document content below to create well-structured slides.\n\nCRITICAL: Use ONLY the information from this document. Do NOT invent data, statistics, numbers, or tables that are not present in the source. If the document has no numerical data, do NOT create data-table slides with fabricated numbers.\n\n${docContent}`;
           addMessage(`📊 Converting document to slides...`,'system');
         }
       }
@@ -2158,6 +2191,7 @@ ${sourceContent}`;
     statusDiv.remove();
     addMessage(`Error: ${err.message}. Try again?`,'ai');
   }finally{
+    _hideAIBlocker(); // Re-enable user interaction
     sendBtn.disabled=false;
     sendBtn.innerHTML=SEND_ARROW_SVG;
     if(window.modeSave) window.modeSave(); // Unified save for current mode
@@ -2875,6 +2909,30 @@ function _hideAIActionOverlay() {
   el.style.animation = 'aiOverlayOut 0.25s ease forwards';
   setTimeout(() => el.remove(), 260);
 }
+
+// ── Interaction blocker: prevents user clicks/touches during AI operations ──
+function _showAIBlocker() {
+  if (document.getElementById('ai-interaction-blocker')) return;
+  const blocker = document.createElement('div');
+  blocker.id = 'ai-interaction-blocker';
+  Object.assign(blocker.style, {
+    position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+    zIndex: '99998', // just below the overlay banner (99999)
+    background: 'transparent', cursor: 'wait',
+  });
+  // Block all pointer/touch events
+  const stop = e => { e.stopPropagation(); e.preventDefault(); };
+  ['pointerdown','pointerup','click','dblclick','mousedown','mouseup',
+   'touchstart','touchmove','touchend','contextmenu'].forEach(evt => {
+    blocker.addEventListener(evt, stop, { capture: true, passive: false });
+  });
+  // Allow chat input area to remain functional (user can still type next message)
+  document.body.appendChild(blocker);
+}
+function _hideAIBlocker() {
+  const el = document.getElementById('ai-interaction-blocker');
+  if (el) el.remove();
+}
 function _updateAIActionOverlay(text) {
   const el = document.getElementById('ai-action-overlay');
   if (el) {
@@ -3127,5 +3185,7 @@ export {
   SHEET_FILL_PROMPT,
   _showAIActionOverlay,
   _hideAIActionOverlay,
-  _updateAIActionOverlay
+  _updateAIActionOverlay,
+  _showAIBlocker,
+  _hideAIBlocker
 };

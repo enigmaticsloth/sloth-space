@@ -1001,8 +1001,8 @@ function checkWelcomeScreen() {
       sessionStorage.setItem('sloth_mode',lastMode);
       sessionStorage.setItem('sloth_active','1');
     }
-    // Clear the picker flag after checking
-    sessionStorage.removeItem('sloth_on_picker');
+    // NOTE: Do NOT clear sloth_on_picker here — autoLoad() and setAuthUser() run AFTER this
+    // and need to see the flag. It gets cleared when user enters a mode (modeEnter).
   }
   // Only skip welcome if user was actively working (refresh or restored), not fresh setup
   if (hasConfig && window.isConfigured() && sessionStorage.getItem('sloth_active')) {
@@ -1733,6 +1733,9 @@ function mpSendPrompt(text) {
 
   // Async flow
   (async () => {
+    // Block user interaction during AI routing + mode entry
+    if (window._showAIBlocker) window._showAIBlocker();
+
     // Step 1: Show Monet overlay during routing
     if (window._showAIActionOverlay) window._showAIActionOverlay('AI ▸ Analyzing request...');
 
@@ -1759,6 +1762,8 @@ function mpSendPrompt(text) {
 
     // Step 6: Hide overlay before entering mode (sendMessage will show its own)
     if (window._hideAIActionOverlay) window._hideAIActionOverlay();
+    // Release blocker — sendMessage will create its own blocker
+    if (window._hideAIBlocker) window._hideAIBlocker();
 
     // Step 7: Enter the mode (hides overlay, renders mode UI)
     modeEnter(mode);
@@ -1773,7 +1778,11 @@ function mpSendPrompt(text) {
         if (window.sendMessage) window.sendMessage();
       }
     }, 400);
-  })();
+  })().catch(() => {
+    // Safety: release blocker if routing fails
+    if (window._hideAIBlocker) window._hideAIBlocker();
+    if (window._hideAIActionOverlay) window._hideAIActionOverlay();
+  });
 }
 
 /**

@@ -244,7 +244,8 @@ export function autoLoad(){
     // BUT only if user isn't on the mode picker (showModePicker clears session state)
     const lastMode=localStorage.getItem('sloth_last_mode');
     const modePickerVisible=!document.getElementById('modePickerOverlay')?.classList.contains('hidden');
-    if(lastMode&&!sessionStorage.getItem('sloth_mode')&&!modePickerVisible){
+    const onPicker=sessionStorage.getItem('sloth_on_picker')==='1';
+    if(lastMode&&!sessionStorage.getItem('sloth_mode')&&!modePickerVisible&&!onPicker){
       sessionStorage.setItem('sloth_mode',lastMode);
       sessionStorage.setItem('sloth_active','1');
     }
@@ -736,10 +737,13 @@ export function setAuthUser(user){
       }
       if(window.isConfigured&&window.isConfigured()){
         const savedMode=sessionStorage.getItem('sloth_mode');
-        if(savedMode&&savedMode!=='slide'){
+        const pickerActive=sessionStorage.getItem('sloth_on_picker')==='1'||!document.getElementById('modePickerOverlay')?.classList.contains('hidden');
+        if(pickerActive){
+          // User was on the mode picker — don't auto-enter any mode
+        } else if(savedMode&&savedMode!=='slide'){
           document.getElementById('welcomeOverlay')?.classList.add('hidden');
           sessionStorage.setItem('sloth_active','1');
-        } else {
+        } else if(savedMode==='slide'||!savedMode){
           if(window.enterSlides) window.enterSlides();
         }
         if(window.addMessage) window.addMessage('☁️ Settings synced from cloud.','system');
