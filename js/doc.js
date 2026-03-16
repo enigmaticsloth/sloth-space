@@ -541,58 +541,28 @@ export function handleInsertedFiles(files){
 //
 // Architecture:
 //   docPushUndo()  — snapshot current state to undo stack (called before edits)
-//   docUndo()      — restore previous different state from undo stack
-//   docRedo()      — restore next different state from redo stack
+//   docUndo()      — restore previous state from undo stack (same pattern as slide undo)
+//   docRedo()      — restore next state from redo stack
 //
-// Content comparison uses docContentKey() which strips the `updated` timestamp,
-// so snapshots that differ only in timestamp are treated as identical.
-//
-// Persistence: stacks are saved to sessionStorage (survives refresh, cleared on tab close).
-// docSaveUndoStacks() is called after every stack mutation.
-// docRestoreUndoStacks() is called when entering doc mode.
-//
-// Guard: S.docUndoRedoInProgress prevents docPushUndo() from firing during
-// renderDocMode() re-focus cycles triggered by undo/redo.
+// Simplified to match the proven slide undo system: simple push/pop, no dedup, no content comparison.
 
-// ── Snapshot & comparison ──
+// ── Snapshot ──
 export function docSnapshotDoc(){
   if(!S.currentDoc) return null;
   return JSON.parse(JSON.stringify(S.currentDoc));
 }
 
-export function docContentKey(doc){
-  if(!doc) return '';
-  const copy=Object.assign({},doc);
-  delete copy.updated;
-  return JSON.stringify(copy);
-}
-
-export function docStackHasDifferent(stack){
-  const curKey=docContentKey(S.currentDoc);
-  for(let i=stack.length-1;i>=0;i--){
-    if(docContentKey(stack[i])!==curKey) return true;
-  }
-  return false;
-}
-
-// Pop first snapshot from stack whose content differs from current state.
-export function docPopDifferent(stack){
-  const curKey=docContentKey(S.currentDoc);
-  while(stack.length){
-    const candidate=stack.pop();
-    if(docContentKey(candidate)!==curKey) return candidate;
-  }
-  return null;
-}
+// Legacy exports kept for compatibility but no longer used internally
+export function docContentKey(doc){ return doc ? JSON.stringify(doc) : ''; }
+export function docStackHasDifferent(stack){ return stack.length > 0; }
+export function docPopDifferent(stack){ return stack.length ? stack.pop() : null; }
 
 // ── Flush editing DOM → model ──
 export function docFlushEditing(){
   clearTimeout(S.docUndoPushTimer);
-  // In freeflow mode, sync all blocks from the DOM
   const page=document.getElementById('docPage');
   if(!page) return;
 
-  // Walk through all block elements and sync their content
   const walker=document.createTreeWalker(page, NodeFilter.SHOW_ELEMENT, {
     acceptNode(node){
       if(node.dataset?.blockId) return NodeFilter.FILTER_ACCEPT;
@@ -606,7 +576,6 @@ export function docFlushEditing(){
     const block=docGetBlock(bid);
     if(!block) continue;
 
-    // Extract text content from the element
     let text='';
     for(const tn of node.childNodes){
       if(tn.nodeType===Node.TEXT_NODE){
@@ -621,49 +590,45 @@ export function docFlushEditing(){
   S.currentDoc.updated=new Date().toISOString();
 }
 
-// ── Stack operations ──
+// ── Stack operations (matches slide.js pattern exactly) ──
 export function docPushUndo(){
-  if(S.docUndoRedoInProgress) return;
+  // Save current state BEFORE any mutation (same as slide pushUndo)
   const snap=docSnapshotDoc();
   if(!snap) return;
-  const key=docContentKey(snap);
-  if(S.docUndoStack.length>0 && docContentKey(S.docUndoStack[S.docUndoStack.length-1])===key) return;
   S.docUndoStack.push(snap);
   if(S.docUndoStack.length>DOC_MAX_UNDO) S.docUndoStack.shift();
-  S.docRedoStack=[];
+  S.docRedoStack=[]; // new action clears redo
   docUpdateUndoUI();
   docSaveUndoStacks();
 }
 
 export function docUndo(){
   if(!S.docUndoStack.length) return;
-  S.docUndoRedoInProgress=true;
-  const snap=docPopDifferent(S.docUndoStack);
-  if(!snap){ S.docUndoRedoInProgress=false; docUpdateUndoUI(); docSaveUndoStacks(); return; }
+  // Save current state to redo stack
   const current=docSnapshotDoc();
   if(current) S.docRedoStack.push(current);
+  // Restore previous state
+  const snap=S.docUndoStack.pop();
   S.currentDoc=snap;
   S.docEditingBlockId=null;
   docUpdateUndoUI();
   renderDocMode();
   docAutoSave();
-  S.docUndoRedoInProgress=false;
   docSaveUndoStacks();
 }
 
 export function docRedo(){
   if(!S.docRedoStack.length) return;
-  S.docUndoRedoInProgress=true;
-  const snap=docPopDifferent(S.docRedoStack);
-  if(!snap){ S.docUndoRedoInProgress=false; docUpdateUndoUI(); docSaveUndoStacks(); return; }
+  // Save current state to undo stack
   const current=docSnapshotDoc();
   if(current) S.docUndoStack.push(current);
+  // Restore redo state
+  const snap=S.docRedoStack.pop();
   S.currentDoc=snap;
   S.docEditingBlockId=null;
   docUpdateUndoUI();
   renderDocMode();
   docAutoSave();
-  S.docUndoRedoInProgress=false;
   docSaveUndoStacks();
 }
 
