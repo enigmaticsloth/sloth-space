@@ -287,10 +287,11 @@ export function wsFileToContext(file) {
     );
   }
   if (file.type === 'sheet') {
-    const c = file.content;
-    let table = c.columns.join('\t') + '\n';
-    table += (c.rows || []).map(r => r.join('\t')).join('\n');
-    return `[WORKSPACE SHEET: "${file.title}" (id: ${file.id})]\n${table}`;
+    // Use compact markdown table via sheetToMarkdownTable (70-80% smaller than raw JSON)
+    const mdTable = window.sheetToMarkdownTable
+      ? window.sheetToMarkdownTable(file.content)
+      : _fallbackSheetTable(file.content);
+    return `[WORKSPACE SHEET: "${file.title}" (id: ${file.id})]\n${mdTable}`;
   }
   if (file.type === 'slides') {
     return `[WORKSPACE SLIDES: "${file.title}" (id: ${file.id})]\n${JSON.stringify(file.content)}`;
@@ -300,6 +301,29 @@ export function wsFileToContext(file) {
     return `[WORKSPACE IMAGE: "${file.title}" (id: ${file.id}) ${c.width}×${c.height} ${c.mimeType}]`;
   }
   return '';
+}
+
+// Fallback sheet table renderer if sheetToMarkdownTable isn't available yet
+function _fallbackSheetTable(content) {
+  if (!content) return '';
+  const c = content;
+  // Handle both old format (columns as string array) and new format (columns as objects)
+  const colNames = (c.columns || []).map(col => typeof col === 'string' ? col : (col.name || col.id || ''));
+  if (colNames.length === 0) return '';
+  const lines = ['| ' + colNames.join(' | ') + ' |', '|' + colNames.map(() => ' --- ').join('|') + '|'];
+  for (const row of (c.rows || [])) {
+    if (Array.isArray(row)) {
+      lines.push('| ' + row.join(' | ') + ' |');
+    } else if (row.cells) {
+      const cols = c.columns || [];
+      const cells = cols.map(col => {
+        const id = typeof col === 'string' ? col : col.id;
+        return row.cells[id] ?? '';
+      });
+      lines.push('| ' + cells.join(' | ') + ' |');
+    }
+  }
+  return lines.join('\n');
 }
 
 /**

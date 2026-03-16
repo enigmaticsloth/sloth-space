@@ -262,6 +262,16 @@ INTENTS:
 "deck_edit" — batch edit ALL slides at once or restructure entire doc.
   "translate everything to English", "translate everything", "reorganize this article"
 
+"sheet_fill" — SHEET MODE ONLY. User wants AI to FILL, COMPUTE, or GENERATE values for cells/columns/rows based on existing data.
+  Output: {"intent":"sheet_fill","instruction":"what the user wants filled","targetCol":"column name or null","targetRange":"description or null"}
+  Examples:
+  - "fill column C with estimated market share" → {"intent":"sheet_fill","instruction":"estimate market share based on product data","targetCol":"C"}
+  - "based on the product names on the left, fill in their prices" → {"intent":"sheet_fill","instruction":"fill prices for each product","targetCol":null}
+  - "predict next quarter revenue for each row" → {"intent":"sheet_fill","instruction":"predict next quarter revenue","targetCol":null}
+  - "translate column B to English" → {"intent":"sheet_fill","instruction":"translate to English","targetCol":"B"}
+  - "categorize each item" → {"intent":"sheet_fill","instruction":"categorize items","targetCol":null}
+  CRITICAL: This is ONLY for sheet mode when the user wants to WRITE/FILL data into cells using AI. If they just want to ASK about data (analyze, summarize), use "describe".
+
 "describe" — user is asking ABOUT THE CURRENT DOCUMENT/CONTENT: what it says, summarize it, what's in it, analyze data, calculate values, explain meaning.
   Output: {"intent":"describe"}
   Examples: "what is this about", "what is the current content", "summarize this", "what does this say", "what does this presentation cover", "help me summarize", "content overview", "what have we written"
@@ -385,8 +395,11 @@ PRIORITY RULES (follow in order):
 
 MODE-SPECIFIC:
 - "style" and "image" intents ONLY in slide mode. In doc mode use content_edit or generate.
-- In DOC mode: insert table/divider, position image → content_edit. Topic creation → generate.
+- In DOC mode: insert table/divider, position image → content_edit. Topic creation → generate. To convert doc into slides → generate with target "slide". To extract doc data to spreadsheet → generate with target "sheet".
+- In SLIDE mode: to convert slides into a document → generate with target "doc". To extract slide data to spreadsheet → generate with target "sheet".
+- In SHEET mode: if user wants to FILL/COMPUTE/GENERATE cell values using AI → "sheet_fill". If user wants to turn sheet data INTO a presentation/slides → "generate" with target "slide". If user wants to turn sheet data into a document → generate with target "doc". If user just asks about data → "describe".
 - In WORKSPACE mode: if user asks to CREATE/WRITE/MAKE a document/report/slides about a project → "generate" with target. "describe" is ONLY for read-only questions.
+- CROSS-MODE CONVERSION: when user says "turn this into X" / "convert to X" / "make slides from this" / "make a doc from this" / "extract to spreadsheet", use "generate" with the appropriate target ("slide", "doc", or "sheet").
 - NEVER choose "chat" when user wants content created, edited, or deleted.
 - NEVER choose "chat" if the message contains a topic/subject. Always prefer "generate" or "about".
 
@@ -533,6 +546,29 @@ Sloth Space, Slides, Doc, Sheet, Workspace, Project, PPTX, PowerPoint, CSV, AI, 
 Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, emojis, markdown bold markers, numbered lists, line breaks.
 Only translate the regular text content. Output ONLY the translated text, nothing else.`;
 
+// Sheet Fill prompt — AI as a Function
+const SHEET_FILL_PROMPT=`You are Sloth Space's AI data assistant. The user wants you to FILL cells in their spreadsheet based on existing data and their instruction.
+
+You will receive:
+1. The current sheet data as a markdown table
+2. The user's instruction describing what to fill
+3. (Optional) A target column name
+
+Your job: Generate values for the requested cells. Output ONLY a JSON object:
+{"column":"target column name","values":["val1","val2","val3",...]}
+
+Rules:
+- "column" must be an EXISTING column name from the sheet, or a new column name if the user asks to add one.
+- "values" array must have EXACTLY the same length as the number of data rows (excluding header).
+- Each value should be a string. Use "" for cells you can't determine.
+- If the user asks to fill a specific column, fill that column.
+- If no specific column is mentioned, infer the best target column (usually an empty one, or create a new column name).
+- Be intelligent: use the existing data to inform your values. If the sheet has product names and the user asks for prices, estimate reasonable prices.
+- For translations, translate each cell value in the target column.
+- For categorization, assign appropriate categories based on the data.
+- For predictions/estimates, provide reasonable values with context from the data.
+- Output ONLY the JSON object. No explanation, no markdown fences.`;
+
 // Describe/summarize prompt for current content
 const DESCRIBE_PROMPT=`You are Sloth Space's content assistant. The user wants to understand their current document. Read the content below and respond to their specific question. Use the same language the user asked in.
 
@@ -596,7 +632,10 @@ function getCurrentContentText(){
   }
   if(S.currentMode==='sheet'&&S.sheet&&S.sheet.current){
     const sh=S.sheet.current;
-    const serialized=window.shSerializeForAI ? window.shSerializeForAI() : '';
+    // Prefer compact markdown table (sheetToMarkdownTable) over old shSerializeForAI
+    const serialized=window.sheetToMarkdownTable
+      ? window.sheetToMarkdownTable(sh)
+      : (window.shSerializeForAI ? window.shSerializeForAI() : '');
     if(serialized){
       const lines=serialized.split('\n');
       const preview=lines.slice(0,60).join('\n')+(lines.length>60?'\n... (truncated)':'');
@@ -1609,6 +1648,69 @@ async function sendMessage(){
         }
       }
 
+    }else if(intent==='sheet_fill'){
+      // ── SHEET FILL: AI as Function — fill cells with AI-generated values ──
+      if(S.currentMode!=='sheet' || !S.sheet?.current){
+        statusDiv.remove();
+        addMessage('Please open a sheet first before asking me to fill data.','ai');
+      }else{
+        statusDiv.textContent='AI is analyzing your data...';
+        _showAIActionOverlay('AI ▸ Generating cell values...');
+        try{
+          const sh=S.sheet.current;
+          const mdTable=window.sheetToMarkdownTable ? window.sheetToMarkdownTable(sh) : '';
+          const instruction=routerData.instruction || text;
+          const targetCol=routerData.targetCol || null;
+          let fillPrompt=`## SHEET DATA\n${mdTable}\n\n## INSTRUCTION\n${instruction}`;
+          if(targetCol) fillPrompt+=`\n\nTarget column: ${targetCol}`;
+          fillPrompt+=`\n\nNumber of data rows: ${sh.rows.length}`;
+
+          const raw=await callLLM(SHEET_FILL_PROMPT,[{role:'user',content:fillPrompt}],{temperature:0.3,max_tokens:4096,json:true});
+          const result=extractJSON(raw);
+          if(!result || !result.values || !Array.isArray(result.values)){
+            throw new Error('AI returned invalid data format');
+          }
+
+          // Find or create the target column
+          let col=sh.columns.find(c=>c.name.toLowerCase()===result.column?.toLowerCase());
+          if(!col){
+            // Create new column
+            const newId='col_'+Date.now().toString(36);
+            col={id:newId, name:result.column||'AI Fill', width:120};
+            sh.columns.push(col);
+          }
+
+          // Push undo before batch write
+          if(window.shPushUndo) window.shPushUndo();
+
+          // Batch write values
+          let written=0;
+          for(let i=0; i<Math.min(result.values.length, sh.rows.length); i++){
+            const val=result.values[i];
+            if(val!==undefined && val!==null){
+              sh.rows[i].cells[col.id]=String(val);
+              written++;
+            }
+          }
+          sh.updated=new Date().toISOString();
+
+          statusDiv.remove();
+          _updateAIActionOverlay(`AI ▸ Filled ${written} cells ✓`);
+          setTimeout(_hideAIActionOverlay, 1200);
+          addMessage(`✓ AI filled ${written} cells in column "${col.name}"`,'ai');
+          S.chatHistory.push({role:'assistant',content:`[Sheet fill: ${written} cells in "${col.name}"]`});
+
+          // Re-render and save
+          if(window.renderSheetMode) window.renderSheetMode();
+          if(window.shAutoSave) window.shAutoSave();
+        }catch(e){
+          console.error('Sheet fill error:',e);
+          statusDiv.remove();
+          _hideAIActionOverlay();
+          addMessage(`Error filling cells: ${e.message}`,'ai');
+        }
+      }
+
     }else if(intent==='describe'){
       // ── DESCRIBE: summarize current content + project context ──
       const contentText=getCurrentContentText();
@@ -1813,22 +1915,101 @@ async function sendMessage(){
         S.chatHistory.push({role:'assistant',content:'Please click the region on the slide you want to edit, or tell me which page and section to modify.'});
       }
 
-    }else if(intent==='generate'&&(S.currentMode==='doc'||(S.currentMode==='workspace'&&routerData.target!=='slide'))){
-      // ── DOC GENERATE: create doc blocks (also from workspace when user asks for doc/report) ──
-      if(S.currentMode==='workspace'){
-        // Auto-switch to doc mode so the generated document renders
+    }else if(intent==='generate'&&routerData.target==='sheet'){
+      // ── CROSS-MODE: Convert current content to spreadsheet ──
+      statusDiv.textContent='Converting to spreadsheet...';
+      const sourceContent=getCurrentContentText();
+      if(!sourceContent){
+        statusDiv.remove();
+        addMessage('No content to convert. Please open a document or slides first.','ai');
+      }else{
+        _showAIActionOverlay('AI ▸ Converting to spreadsheet...');
+        addMessage(`📊 Converting ${S.currentMode} data to spreadsheet...`,'system');
+        const convertPrompt=`You are a data extraction AI. Convert the following content into a spreadsheet format.
+Output ONLY a JSON object: {"title":"sheet title","columns":[{"name":"col1"},{"name":"col2"}],"rows":[{"cells":{"col1":"val","col2":"val"}},...]}
+Extract structured data: names, numbers, dates, categories. Create meaningful column headers.
+If the content has tables, extract them. If it's prose, extract key entities and facts into columns.
+
+SOURCE CONTENT:
+${sourceContent}`;
+        try{
+          const raw=await callLLM(convertPrompt,[{role:'user',content:text}],{temperature:0.3,max_tokens:8192,json:true});
+          const result=extractJSON(raw);
+          if(!result||!result.columns||!result.rows) throw new Error('Invalid sheet data');
+          // Build sheet object
+          const sheetId='sh_'+Date.now();
+          const cols=result.columns.map((c,i)=>({id:'col_'+i, name:c.name||('Col '+(i+1)), width:120}));
+          const rows=result.rows.map(r=>{
+            const cells={};
+            cols.forEach((col,i)=>{
+              const key=result.columns[i].name||('Col '+(i+1));
+              cells[col.id]=String(r.cells?.[key]??r.cells?.[col.id]??'');
+            });
+            return {id:'row_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), cells};
+          });
+          const sheetData={id:sheetId, title:result.title||'Extracted Data', columns:cols, rows, created:new Date().toISOString(), updated:new Date().toISOString()};
+          // Switch to sheet mode and load data
+          window.modeEnter('sheet');
+          if(window.shLoadData) window.shLoadData(sheetData);
+          statusDiv.remove();
+          _updateAIActionOverlay(`AI ▸ Created sheet with ${rows.length} rows ✓`);
+          setTimeout(_hideAIActionOverlay,1200);
+          addMessage(`✓ Converted to sheet "${sheetData.title}" (${rows.length} rows × ${cols.length} cols)`,'ai');
+          S.chatHistory.push({role:'assistant',content:`[Converted to sheet: "${sheetData.title}" (${rows.length} rows)]`});
+          _autoLinkToProject(_resolvedProjectId);
+        }catch(e){
+          statusDiv.remove();
+          _hideAIActionOverlay();
+          addMessage(`⚠️ Conversion failed: ${e.message}`,'ai');
+        }
+      }
+
+    }else if(intent==='generate'&&_isDocTarget(routerData, S.currentMode)){
+      // ── DOC GENERATE: create doc blocks ──
+      let docWsContext=wsContext;
+      // Cross-mode: inject source content when converting from another mode
+      if(S.currentMode==='sheet' && S.sheet && S.sheet.current){
+        const sheetTitle=S.sheet.current.title || S.sheet.current.name || 'Current Sheet';
+        const mdTable=window.sheetToMarkdownTable ? window.sheetToMarkdownTable(S.sheet.current) : '';
+        if(mdTable){
+          docWsContext+=`\n\n## SOURCE SHEET DATA: "${sheetTitle}"\nThe user wants to create a document based on this spreadsheet data. Use the data below as the basis for the document.\n\n${mdTable}`;
+          addMessage(`📊 Using sheet data from "${sheetTitle}" to generate document...`,'system');
+        }
+      }else if(S.currentMode==='slide' && S.currentDeck){
+        const slideContent=getCurrentContentText();
+        if(slideContent){
+          docWsContext+=`\n\n## SOURCE SLIDE DATA\nThe user wants to convert these slides into a document. Use the slide content below to create a well-structured document.\n\n${slideContent}`;
+          addMessage(`📊 Converting slides to document...`,'system');
+        }
+      }
+      if(S.currentMode!=='doc'){
         window.modeEnter('doc');
       }
-      await doDocGenerate(statusDiv,text,wsContext);
+      await doDocGenerate(statusDiv,text,docWsContext);
       _autoLinkToProject(_resolvedProjectId);
 
     }else if(intent==='generate'){
-      // ── GENERATE: create/modify slides ──
-      if(S.currentMode==='workspace'){
-        // Auto-switch to slide mode so the generated slides render
+      // ── GENERATE: create/modify slides (catch-all) ──
+      let slideWsContext=wsContext;
+      // Cross-mode: inject source content when converting from another mode
+      if(S.currentMode==='sheet' && S.sheet && S.sheet.current){
+        const sheetTitle=S.sheet.current.title || S.sheet.current.name || 'Current Sheet';
+        const mdTable=window.sheetToMarkdownTable ? window.sheetToMarkdownTable(S.sheet.current) : '';
+        if(mdTable){
+          slideWsContext+=`\n\n## SOURCE SHEET DATA: "${sheetTitle}"\nThe user wants to turn this spreadsheet data into a presentation. Use the data below to create meaningful, well-structured slides.\n\n${mdTable}`;
+          addMessage(`📊 Using sheet data from "${sheetTitle}" to generate slides...`,'system');
+        }
+      }else if(S.currentMode==='doc' && S.currentDoc){
+        const docContent=getCurrentContentText();
+        if(docContent){
+          slideWsContext+=`\n\n## SOURCE DOCUMENT DATA\nThe user wants to convert this document into a presentation. Use the document content below to create well-structured slides.\n\n${docContent}`;
+          addMessage(`📊 Converting document to slides...`,'system');
+        }
+      }
+      if(S.currentMode!=='slide'){
         window.modeEnter('slide');
       }
-      await doGenerate(statusDiv,wsContext);
+      await doGenerate(statusDiv,slideWsContext);
       _autoLinkToProject(_resolvedProjectId);
 
     }else if(S.currentMode==='doc'&&(intent==='content_edit'||intent==='deck_edit')){
@@ -1999,6 +2180,18 @@ async function executeMultiStep(steps, message, userText, wsContext) {
 
   _updateAIActionOverlay('AI ▸ All steps done ✓');
   setTimeout(_hideAIActionOverlay, 1500);
+}
+
+// ── Helper: determine if the generate intent should go to doc generation ──
+function _isDocTarget(routerData, currentMode){
+  const target=routerData.target;
+  // Explicit doc target from any mode
+  if(target==='doc') return true;
+  // In doc mode, default to doc (unless target is explicitly slide/sheet)
+  if(currentMode==='doc' && target!=='slide' && target!=='sheet') return true;
+  // In workspace mode, default to doc unless target is slide/sheet
+  if(currentMode==='workspace' && target!=='slide' && target!=='sheet') return true;
+  return false;
 }
 
 // ── Auto-save generated content to workspace & link to source project ──
@@ -2496,5 +2689,6 @@ export {
   CHAT_PROMPT,
   GEN_PROMPT,
   IMAGE_PROMPT,
-  DOC_GEN_PROMPT
+  DOC_GEN_PROMPT,
+  SHEET_FILL_PROMPT
 };

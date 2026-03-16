@@ -401,9 +401,60 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 /* ─── Doc Canvas ─── */
 .doc-canvas { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#141414; padding:40px 20px; touch-action:pan-y; }
 .doc-page { max-width:720px; margin:0 auto; min-height:60vh; padding-bottom:40vh; overflow:hidden; }
+#docPage { outline:none; padding:0; }
+#docPage:focus-within { outline:none; }
 .doc-empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:50vh; text-align:center; }
 
-/* Doc block styles */
+/* Freeflow semantic HTML elements in docPage */
+#docPage h1, #docPage h2, #docPage h3, #docPage p, #docPage blockquote, #docPage pre, #docPage ul, #docPage ol, #docPage li {
+  color:var(--text); font-family:'Georgia','Times New Roman',serif; line-height:1.7; outline:none;
+  padding:4px 8px; margin:0 0 2px; border-radius:4px; border:1.5px solid transparent;
+  transition:border-color 0.15s, background 0.15s; cursor:text; min-height:28px;
+}
+
+/* Freeflow focus/hover states */
+#docPage h1:focus, #docPage h2:focus, #docPage h3:focus, #docPage p:focus,
+#docPage blockquote:focus, #docPage pre:focus, #docPage ul:focus, #docPage ol:focus, #docPage li:focus {
+  border-color:rgba(120,134,165,0.5); background:rgba(120,134,165,0.04);
+}
+
+#docPage h1:hover, #docPage h2:hover, #docPage h3:hover, #docPage p:hover,
+#docPage blockquote:hover, #docPage pre:hover, #docPage ul:hover, #docPage ol:hover, #docPage li:hover {
+  border-color:rgba(120,134,165,0.15);
+}
+
+/* Heading styles */
+#docPage h1 { font-size:28px; font-weight:700; margin-top:32px; margin-bottom:4px; font-family:Arial,sans-serif; letter-spacing:-0.5px; color:#e8e8e8; }
+#docPage h2 { font-size:22px; font-weight:600; margin-top:24px; margin-bottom:2px; font-family:Arial,sans-serif; letter-spacing:-0.3px; color:#ddd; }
+#docPage h3 { font-size:17px; font-weight:600; margin-top:18px; margin-bottom:2px; font-family:Arial,sans-serif; color:#ccc; }
+
+/* Paragraph style */
+#docPage p { font-size:15px; }
+
+/* Quote style */
+#docPage blockquote { font-size:15px; font-style:italic; border-left:3px solid #7886A5; padding-left:16px; margin:8px 0; color:#bbb; }
+
+/* Code block style */
+#docPage pre { font-family:'Courier New',monospace; font-size:13px; background:#1a1a1a; padding:10px 12px; border-radius:6px; white-space:pre-wrap; color:#c8d0dc; border:1px solid #2a2a2a; }
+
+/* List styles */
+#docPage ul { font-size:15px; list-style:none; padding-left:0; }
+#docPage ol { font-size:15px; padding-left:0; }
+#docPage li { font-size:15px; padding-left:24px; position:relative; margin-bottom:4px; }
+#docPage ul li::before { content:'•'; position:absolute; left:8px; color:#7886A5; font-weight:700; }
+#docPage ol li { counter-increment:doc-ol; }
+#docPage ol li::before {
+  content:attr(data-number) '.'; position:absolute; left:4px; color:#7886A5;
+  font-weight:600; font-size:13px; min-width:16px; text-align:right;
+}
+
+/* Divider (hr) */
+#docPage hr { min-height:12px; height:12px; background:transparent; margin:8px 0; cursor:pointer;
+  padding:0; border:none; display:flex; align-items:center; outline:none; }
+.doc-divider::before { content:''; display:block; width:100%; height:1px; background:#2a2a2a; }
+.doc-divider:hover::before { background:#3a3a3a; }
+
+/* Old .doc-block styles (kept for backward compatibility) */
 .doc-block { position:relative; padding:4px 8px; margin:0 0 2px; border-radius:4px; border:1.5px solid transparent; transition:border-color 0.15s, background 0.15s; cursor:text; min-height:28px; line-height:1.7; color:var(--text); font-family:'Georgia','Times New Roman',serif; }
 .doc-block:hover { border-color:rgba(120,134,165,0.15); }
 .doc-block.selected { border-color:rgba(120,134,165,0.4); background:rgba(120,134,165,0.04); }
@@ -411,7 +462,7 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[contenteditable="true"] { outline:none; }
 .doc-block[contenteditable="true"]:empty::before { content:attr(data-placeholder); color:#444; pointer-events:none; }
 
-/* Block type styles */
+/* Old block type styles (kept for backward compatibility) */
 .doc-block[data-type="heading1"] { font-size:28px; font-weight:700; margin-top:32px; margin-bottom:4px; font-family:Arial,sans-serif; letter-spacing:-0.5px; color:#e8e8e8; }
 .doc-block[data-type="heading2"] { font-size:22px; font-weight:600; margin-top:24px; margin-bottom:2px; font-family:Arial,sans-serif; letter-spacing:-0.3px; color:#ddd; }
 .doc-block[data-type="heading3"] { font-size:17px; font-weight:600; margin-top:18px; margin-bottom:2px; font-family:Arial,sans-serif; color:#ccc; }
@@ -433,6 +484,32 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-block[data-type="image"] .doc-figure-caption:focus { border-color:#555; }
 .doc-block[data-type="image"] .doc-figure-caption:empty::before { content:'Add caption...'; color:#444; }
 .doc-block[data-type="image"] .doc-figure-caption.hidden-cap { display:none; }
+
+/* Floating media blocks (images and tables in freeflow mode) */
+.doc-float { position:relative; padding:8px; min-height:40px; width:fit-content; max-width:100%; z-index:2; margin:8px 0; }
+.doc-float.float-none { margin-left:auto; margin-right:auto; clear:both; display:block; }
+.doc-float.float-left { float:left; max-width:45%; margin:0 20px 12px 0; }
+.doc-float.float-right { float:right; max-width:45%; margin:0 0 12px 20px; }
+.doc-float[data-type="image"] img { max-width:100%; border-radius:4px; display:block; cursor:pointer; }
+.doc-float .doc-figure-caption { font-size:12px; color:#888; text-align:center; font-style:italic; margin-top:4px; padding:2px 8px; min-height:18px; outline:none; border:1px dashed transparent; border-radius:3px; }
+.doc-float .doc-figure-caption:focus { border-color:#555; }
+.doc-float .doc-figure-caption:empty::before { content:'Add caption...'; color:#444; }
+
+/* Floating table block */
+.doc-float[data-type="table"] { padding:4px; overflow-x:auto; width:fit-content; max-width:100%; }
+.doc-float[data-type="table"] table { width:100%; border-collapse:collapse; font-size:13px; }
+.doc-float[data-type="table"] th, .doc-float[data-type="table"] td { border:1px solid #444; padding:6px 10px; text-align:left; min-width:60px; }
+.doc-float[data-type="table"] th { background:#2a2a2a; color:#ccc; font-weight:600; font-size:12px; }
+.doc-float[data-type="table"] td { background:transparent; color:#ddd; }
+.doc-float[data-type="table"] td:focus { outline:1px solid #7886A5; background:rgba(120,134,165,0.1); }
+.doc-float[data-type="table"] .table-add-row { display:block; width:100%; margin-top:4px; padding:3px; font-size:10px; color:#666; background:transparent; border:1px dashed #444; border-radius:4px; cursor:pointer; text-align:center; }
+.doc-float[data-type="table"] .table-add-row:hover { color:#aaa; border-color:#666; }
+
+/* Floating media handle */
+.doc-float-handle { position:absolute; right:4px; top:4px; width:20px; height:20px; display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:opacity 0.15s; cursor:pointer; color:#aaa; border-radius:4px; z-index:5; background:rgba(0,0,0,0.5); padding:2px; }
+.doc-float:hover .doc-float-handle { opacity:1; }
+.doc-float-handle:hover { color:#fff; background:rgba(0,0,0,0.7); }
 /* Image edit popup — fixed positioned above image, never clipped */
 .img-edit-popup { position:fixed; background:#1a1a1a; border:1px solid #444; border-radius:8px; padding:6px 8px; z-index:9999; white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
 .img-edit-popup::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:6px solid transparent; border-top-color:#444; }
@@ -476,6 +553,11 @@ body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; he
 .doc-drop-indicator { height:2px; background:#7886A5; margin:0; border-radius:1px; transition:opacity 0.1s; pointer-events:none; }
 
 /* Block drag animation — smooth displacement, no flash */
+#docPage [data-block-id] { transition:transform 0.28s cubic-bezier(0.2,0.8,0.3,1), opacity 0.2s; }
+#docPage [data-block-id].drag-source { opacity:0.25; transform:scale(0.96); z-index:10; }
+#docPage [data-block-id].drag-settling { transition:transform 0.25s cubic-bezier(0.2,0.8,0.3,1); transform:none !important; }
+
+/* Old block drag styles (kept for backward compatibility) */
 .doc-block { transition:transform 0.28s cubic-bezier(0.2,0.8,0.3,1), opacity 0.2s; }
 .doc-block.drag-source { opacity:0.25; transform:scale(0.96); border-color:#7886A5 !important; z-index:10; }
 .doc-block.drag-settling { transition:transform 0.25s cubic-bezier(0.2,0.8,0.3,1); transform:none !important; }

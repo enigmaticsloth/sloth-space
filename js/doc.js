@@ -186,8 +186,7 @@ export function execDocCtxCustom(blockId){
 
 let S_docSelectedCaptionBlockId=null;
 export function docCaptionClick(event, blockId){
-  // Select the parent block too
-  docSelectBlock(blockId, null);
+  // In freeflow mode, just mark caption as selected
   S_docSelectedCaptionBlockId=blockId;
   const block=docGetBlock(blockId);
   if(!block) return;
@@ -589,9 +588,37 @@ export function docPopDifferent(stack){
 // ── Flush editing DOM → model ──
 export function docFlushEditing(){
   clearTimeout(S.docUndoPushTimer);
-  if(!S.docEditingBlockId) return;
-  const el=document.querySelector(`[data-block-id="${S.docEditingBlockId}"]`);
-  if(el){ const b=docGetBlock(S.docEditingBlockId); if(b) blockFromPlainText(b,docExtractText(el)); }
+  // In freeflow mode, sync all blocks from the DOM
+  const page=document.getElementById('docPage');
+  if(!page) return;
+
+  // Walk through all block elements and sync their content
+  const walker=document.createTreeWalker(page, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(node){
+      if(node.dataset?.blockId) return NodeFilter.FILTER_ACCEPT;
+      return NodeFilter.FILTER_SKIP;
+    }
+  });
+
+  let node;
+  while(node=walker.nextNode()){
+    const bid=node.dataset.blockId;
+    const block=docGetBlock(bid);
+    if(!block) continue;
+
+    // Extract text content from the element
+    let text='';
+    for(const tn of node.childNodes){
+      if(tn.nodeType===Node.TEXT_NODE){
+        text+=tn.textContent;
+      } else if(tn.nodeType===Node.ELEMENT_NODE){
+        text+=tn.textContent;
+      }
+    }
+    blockFromPlainText(block, text);
+  }
+
+  S.currentDoc.updated=new Date().toISOString();
 }
 
 // ── Stack operations ──
@@ -1147,34 +1174,36 @@ export function renderDocMode(){
           <div style="font-size:48px;margin-bottom:16px;opacity:0.3;">📄</div>
           <div style="font-size:16px;color:#999;margin-bottom:8px;">Doc Mode</div>
           <div style="font-size:12px;color:#666;max-width:300px;line-height:1.6;">
-            Block-based document editor. Type in the chat to add content, or start writing directly here.
+            Freeflow document editor. Type in the chat to add content, or start writing directly here.
           </div>
         </div>
       </div>`;
     return;
   }
-  // Build blocks HTML
-  let numberedCounter=0;
-  const blocksHtml=S.currentDoc.blocks.map((block,i)=>{
-    const selected=block.id===S.docSelectedBlockId?' selected':'';
-    const text=blockPlainText(block);
-    const escaped=window.escapeHtml(text);
 
-    // Track numbered list counter
-    if(block.type==='numbered'){
-      numberedCounter++;
-    } else {
+  // Save cursor position before re-render
+  _docSaveCursor();
+
+  // Build HTML: text blocks as semantic elements, media blocks as contenteditable=false islands
+  let html='';
+  let numberedCounter=0;
+  let inUl=false;
+  let inOl=false;
+
+  for(const block of S.currentDoc.blocks){
+    const content=renderBlockContent(block);
+    const bid=block.id;
+
+    // Close open lists if switching away from list
+    if((block.type!=='list'&&inUl)||(block.type!=='numbered'&&inOl)){
+      if(inUl) html+='</ul>';
+      if(inOl) html+='</ol>';
+      inUl=false;
+      inOl=false;
       numberedCounter=0;
     }
 
-    // Divider is special — non-editable
-    if(block.type==='divider'){
-      return `<div class="doc-block${selected}" data-type="divider" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
-        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" ontouchstart="docTouchDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
-      </div>`;
-    }
-
-    // Image block with popup edit menu
+    // Image block (floating island)
     if(block.type==='image'){
       const src=block.meta?.src||'';
       const alt=block.meta?.alt||'';
@@ -1182,86 +1211,105 @@ export function renderDocMode(){
       const caption=block.meta?.caption||'';
       const hasCaption=block.meta?.showCaption===true;
       const floatClass='float-'+float;
-      const btnL=float==='left'?' active':'';
-      const btnC=float==='none'?' active':'';
-      const btnR=float==='right'?' active':'';
-      const capClass=hasCaption?'':'hidden-cap';
-      return `<div class="doc-block${selected} ${floatClass}" data-type="image" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
-        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" ontouchstart="docTouchDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
-        ${src?`<img src="${src}" alt="${window.escapeHtml(alt)}" draggable="false" onclick="event.stopPropagation();docShowImagePopup('${block.id}',this)" />`:`<div style="padding:20px;color:#555;font-size:12px;">Click to add image or paste URL in chat</div>`}
-        <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
-          onblur="docSaveFigureCaption('${block.id}',this.textContent)"
-          onclick="event.stopPropagation();docCaptionClick(event,'${block.id}')"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${window.escapeHtml(caption)}</div>
+      html+=`<div class="doc-float ${floatClass}" contenteditable="false" data-block-id="${bid}" data-type="image">
+        <div class="doc-float-handle" onclick="event.stopPropagation();docShowBlockPopup('${bid}',this)">⋮</div>
+        ${src?`<img src="${src}" alt="${window.escapeHtml(alt)}" draggable="false" onclick="event.stopPropagation();docShowImagePopup('${bid}',this)" />`:`<div style="padding:20px;color:#555;font-size:12px;">Image placeholder</div>`}
+        ${hasCaption?`<figcaption class="doc-figure-caption" contenteditable="true" data-caption-for="${bid}"
+          onblur="docSaveFigureCaption('${bid}',this.textContent)"
+          onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${window.escapeHtml(caption)}</figcaption>`:''}
       </div>`;
+      continue;
     }
 
-    // Table block
+    // Table block (floating island)
     if(block.type==='table'){
       const cells=block.meta?.cells||[];
-      const cols=block.meta?.cols||3;
       const float=block.meta?.float||'none';
       const hasCaption=block.meta?.showCaption===true;
       const caption=block.meta?.caption||'';
       const floatClass='float-'+float;
-      const capClass=hasCaption?'':'hidden-cap';
       let tableHtml='<table>';
       cells.forEach((row,ri)=>{
         tableHtml+='<tr>';
         row.forEach((cell,ci)=>{
           const tag=ri===0?'th':'td';
-          tableHtml+=`<${tag} contenteditable="true" onblur="docSaveTableCell('${block.id}',${ri},${ci},this.textContent)" onkeydown="docTableKeydown(event,'${block.id}',${ri},${ci})">${window.escapeHtml(cell)}</${tag}>`;
+          tableHtml+=`<${tag} contenteditable="true" onblur="docSaveTableCell('${bid}',${ri},${ci},this.textContent)" onkeydown="docTableKeydown(event,'${bid}',${ri},${ci})">${window.escapeHtml(cell)}</${tag}>`;
         });
         tableHtml+='</tr>';
       });
       tableHtml+='</table>';
-      tableHtml+=`<button class="table-add-row" onclick="event.stopPropagation();docTableAddRow('${block.id}')">+ Add row</button>`;
-      return `<div class="doc-block${selected} ${floatClass}" data-type="table" data-block-id="${block.id}" onmousedown="docSelectBlock('${block.id}',event)">
-        <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" ontouchstart="docTouchDragStart(event,'${block.id}')" title="Drag to reorder">⠿</div>
-        <div onclick="event.stopPropagation();docShowBlockPopup('${block.id}',this)">${tableHtml}</div>
-        <div class="doc-figure-caption ${capClass}" contenteditable="true" data-caption-for="${block.id}"
-          onblur="docSaveFigureCaption('${block.id}',this.textContent)"
-          onclick="event.stopPropagation();docCaptionClick(event,'${block.id}')"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${window.escapeHtml(caption)}</div>
+      tableHtml+=`<button class="table-add-row" onclick="event.stopPropagation();docTableAddRow('${bid}')">+ Add row</button>`;
+      html+=`<div class="doc-float ${floatClass}" contenteditable="false" data-block-id="${bid}" data-type="table">
+        <div class="doc-float-handle" onclick="event.stopPropagation();docShowBlockPopup('${bid}',this)">⋮</div>
+        ${tableHtml}
+        ${hasCaption?`<figcaption class="doc-figure-caption" contenteditable="true" data-caption-for="${bid}"
+          onblur="docSaveFigureCaption('${bid}',this.textContent)"
+          onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${window.escapeHtml(caption)}</figcaption>`:''}
       </div>`;
+      continue;
     }
 
-    const placeholder=block.type.startsWith('heading')?'Heading':block.type==='quote'?'Quote...':block.type==='code'?'Code...':'Type something...';
-    const numAttr=block.type==='numbered'?` data-number="${numberedCounter}"`:'';
+    // Divider (inline non-editable)
+    if(block.type==='divider'){
+      html+=`<hr class="doc-divider" contenteditable="false" data-block-id="${bid}" />`;
+      numberedCounter=0;
+      continue;
+    }
 
-    const isEditing=(S.docEditingBlockId===block.id);
-    return `<div class="doc-block${selected}" data-type="${block.type}" data-block-id="${block.id}"${numAttr}
-      contenteditable="${isEditing?'true':'false'}"
-      data-placeholder="${placeholder}"
-      onfocus="docFocusBlock('${block.id}')"
-      onblur="docBlurBlock('${block.id}')"
-      oninput="docInputBlock('${block.id}')"
-      onkeydown="docKeydownBlock(event,'${block.id}')"
-      onclick="docTextBlockClick(event,'${block.id}')">
-      <div class="doc-block-handle" draggable="true" ondragstart="docDragStart(event,'${block.id}')" ontouchstart="docTouchDragStart(event,'${block.id}')" title="Drag to reorder" contenteditable="false">⠿</div>${renderBlockContent(block)}</div>`;
-  }).join('\n');
-
-  canvas.innerHTML=`
-    <div class="doc-page" id="docPage"
-      ondragover="docDragOver(event)" ondrop="docDrop(event)" ondragleave="docDragLeave(event)"
-      onclick="docPageClick(event)">
-      ${blocksHtml}
-    </div>`;
-
-  // Restore cursor if editing
-  if(S.docEditingBlockId){
-    const el=canvas.querySelector(`[data-block-id="${S.docEditingBlockId}"]`);
-    if(el&&document.activeElement!==el){
-      el.focus();
-      // Place cursor at end
-      const range=document.createRange();
-      const sel=window.getSelection();
-      range.selectNodeContents(el);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
+    // Text blocks — rendered as semantic HTML elements
+    switch(block.type){
+      case 'heading1':
+        html+=`<h1 data-block-id="${bid}">${content||''}</h1>`;
+        numberedCounter=0;
+        break;
+      case 'heading2':
+        html+=`<h2 data-block-id="${bid}">${content||''}</h2>`;
+        numberedCounter=0;
+        break;
+      case 'heading3':
+        html+=`<h3 data-block-id="${bid}">${content||''}</h3>`;
+        numberedCounter=0;
+        break;
+      case 'quote':
+        html+=`<blockquote data-block-id="${bid}">${content||''}</blockquote>`;
+        numberedCounter=0;
+        break;
+      case 'code':
+        html+=`<pre data-block-id="${bid}">${content||''}</pre>`;
+        numberedCounter=0;
+        break;
+      case 'list':
+        if(!inUl){ html+='<ul>'; inUl=true; }
+        html+=`<li data-block-id="${bid}">${content||''}</li>`;
+        break;
+      case 'numbered':
+        if(!inOl){ html+=`<ol>`; inOl=true; }
+        numberedCounter++;
+        html+=`<li data-block-id="${bid}" data-number="${numberedCounter}">${content||''}</li>`;
+        break;
+      default: // paragraph, caption, etc.
+        html+=`<p data-block-id="${bid}">${content||''}</p>`;
+        numberedCounter=0;
     }
   }
+
+  // Close any open lists
+  if(inUl) html+='</ul>';
+  if(inOl) html+='</ol>';
+
+  canvas.innerHTML=`
+    <div class="doc-page" id="docPage" contenteditable="true"
+      oninput="docFreeflowInput()"
+      onkeydown="docFreeflowKeydown(event)"
+      onclick="docFreeflowClick(event)"
+      ondragover="docDragOver(event)" ondrop="docDrop(event)" ondragleave="docDragLeave(event)">
+      ${html}
+    </div>`;
+
+  // Restore cursor position after render
+  _docRestoreCursor();
 }
 
 export function renderBlockContent(block){
@@ -1285,114 +1333,12 @@ export function renderBlockContent(block){
   }).join('');
 }
 
-// ── Doc block event handlers ──
+// ── Freeflow editor event handlers ──
 
-let docLastClickedBlock=null;
-let docClickTimer=null;
-
-// Click on text block: first click → select, second click → edit.
-// Uses onclick (not onmousedown) so mobile scroll gestures are never blocked.
-export function docTextBlockClick(event, blockId){
-  if(event.target.closest('.doc-block-handle')) return;
-  if(S.docSelectedBlockId!==blockId){
-    // First click: select only
-    docSelectBlock(blockId, event);
-    return;
-  }
-  // Already selected → enter edit mode
-  if(S.docEditingBlockId!==blockId){
-    const el=event.currentTarget;
-    if(el){
-      el.contentEditable='true';
-      setTimeout(()=>el.focus(),0);
-    }
-    return;
-  }
-  // Already editing → normal click behavior (cursor placement handled by browser)
-  docSelectBlock(blockId, event);
-}
-
-export function docSelectBlock(blockId, e){
-  const wasSelected=(S.docSelectedBlockId===blockId);
-  S.docSelectedBlockId=blockId;
-  document.querySelectorAll('.doc-block').forEach(el=>{
-    el.classList.toggle('selected', el.dataset.blockId===blockId);
-  });
-  docUpdateToolbarState();
-
-  // Show selection bar with block info
-  const block=docGetBlock(blockId);
-  if(block){
-    const blockIdx=S.currentDoc.blocks.findIndex(b=>b.id===blockId);
-    const typeLabel=block.type.charAt(0).toUpperCase()+block.type.slice(1);
-    const preview=blockPlainText(block).substring(0,60);
-    const previewStr=preview?(` — "${preview}${blockPlainText(block).length>60?'...':''}"`):'';
-    document.getElementById('selectionBar').style.display='flex';
-    document.getElementById('selectionTag').textContent=`Block ${blockIdx+1}: ${typeLabel}${previewStr}`;
-  }
-
-  // Show context AI menu on first click (not from handle, not when entering edit)
-  if(e && !e.target.closest('.doc-block-handle') && !e.target.closest('.doc-figure-caption')){
-    if(!wasSelected){
-      showDocCtxAiMenu(blockId, e);
-    } else {
-      // Second click on already-selected block — still show menu if not editing
-      clearTimeout(docClickTimer);
-      docClickTimer=setTimeout(()=>docBlockClickAction(blockId, e), 200);
-    }
-  }
-}
-
-export function docPageClick(event){
-  // Click on blank area (not on a block) → clear selection (shared with slide)
-  if(!event.target.closest('.doc-block')){
-    window.clearSelection();
-  }
-}
-
-export function docFocusBlock(blockId){
-  // Push undo snapshot when user starts editing a new block
-  if(S.docEditingBlockId!==blockId) docPushUndo();
-  S.docEditingBlockId=blockId;
-  docSelectBlock(blockId);
-  docUpdateToolbarState();
-}
-
-export function docBlurBlock(blockId){
-  // Save content on blur
-  const el=document.querySelector(`[data-block-id="${blockId}"]`);
-  if(!el) return;
-  const block=docGetBlock(blockId);
-  if(!block) return;
-  // Extract plain text from contenteditable (strip the handle)
-  const text=docExtractText(el);
-  blockFromPlainText(block, text);
-  S.currentDoc.updated=new Date().toISOString();
-  S.docEditingBlockId=null;
-  // Lock block back to non-editable
-  el.contentEditable='false';
-  // Auto-save to workspace
-  docAutoSave();
-}
-
-export function docExtractText(el){
-  // Get text content, but skip the drag handle element
-  let text='';
-  for(const node of el.childNodes){
-    if(node.nodeType===Node.ELEMENT_NODE && node.classList?.contains('doc-block-handle')) continue;
-    text+=node.textContent||'';
-  }
-  return text;
-}
-
-export function docInputBlock(blockId){
-  const el=document.querySelector(`[data-block-id="${blockId}"]`);
-  if(!el) return;
-  const block=docGetBlock(blockId);
-  if(!block) return;
-  const text=docExtractText(el);
-  blockFromPlainText(block, text);
-  S.currentDoc.updated=new Date().toISOString();
+export function docFreeflowInput(){
+  // Sync DOM changes back to blocks data model
+  const page=document.getElementById('docPage');
+  if(!page) return;
 
   // Debounced undo snapshot: push undo every 1.5s of typing
   clearTimeout(S.docUndoPushTimer);
@@ -1401,175 +1347,276 @@ export function docInputBlock(blockId){
   // Auto-save on every content change (debounced)
   docAutoSave();
 
-  // Slash command detection: if typing starts with /
-  if(text.startsWith('/')){
-    docShowTypeMenu(el, text.slice(1));
-  } else {
-    docHideTypeMenu();
+  // Slash command detection: check if current selection starts with /
+  const sel=window.getSelection();
+  if(sel&&sel.rangeCount>0){
+    const range=sel.getRangeAt(0);
+    const node=range.startContainer;
+    const offset=range.startOffset;
+    let text='';
+
+    // Find the start of the line from cursor position
+    const walker=document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
+    walker.currentNode=node;
+    let currentNode=node;
+    let charCount=0;
+
+    // Collect text from start of element to cursor
+    while(currentNode){
+      if(currentNode===node){
+        text+=currentNode.textContent.substring(0,offset);
+        break;
+      }
+      currentNode=walker.previousNode();
+      if(!currentNode||currentNode.parentElement.closest('[contenteditable="false"]')) break;
+      text=currentNode.textContent+text;
+    }
+
+    // Check if starts with / (simple case for now)
+    const lineStart=text.lastIndexOf('\n')+1;
+    const lineText=text.substring(lineStart);
+    if(lineText.startsWith('/')){
+      docShowTypeMenu(page, lineText.slice(1));
+    } else {
+      docHideTypeMenu();
+    }
   }
 }
 
-export function docKeydownBlock(event, blockId){
-  const block=docGetBlock(blockId);
-  if(!block) return;
+export function docFreeflowKeydown(event){
+  const sel=window.getSelection();
+  if(!sel||sel.rangeCount===0) return;
 
-  // Enter: create new block below (unless Shift+Enter for soft break)
-  if(event.key==='Enter' && !event.shiftKey){
-    event.preventDefault();
-    const el=document.querySelector(`[data-block-id="${blockId}"]`);
-    // Save current block content
-    if(el){
-      const text=docExtractText(el);
-      blockFromPlainText(block, text);
-    }
-    // If slash menu is open and there's a selection, apply it
-    if(S.docTypeMenuVisible){
-      docApplyTypeMenuSelection(blockId);
-      return;
-    }
-    // Determine new block type (lists continue their type)
-    const newType=(block.type==='list'||block.type==='numbered')?block.type:'paragraph';
-    // If current block is empty list/numbered, convert to paragraph instead
-    const curText=blockPlainText(block);
-    if((block.type==='list'||block.type==='numbered')&&!curText.trim()){
-      docConvertBlock(blockId,'paragraph');
-      renderDocMode();
-      return;
-    }
-    const newBlock=docInsertBlock(blockId, newType);
-    S.docEditingBlockId=newBlock.id;
-    renderDocMode();
-    // Focus new block
-    setTimeout(()=>{
-      const newEl=document.querySelector(`[data-block-id="${newBlock.id}"]`);
-      if(newEl) newEl.focus();
-    },10);
-    return;
-  }
-
-  // Backspace at start of empty block: delete block, focus previous
-  if(event.key==='Backspace'){
-    const text=blockPlainText(block);
-    const el=document.querySelector(`[data-block-id="${blockId}"]`);
-    const sel=window.getSelection();
-    const atStart=sel&&sel.rangeCount>0&&sel.getRangeAt(0).startOffset===0;
-    if(!text.trim()&&S.currentDoc.blocks.length>1){
-      event.preventDefault();
-      const idx=S.currentDoc.blocks.findIndex(b=>b.id===blockId);
-      const prevBlock=idx>0?S.currentDoc.blocks[idx-1]:null;
-      docDeleteBlock(blockId);
-      S.docEditingBlockId=prevBlock?prevBlock.id:S.currentDoc.blocks[0].id;
-      renderDocMode();
-      return;
-    }
-    // If at start and block has content, merge with previous
-    if(atStart&&text&&S.currentDoc.blocks.length>1){
-      const idx=S.currentDoc.blocks.findIndex(b=>b.id===blockId);
-      if(idx>0){
-        const prevBlock=S.currentDoc.blocks[idx-1];
-        if(prevBlock.type!=='divider'&&prevBlock.type!=='image'){
-          event.preventDefault();
-          const prevText=blockPlainText(prevBlock);
-          blockFromPlainText(prevBlock, prevText+text);
-          docDeleteBlock(blockId);
-          S.docEditingBlockId=prevBlock.id;
-          renderDocMode();
-          // Place cursor at merge point
-          setTimeout(()=>{
-            const prevEl=document.querySelector(`[data-block-id="${prevBlock.id}"]`);
-            if(prevEl){
-              prevEl.focus();
-              // Set cursor to the join point
-              const range=document.createRange();
-              const sel=window.getSelection();
-              const textNode=_docFindTextNode(prevEl, prevText.length);
-              if(textNode.node){
-                range.setStart(textNode.node, textNode.offset);
-                range.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(range);
-              }
-            }
-          },10);
-          return;
-        }
-      }
-    }
-  }
-
-  // Arrow Up at start: focus previous block (but not when Shift is held — that's text selection)
-  if(event.key==='ArrowUp'&&!event.shiftKey){
-    const sel=window.getSelection();
-    if(sel&&sel.rangeCount>0){
-      const range=sel.getRangeAt(0);
-      if(range.startOffset===0){
-        const idx=S.currentDoc.blocks.findIndex(b=>b.id===blockId);
-        if(idx>0){
-          event.preventDefault();
-          const prevId=S.currentDoc.blocks[idx-1].id;
-          S.docEditingBlockId=prevId;
-          const prevEl=document.querySelector(`[data-block-id="${prevId}"]`);
-          if(prevEl){
-            prevEl.focus();
-            // Place cursor at end
-            const r=document.createRange();
-            r.selectNodeContents(prevEl);
-            r.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(r);
-          }
-        }
-      }
-    }
-  }
-
-  // Arrow Down at end: focus next block (but not when Shift is held — that's text selection)
-  if(event.key==='ArrowDown'&&!event.shiftKey){
-    const sel=window.getSelection();
-    if(sel&&sel.rangeCount>0){
-      const el=document.querySelector(`[data-block-id="${blockId}"]`);
-      const text=docExtractText(el);
-      const range=sel.getRangeAt(0);
-      // Check if cursor is at end
-      if(range.endOffset>=text.length || range.endContainer===el){
-        const idx=S.currentDoc.blocks.findIndex(b=>b.id===blockId);
-        if(idx<S.currentDoc.blocks.length-1){
-          event.preventDefault();
-          const nextId=S.currentDoc.blocks[idx+1].id;
-          S.docEditingBlockId=nextId;
-          const nextEl=document.querySelector(`[data-block-id="${nextId}"]`);
-          if(nextEl){
-            nextEl.focus();
-            const r=document.createRange();
-            r.selectNodeContents(nextEl);
-            r.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(r);
-          }
-        }
-      }
-    }
-  }
-
-  // Tab: indent (convert paragraph to list, or increase list level)
-  if(event.key==='Tab'){
-    event.preventDefault();
-    if(!block.type.startsWith('list')&&block.type!=='numbered'){
-      docConvertBlock(blockId, 'list');
-      renderDocMode();
-      setTimeout(()=>{
-        const el=document.querySelector(`[data-block-id="${blockId}"]`);
-        if(el) el.focus();
-      },10);
-    }
-  }
+  const range=sel.getRangeAt(0);
+  const node=range.startContainer;
+  const page=document.getElementById('docPage');
+  if(!page) return;
 
   // Keyboard shortcuts: Ctrl/Cmd + B/I/U
   if((event.ctrlKey||event.metaKey)&&!event.shiftKey){
-    if(event.key==='b'||event.key==='B'){ event.preventDefault(); document.execCommand('bold'); }
-    if(event.key==='i'||event.key==='I'){ event.preventDefault(); document.execCommand('italic'); }
-    if(event.key==='u'||event.key==='U'){ event.preventDefault(); document.execCommand('underline'); }
+    if(event.key==='b'||event.key==='B'){ event.preventDefault(); document.execCommand('bold'); return; }
+    if(event.key==='i'||event.key==='I'){ event.preventDefault(); document.execCommand('italic'); return; }
+    if(event.key==='u'||event.key==='U'){ event.preventDefault(); document.execCommand('underline'); return; }
   }
+
+  // Ctrl/Cmd + Z/Y for undo/redo (override browser default)
+  if((event.ctrlKey||event.metaKey)&&!event.shiftKey){
+    if(event.key==='z'||event.key==='Z'){ event.preventDefault(); docFlushEditing(); docUndo(); return; }
+  }
+  if((event.ctrlKey||event.metaKey)&&event.shiftKey){
+    if(event.key==='z'||event.key==='Z'){ event.preventDefault(); docFlushEditing(); docRedo(); return; }
+  }
+
+  // Tab: indent in lists or convert to list
+  if(event.key==='Tab'){
+    event.preventDefault();
+    // Find closest li ancestor
+    const li=node.parentElement?.closest('li');
+    if(li){
+      // TODO: increase indent level (would need nested lists support)
+    } else {
+      // Convert current block to list
+      const blockEl=_docFindBlockElement(node);
+      if(blockEl&&(blockEl.tagName==='P'||blockEl.tagName==='H1'||blockEl.tagName==='H2'||blockEl.tagName==='H3')){
+        const bid=blockEl.dataset.blockId;
+        const block=docGetBlock(bid);
+        if(block&&block.type==='paragraph'){
+          docConvertBlock(bid,'list');
+          renderDocMode();
+          _docRestoreCursor();
+        }
+      }
+    }
+    return;
+  }
+
+  // Enter: handle lists and block creation
+  if(event.key==='Enter'&&!event.shiftKey){
+    // Check if in list item
+    const li=node.parentElement?.closest('li');
+    if(li){
+      // Let browser handle creating new <li>
+      return;
+    }
+
+    // Not in list — check for slash menu
+    if(S.docTypeMenuVisible){
+      event.preventDefault();
+      docApplyTypeMenuSelection(null);
+      return;
+    }
+
+    // Otherwise, allow normal Enter behavior (paragraph break)
+    return;
+  }
+
+  // Backspace: handle merging blocks
+  if(event.key==='Backspace'){
+    const atStart=range.startOffset===0 && range.startContainer===node;
+    if(!atStart) return;
+
+    // Find the block element we're in
+    const blockEl=_docFindBlockElement(node);
+    if(!blockEl) return;
+
+    const bid=blockEl.dataset.blockId;
+    const block=docGetBlock(bid);
+    if(!block) return;
+
+    // Find previous block
+    const idx=S.currentDoc.blocks.findIndex(b=>b.id===bid);
+    if(idx===0) return; // First block
+
+    const prevBlock=S.currentDoc.blocks[idx-1];
+    // Don't merge with media blocks or dividers
+    if(prevBlock.type==='divider'||prevBlock.type==='image'||prevBlock.type==='table') return;
+
+    // Merge content
+    event.preventDefault();
+    const curText=blockPlainText(block);
+    const prevText=blockPlainText(prevBlock);
+    blockFromPlainText(prevBlock, prevText+curText);
+    docDeleteBlock(bid);
+    S.currentDoc.updated=new Date().toISOString();
+    docPushUndo();
+    renderDocMode();
+    _docRestoreCursor();
+    return;
+  }
+}
+
+export function docFreeflowClick(event){
+  // Handle clicks on media blocks (non-editable islands)
+  const target=event.target;
+  if(target.closest('[contenteditable="false"][data-block-id]')){
+    // Media block clicked — show context menu
+    const mediaBlock=target.closest('[data-block-id]');
+    if(mediaBlock&&mediaBlock.dataset.blockId){
+      showDocCtxAiMenu(mediaBlock.dataset.blockId, event);
+    }
+  }
+}
+
+// ── Stub functions for backward compatibility with old code ──
+// In freeflow mode, these are no-ops or simplified versions
+
+export function docSelectBlock(blockId, e){
+  // In freeflow mode, selection is implicit with contenteditable
+  // Just update toolbar if needed
+  S.docSelectedBlockId=blockId;
+  docUpdateToolbarState();
+}
+
+export function docPageClick(event){
+  // Click on blank area → clear selection
+  if(!event.target.closest('[data-block-id]')&&!event.target.closest('[contenteditable="false"]')){
+    window.clearSelection?.();
+  }
+}
+
+export function docFocusBlock(blockId){
+  // Push undo snapshot when user starts editing a new block
+  if(S.docEditingBlockId!==blockId) docPushUndo();
+  S.docEditingBlockId=blockId;
+  docUpdateToolbarState();
+}
+
+export function docBlurBlock(blockId){
+  // Save content on blur (in freeflow, this is handled by docFlushEditing)
+  S.docEditingBlockId=null;
+}
+
+export function docExtractText(el){
+  // Get text content from an element
+  if(!el) return '';
+  let text='';
+  for(const node of el.childNodes){
+    if(node.nodeType===Node.TEXT_NODE) text+=node.textContent;
+    else if(node.nodeType===Node.ELEMENT_NODE) text+=node.textContent;
+  }
+  return text;
+}
+
+// Helper: find the block-level element containing a node
+export function _docFindBlockElement(node){
+  if(!node) return null;
+  let current=node.nodeType===Node.ELEMENT_NODE?node:node.parentElement;
+  while(current){
+    if(current.dataset?.blockId) return current;
+    current=current.parentElement;
+  }
+  return null;
+}
+
+// ── Cursor position save/restore ──
+let docSavedCursorPos=null;
+
+export function _docSaveCursor(){
+  const sel=window.getSelection();
+  if(!sel||sel.rangeCount===0){
+    docSavedCursorPos=null;
+    return;
+  }
+  const range=sel.getRangeAt(0);
+  const page=document.getElementById('docPage');
+  if(!page||!page.contains(range.startContainer)){
+    docSavedCursorPos=null;
+    return;
+  }
+
+  // Find block ID and offset within the page
+  const blockEl=_docFindBlockElement(range.startContainer);
+  if(!blockEl) return;
+
+  const bid=blockEl.dataset.blockId;
+  let offset=0;
+  // Count characters from page start to cursor
+  const walker=document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
+  let node=walker.nextNode();
+  while(node&&node!==range.startContainer){
+    offset+=node.textContent.length;
+    node=walker.nextNode();
+  }
+  if(node){
+    offset+=range.startOffset;
+  }
+
+  docSavedCursorPos={blockId:bid, offset};
+}
+
+export function _docRestoreCursor(){
+  if(!docSavedCursorPos) return;
+  const page=document.getElementById('docPage');
+  if(!page) return;
+
+  const {blockId, offset}=docSavedCursorPos;
+  let charCount=0;
+  let targetNode=null;
+  let targetOffset=0;
+
+  // Walk through all text nodes to find the position
+  const walker=document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
+  let node=walker.nextNode();
+  while(node){
+    if(charCount+node.textContent.length>=offset){
+      targetNode=node;
+      targetOffset=offset-charCount;
+      break;
+    }
+    charCount+=node.textContent.length;
+    node=walker.nextNode();
+  }
+
+  if(targetNode){
+    const range=document.createRange();
+    range.setStart(targetNode, Math.min(targetOffset, targetNode.textContent.length));
+    range.collapse(true);
+    const sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  docSavedCursorPos=null;
 }
 
 // Helper: find text node at character offset within an element
@@ -1693,7 +1740,7 @@ export function docDragOver(event){
   }
   const page=document.getElementById('docPage');
   if(!page) return;
-  const blocks=[...page.querySelectorAll('.doc-block')];
+  const blocks=[...page.querySelectorAll('[data-block-id]')];
 
   // Find closest block with hysteresis
   let closestBlock=null, closestDist=Infinity, insertAfter=false;
@@ -1770,7 +1817,7 @@ export function docDragLeave(event){
   if(!page) return;
   if(event.relatedTarget&&page.contains(event.relatedTarget)) return;
   page.querySelectorAll('.doc-drop-indicator').forEach(el=>el.remove());
-  page.querySelectorAll('.doc-block').forEach(b=>{ b.style.transform=''; });
+  page.querySelectorAll('[data-block-id]').forEach(b=>{ b.style.transform=''; });
   docDragLastOverId=null;
   docDragLastInsertAfter=null;
 }
@@ -1783,7 +1830,7 @@ export function docDrop(event){
   if(!docDragBlockId||!S.currentDoc){ docDragBlockId=null; return; }
 
   // Find target position from cursor
-  const blocks=[...page.querySelectorAll('.doc-block')];
+  const blocks=[...page.querySelectorAll('[data-block-id]')];
   let targetIdx=-1;
   for(const block of blocks){
     if(block.dataset.blockId===docDragBlockId) continue;
@@ -1857,7 +1904,7 @@ export function docTouchDragMove(event){
   }
   const page=document.getElementById('docPage');
   if(!page) return;
-  const blocks=[...page.querySelectorAll('.doc-block')];
+  const blocks=[...page.querySelectorAll('[data-block-id]')];
 
   let closestBlock=null, closestDist=Infinity, insertAfter=false;
   for(const block of blocks){

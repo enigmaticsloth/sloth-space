@@ -2035,6 +2035,67 @@ export function shSerializeForAI() {
 }
 
 /**
+ * Convert any sheet data (live or workspace-stored) to compact Markdown table.
+ * Accepts either the live S.sheet.current or a workspace file's content object.
+ * Token-efficient: ~70-80% smaller than raw JSON.
+ */
+export function sheetToMarkdownTable(sheetData) {
+  const sh = sheetData || S.sheet.current;
+  if (!sh || !sh.columns || !sh.rows) return '';
+  const cols = sh.columns;
+  const colNames = cols.map(c => c.name || c.id);
+  const lines = [];
+  lines.push('| ' + colNames.join(' | ') + ' |');
+  lines.push('|' + cols.map(() => ' --- ').join('|') + '|');
+  for (const row of sh.rows) {
+    const cells = cols.map(col => {
+      const raw = row.cells?.[col.id] ?? '';
+      if (!raw) return '';
+      // For formulas, show evaluated result
+      if (typeof raw === 'string' && raw.startsWith('=')) {
+        try {
+          const v = shEvalFormula(raw, sh);
+          return (typeof v === 'object') ? '#ERR' : String(v);
+        } catch { return raw; }
+      }
+      return String(raw);
+    });
+    lines.push('| ' + cells.join(' | ') + ' |');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Convert any sheet data to CSV string.
+ * Even more compact than markdown for very large sheets.
+ */
+export function sheetToCSV(sheetData) {
+  const sh = sheetData || S.sheet.current;
+  if (!sh || !sh.columns || !sh.rows) return '';
+  const cols = sh.columns;
+  const escape = v => {
+    const s = String(v ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [];
+  lines.push(cols.map(c => escape(c.name || c.id)).join(','));
+  for (const row of sh.rows) {
+    const cells = cols.map(col => {
+      const raw = row.cells?.[col.id] ?? '';
+      if (typeof raw === 'string' && raw.startsWith('=')) {
+        try {
+          const v = shEvalFormula(raw, sh);
+          return escape((typeof v === 'object') ? '#ERR' : v);
+        } catch { return escape(raw); }
+      }
+      return escape(raw);
+    });
+    lines.push(cells.join(','));
+  }
+  return lines.join('\n');
+}
+
+/**
  * Get info about the current selection (cell, range) for AI context.
  */
 export function shGetSelectionContext() {
@@ -2137,4 +2198,45 @@ export function enterSheetMode() {
   }
 
   window.modeEnter('sheet');
+}
+
+/**
+ * Load arbitrary sheet data (e.g. from AI conversion).
+ * Replaces current sheet, registers in workspace, and re-renders.
+ */
+export function shLoadData(sheetData) {
+  if (!sheetData || !sheetData.columns || !sheetData.rows) return;
+  S.sheet.current = {
+    title: sheetData.title || 'Untitled Sheet',
+    columns: sheetData.columns,
+    rows: sheetData.rows,
+    frozenRows: sheetData.frozenRows ?? 1,
+    frozenCols: sheetData.frozenCols ?? 0,
+    created: sheetData.created || new Date().toISOString(),
+    updated: sheetData.updated || new Date().toISOString(),
+  };
+  S.sheet.undoStack = [];
+  S.sheet.redoStack = [];
+  S.sheet.selectedCell = null;
+  S.sheet.editingCell = null;
+  S.sheet.selectedRange = null;
+
+  // Register in workspace
+  if (window.wsLoad && window.wsSave) {
+    const files = window.wsLoad();
+    const wsId = sheetData.id || ('ws_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7));
+    const { title, ...content } = S.sheet.current;
+    files.push({
+      id: wsId,
+      type: 'sheet',
+      title: title || 'Untitled Sheet',
+      created: S.sheet.current.created,
+      updated: S.sheet.current.updated,
+      content
+    });
+    window.wsSave(files);
+    S._wsCurrentFileId = wsId;
+  }
+
+  if (window.renderSheetMode) window.renderSheetMode();
 }
