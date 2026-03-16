@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c4';
-import * as slide from './slide.js?v=20260317c4';
-import * as doc from './doc.js?v=20260317c4';
-import * as workspace from './workspace.js?v=20260317c4';
-import * as ai from './ai.js?v=20260317c4';
-import * as ui from './ui.js?v=20260317c4';
-import * as storage from './storage.js?v=20260317c4';
-import * as keys from './keys.js?v=20260317c4';
-import * as sheet from './sheet.js?v=20260317c4';
-import * as bench from './bench.js?v=20260317c4';
+import { S } from './state.js?v=20260317c5';
+import * as slide from './slide.js?v=20260317c5';
+import * as doc from './doc.js?v=20260317c5';
+import * as workspace from './workspace.js?v=20260317c5';
+import * as ai from './ai.js?v=20260317c5';
+import * as ui from './ui.js?v=20260317c5';
+import * as storage from './storage.js?v=20260317c5';
+import * as keys from './keys.js?v=20260317c5';
+import * as sheet from './sheet.js?v=20260317c5';
+import * as bench from './bench.js?v=20260317c5';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -327,83 +327,170 @@ ui.renderApp();
   setTimeout(runDemo,1200);
 })();
 
-// ─── Left sidebar demo showcase animation (visual mockups) ───
+// ─── Left sidebar demo — mini Sloth UI with animated cursor ───
 (function(){
-  let sceneIdx=0, _timer=null, _running=false;
-  function el(id){ return document.getElementById(id); }
-  function wait(ms){ return new Promise(r=>{ _timer=setTimeout(r,ms); }); }
-  function alive(){ return !!el('llDemo'); }
+  let sceneIdx=0, _running=false;
+  const $ = id => document.getElementById(id);
+  const wait = ms => new Promise(r=>setTimeout(r,ms));
+  function alive(){ return !!$('llDemo'); }
 
-  // Typewriter into the mini prompt bar
-  async function typePrompt(text){
-    const t=el('demoInputText');
-    if(!t) return;
-    t.textContent='';
-    for(let i=0;i<text.length;i++){
-      if(!alive()) return;
-      t.textContent=text.slice(0,i+1);
-      await wait(28+Math.random()*18);
-    }
-    await wait(350);
+  /* ── Cursor helpers ── */
+  function showCursor(){ const c=$('muCursor'); if(c) c.classList.add('show'); }
+  function hideCursor(){ const c=$('muCursor'); if(c) c.classList.remove('show'); }
+
+  async function moveCursor(x, y){
+    const c=$('muCursor');
+    if(!c) return;
+    c.style.left = x+'px';
+    c.style.top  = y+'px';
+    await wait(480);
   }
 
-  function setStatus(html){ const s=el('demoStatus'); if(s) s.innerHTML=html; }
-  function clearCanvas(){ const c=el('demoCanvas'); if(c){ c.innerHTML=''; c.classList.remove('fade-out'); } }
+  // Move cursor to the centre of a child element inside muFrame
+  async function moveCursorTo(targetEl){
+    const frame=$('muFrame');
+    if(!frame||!targetEl) return;
+    const fRect=frame.getBoundingClientRect();
+    const tRect=targetEl.getBoundingClientRect();
+    const x = tRect.left - fRect.left + tRect.width/2;
+    const y = tRect.top  - fRect.top  + tRect.height/2;
+    await moveCursor(x, y);
+  }
 
-  // Transition: fade out phase-1 canvas → show result card
-  async function showResultCard(c, cardHTML){
+  function clickRipple(){
+    const cur=$('muCursor');
+    const frame=$('muFrame');
+    if(!cur||!frame) return;
+    const rip=document.createElement('div');
+    rip.className='mu-click';
+    rip.style.left=cur.style.left;
+    rip.style.top=cur.style.top;
+    frame.appendChild(rip);
+    requestAnimationFrame(()=>rip.classList.add('pop'));
+    setTimeout(()=>rip.remove(),500);
+  }
+
+  async function clickEl(targetEl){
+    await moveCursorTo(targetEl);
+    clickRipple();
+    await wait(250);
+  }
+
+  /* ── UI helpers ── */
+  function setMode(text){
+    const m=$('muMode');
+    if(m){ m.textContent=text; m.classList.add('active'); }
+  }
+  function setTab(text){
+    const t=$('muTab0');
+    if(t){ t.textContent=text; t.classList.add('active'); }
+  }
+  function setStatus(html){ const s=$('muStatus'); if(s) s.innerHTML=html; }
+  function clearCanvas(){
+    const c=$('muCanvas');
+    if(c) c.innerHTML='';
+  }
+  function clearPrompt(){
+    const t=$('muPromptText');
+    if(t) t.textContent='';
+  }
+  function lightSend(on){
+    const s=$('muSend');
+    if(s){ if(on) s.classList.add('lit'); else s.classList.remove('lit'); }
+  }
+
+  /* ── Type in prompt bar with cursor moving there first ── */
+  async function typeInPrompt(text){
+    const prompt=$('muPrompt');
+    const pt=$('muPromptText');
+    if(!prompt||!pt) return;
+    await moveCursorTo(prompt);
+    clickRipple();
+    await wait(200);
+    pt.textContent='';
+    for(let i=0;i<text.length;i++){
+      if(!alive()) return;
+      pt.textContent=text.slice(0,i+1);
+      if(i===3) lightSend(true);
+      await wait(26+Math.random()*16);
+    }
+    await wait(300);
+  }
+
+  /* ── Click the send button ── */
+  async function clickSend(){
+    const btn=$('muSend');
+    if(!btn) return;
+    await clickEl(btn);
+    lightSend(false);
+    clearPrompt();
+    await wait(200);
+  }
+
+  /* ── Phase-2 result card (fade out canvas → show card) ── */
+  async function showResult(cardHTML){
     if(!alive()) return;
-    c.classList.add('fade-out');
-    await wait(350);
+    const c=$('muCanvas');
+    if(!c) return;
+    // Fade out existing content
+    c.style.transition='opacity 0.35s';
+    c.style.opacity='0';
+    await wait(380);
     if(!alive()) return;
     c.innerHTML=cardHTML;
-    c.classList.remove('fade-out');
-    // trigger show animation on card
+    c.style.opacity='1';
     await wait(30);
     const card=c.querySelector('.demo-result-card');
     if(card) card.classList.add('show');
     await wait(2800);
+    c.style.transition='';
   }
 
-  // ──── Scene 1: Generate Slides ────
+  /* ════════════════════════════════════════════════════
+     Scene 1 — Generate Slides
+     ════════════════════════════════════════════════════ */
   async function sceneSlides(){
-    await typePrompt('Create a pitch deck for our startup');
+    setMode('Slide');
+    setTab('Untitled');
+    showCursor();
+
+    // Cursor types prompt → clicks send
+    await typeInPrompt('Create a pitch deck');
+    await clickSend();
     setStatus('<span class="ds-spin"></span> Generating slides...');
-    clearCanvas();
-    const c=el('demoCanvas');
-    if(!c) return;
-    const slides=[
-      {bars:['title','w1','w2']},
-      {bars:['title','w3','w1','w2']},
-      {bars:['title','w2 accent','w1']},
-      {bars:['title','w1','w3','w2']},
-      {bars:['title','w2','w1 accent']},
-      {bars:['title','w3','w1','w2']},
-    ];
+
+    // Build mini slides in canvas
+    const c=$('muCanvas'); if(!c) return;
     const wrap=document.createElement('div');
-    wrap.className='demo-slides';
-    slides.forEach(s=>{
-      const card=document.createElement('div');
-      card.className='demo-slide';
-      s.bars.forEach(b=>{
+    wrap.className='mu-slides';
+    const slideData=[
+      ['t','a','b'],['t','b','a','c'],['t','c gold','a'],
+      ['t','a','b','c'],['t','b','a gold'],['t','c','a','b']
+    ];
+    slideData.forEach(bars=>{
+      const s=document.createElement('div');
+      s.className='mu-slide';
+      bars.forEach(b=>{
         const bar=document.createElement('div');
-        bar.className='ds-bar '+b;
-        card.appendChild(bar);
+        bar.className='sb '+b;
+        s.appendChild(bar);
       });
-      wrap.appendChild(card);
+      wrap.appendChild(s);
     });
     c.appendChild(wrap);
-    const cards=wrap.querySelectorAll('.demo-slide');
+
+    const cards=wrap.querySelectorAll('.mu-slide');
     for(let i=0;i<cards.length;i++){
       if(!alive()) return;
       await wait(180);
       cards[i].classList.add('show');
       setStatus(`<span class="ds-spin"></span> Slide ${i+1} of 6`);
     }
-    await wait(600);
+    await wait(500);
     setStatus('<span class="ds-ok">✓ Pitch deck ready</span>');
-    // Phase 2: result card
-    await showResultCard(c,`
+    hideCursor();
+
+    await showResult(`
       <div class="demo-result-card">
         <div class="demo-rc-header">
           <div class="demo-rc-icon" style="background:rgba(120,134,165,0.2);color:#B8C4D8;">▦</div>
@@ -421,97 +508,119 @@ ui.renderApp();
       </div>`);
   }
 
-  // ──── Scene 2: AI reads project files ────
+  /* ════════════════════════════════════════════════════
+     Scene 2 — Workspace: scan project files
+     ════════════════════════════════════════════════════ */
   async function sceneContext(){
-    await typePrompt('Summarize all files in Project Alpha');
-    setStatus('<span class="ds-spin"></span> Scanning project files...');
-    clearCanvas();
-    const c=el('demoCanvas');
-    if(!c) return;
+    setMode('Workspace');
+    setTab('Project Alpha');
+    showCursor();
+
+    await typeInPrompt('Summarize all project files');
+    await clickSend();
+    setStatus('<span class="ds-spin"></span> Scanning files...');
+
+    const c=$('muCanvas'); if(!c) return;
     const files=[
-      {icon:'#7886A5',label:'SL',name:'pitch-deck.sloth'},
-      {icon:'#5A9E5A',label:'DC',name:'market-research.doc'},
-      {icon:'#C8A870',label:'SH',name:'budget-q4.sheet'},
-      {icon:'#A899C4',label:'DC',name:'strategy-notes.doc'},
-      {icon:'#7886A5',label:'SL',name:'team-intro.sloth'},
-      {icon:'#C8A870',label:'SH',name:'metrics.sheet'},
+      {bg:'#7886A5',lb:'SL',nm:'pitch-deck.sloth'},
+      {bg:'#5A9E5A',lb:'DC',nm:'market-research.doc'},
+      {bg:'#C8A870',lb:'SH',nm:'budget-q4.sheet'},
+      {bg:'#A899C4',lb:'DC',nm:'strategy-notes.doc'},
     ];
     const wrap=document.createElement('div');
-    wrap.className='demo-files';
+    wrap.style.cssText='width:100%;display:flex;flex-direction:column;gap:2px;';
     files.forEach(f=>{
       const row=document.createElement('div');
-      row.className='demo-file';
-      row.innerHTML=`<div class="df-icon" style="background:${f.icon}">${f.label}</div><span class="df-name">${f.name}</span><span class="df-check">✓</span>`;
+      row.style.cssText='display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:3px;opacity:0;transform:translateX(-4px);transition:all 0.25s ease;';
+      row.innerHTML=`<div style="width:14px;height:14px;border-radius:2px;background:${f.bg};font-size:5px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;">${f.lb}</div>
+        <span style="font-size:6px;color:#888;flex:1;">${f.nm}</span>
+        <span class="fcheck" style="font-size:7px;color:#5A9E5A;opacity:0;transition:opacity 0.3s;">✓</span>`;
       wrap.appendChild(row);
     });
     c.appendChild(wrap);
-    const rows=wrap.querySelectorAll('.demo-file');
+
+    // Reveal rows
+    const rows=wrap.children;
     for(let i=0;i<rows.length;i++){
       if(!alive()) return;
-      await wait(120);
-      rows[i].classList.add('show');
+      await wait(150);
+      rows[i].style.opacity='1';
+      rows[i].style.transform='translateX(0)';
     }
-    await wait(300);
+    await wait(200);
+
+    // Cursor scans each file
     for(let i=0;i<rows.length;i++){
       if(!alive()) return;
-      await wait(220);
-      rows[i].classList.add('scanned');
-      setStatus(`<span class="ds-spin"></span> Reading ${files[i].name}...`);
+      await moveCursorTo(rows[i]);
+      clickRipple();
+      rows[i].style.background='rgba(120,134,165,0.08)';
+      setStatus(`<span class="ds-spin"></span> Reading ${files[i].nm}...`);
+      await wait(350);
+      rows[i].querySelector('.fcheck').style.opacity='1';
     }
-    await wait(500);
+    await wait(400);
     setStatus('<span class="ds-ok">✓ Analysis complete</span>');
-    // Phase 2: summary result card
-    await showResultCard(c,`
+    hideCursor();
+
+    await showResult(`
       <div class="demo-result-card">
         <div class="demo-rc-header">
           <div class="demo-rc-icon" style="background:rgba(90,158,90,0.2);color:#5A9E5A;">✦</div>
           <div><div class="demo-rc-title">Project Alpha Summary</div>
-          <div class="demo-rc-subtitle">6 files · 5 insights</div></div>
+          <div class="demo-rc-subtitle">4 files · 5 insights</div></div>
         </div>
         <div class="demo-rc-body">
           <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#5A9E5A"></span><span class="demo-rc-text">Revenue up 27% QoQ</span></div>
           <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#C8A870"></span><span class="demo-rc-text">Budget on track for Q4</span></div>
           <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#7886A5"></span><span class="demo-rc-text">3 action items pending</span></div>
           <div class="demo-rc-divider"></div>
-          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Files scanned</span><span class="demo-rc-stat-val">6</span></div>
-          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Total content</span><span class="demo-rc-stat-val">4,200 words</span></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Files scanned</span><span class="demo-rc-stat-val">4</span></div>
           <div class="demo-rc-stat"><span class="demo-rc-stat-label">Cross-refs</span><span class="demo-rc-stat-val">12 found</span></div>
         </div>
       </div>`);
   }
 
-  // ──── Scene 3: Build a spreadsheet ────
+  /* ════════════════════════════════════════════════════
+     Scene 3 — Generate Spreadsheet
+     ════════════════════════════════════════════════════ */
   async function sceneSheet(){
-    await typePrompt('Create a Q4 budget spreadsheet');
+    setMode('Sheet');
+    setTab('Untitled');
+    showCursor();
+
+    await typeInPrompt('Create Q4 budget sheet');
+    await clickSend();
     setStatus('<span class="ds-spin"></span> Building spreadsheet...');
-    clearCanvas();
-    const c=el('demoCanvas');
-    if(!c) return;
+
+    const c=$('muCanvas'); if(!c) return;
     const wrap=document.createElement('div');
-    wrap.className='demo-sheet';
+    wrap.className='mu-sheet';
+    const hdrData=['','Oct','Nov','Dec'];
     const hdr=document.createElement('div');
-    hdr.className='demo-sheet-header';
-    ['A','B','C','D'].forEach(l=>{
-      const s=document.createElement('span');
-      s.textContent=l;
-      hdr.appendChild(s);
+    hdr.className='mu-sh-row show';
+    hdrData.forEach(h=>{
+      const cell=document.createElement('div');
+      cell.className='mu-sh-cell hdr';
+      cell.textContent=h;
+      hdr.appendChild(cell);
     });
     wrap.appendChild(hdr);
+
     const data=[
       ['Revenue','$48K','$52K','$61K'],
       ['COGS','$18K','$19K','$22K'],
       ['Gross','$30K','$33K','$39K'],
       ['Opex','$12K','$11K','$13K'],
       ['EBITDA','$18K','$22K','$26K'],
-      ['Margin','37%','42%','43%'],
     ];
     const rowEls=[];
     data.forEach((r,ri)=>{
       const row=document.createElement('div');
-      row.className='demo-sheet-row';
+      row.className='mu-sh-row';
       r.forEach((v,ci)=>{
         const cell=document.createElement('div');
-        cell.className='demo-sheet-cell'+(ri===4&&ci>0?' highlight':'');
+        cell.className='mu-sh-cell'+(ri===4&&ci>0?' hl':'');
         cell.textContent=v;
         row.appendChild(cell);
       });
@@ -519,21 +628,23 @@ ui.renderApp();
       rowEls.push(row);
     });
     c.appendChild(wrap);
+
     for(let i=0;i<rowEls.length;i++){
       if(!alive()) return;
       await wait(200);
       rowEls[i].classList.add('show');
       setStatus(`<span class="ds-spin"></span> Row ${i+1} of ${data.length}`);
     }
-    await wait(600);
+    await wait(500);
     setStatus('<span class="ds-ok">✓ Spreadsheet ready</span>');
-    // Phase 2: result card
-    await showResultCard(c,`
+    hideCursor();
+
+    await showResult(`
       <div class="demo-result-card">
         <div class="demo-rc-header">
           <div class="demo-rc-icon" style="background:rgba(200,168,112,0.2);color:#C8A870;">⊞</div>
           <div><div class="demo-rc-title">Q4 Budget</div>
-          <div class="demo-rc-subtitle">4 columns · 6 rows · formulas</div></div>
+          <div class="demo-rc-subtitle">4 columns · 5 rows · formulas</div></div>
         </div>
         <div class="demo-rc-body">
           <div class="demo-rc-stat"><span class="demo-rc-stat-label">Revenue (Oct)</span><span class="demo-rc-stat-val">$48K</span></div>
@@ -546,44 +657,54 @@ ui.renderApp();
       </div>`);
   }
 
-  // ──── Scene 4: Generate a doc ────
+  /* ════════════════════════════════════════════════════
+     Scene 4 — Generate Document
+     ════════════════════════════════════════════════════ */
   async function sceneDoc(){
-    await typePrompt('Write a project proposal for Q1');
+    setMode('Doc');
+    setTab('Untitled');
+    showCursor();
+
+    await typeInPrompt('Write a project proposal');
+    await clickSend();
     setStatus('<span class="ds-spin"></span> Writing document...');
-    clearCanvas();
-    const c=el('demoCanvas');
-    if(!c) return;
+
+    const c=$('muCanvas'); if(!c) return;
     const wrap=document.createElement('div');
-    wrap.className='demo-doc';
+    wrap.style.cssText='width:100%;display:flex;flex-direction:column;gap:2px;padding:2px;';
+    // Title line
     const title=document.createElement('div');
-    title.className='dd-title';
+    title.className='mu-doc-line t';
     wrap.appendChild(title);
-    const widths=['w1','w3','w2','w5','w4','w6','w1','w3'];
+    // Body lines
+    const lineClasses=['a','c','b','a','d','b','c','a'];
     const lines=[];
-    widths.forEach(w=>{
+    lineClasses.forEach(cls=>{
       const l=document.createElement('div');
-      l.className='dd-line '+w;
+      l.className='mu-doc-line '+cls;
       wrap.appendChild(l);
       lines.push(l);
     });
     c.appendChild(wrap);
+
     await wait(200);
     if(!alive()) return;
     title.classList.add('show');
     setStatus('<span class="ds-spin"></span> Writing title...');
-    await wait(350);
+    await wait(300);
     for(let i=0;i<lines.length;i++){
       if(!alive()) return;
-      await wait(140);
+      await wait(130);
       lines[i].classList.add('show');
       if(i===0) setStatus('<span class="ds-spin"></span> Introduction...');
       if(i===3) setStatus('<span class="ds-spin"></span> Key objectives...');
       if(i===6) setStatus('<span class="ds-spin"></span> Timeline...');
     }
-    await wait(600);
+    await wait(500);
     setStatus('<span class="ds-ok">✓ Document ready</span>');
-    // Phase 2: result card
-    await showResultCard(c,`
+    hideCursor();
+
+    await showResult(`
       <div class="demo-result-card">
         <div class="demo-rc-header">
           <div class="demo-rc-icon" style="background:rgba(168,153,196,0.2);color:#A899C4;">☰</div>
@@ -602,89 +723,120 @@ ui.renderApp();
       </div>`);
   }
 
-  // ──── Scene 5: Convert between formats ────
+  /* ════════════════════════════════════════════════════
+     Scene 5 — Convert: right-click tab → context menu
+     ════════════════════════════════════════════════════ */
   async function sceneConvert(){
-    await typePrompt('Convert my pitch deck to a doc');
-    setStatus('<span class="ds-spin"></span> Analyzing source file...');
-    clearCanvas();
-    const c=el('demoCanvas');
-    if(!c) return;
+    setMode('Slide');
+    setTab('pitch-deck');
+    showCursor();
 
+    // Build a few placeholder slides in canvas first
+    const c=$('muCanvas'); if(!c) return;
     const wrap=document.createElement('div');
-    wrap.className='demo-convert';
-
-    // Top row: source file → arrow → target file
-    const row=document.createElement('div');
-    row.className='demo-cv-row';
-    row.innerHTML=`
-      <div class="demo-cv-file" id="cvSrc">
-        <div class="cvf-icon" style="background:#7886A5;">SL</div>
-        <span class="cvf-label">pitch-deck.sloth</span>
-      </div>
-      <div class="demo-cv-arrow" id="cvArrow">→</div>
-      <div class="demo-cv-file" id="cvDst">
-        <div class="cvf-icon" style="background:#5A9E5A;">DC</div>
-        <span class="cvf-label">pitch-deck.doc</span>
-      </div>`;
-    wrap.appendChild(row);
-
-    // Conversion flow steps
-    const flowsDiv=document.createElement('div');
-    flowsDiv.className='demo-cv-flows';
-    const steps=[
-      {from:'6 slides',to:'6 sections',label:'Structure'},
-      {from:'Titles',to:'Headings',label:'Formatting'},
-      {from:'Bullets',to:'Paragraphs',label:'Content'},
-      {from:'Images',to:'Inline images',label:'Assets'},
-      {from:'Theme',to:'Doc styles',label:'Styling'},
-    ];
-    steps.forEach(s=>{
-      const fl=document.createElement('div');
-      fl.className='demo-cv-flow';
-      fl.innerHTML=`<span class="cvfl-from">${s.from}</span><span class="cvfl-arrow">→</span><span class="cvfl-to">${s.to}</span><span class="cvfl-check">✓</span>`;
-      flowsDiv.appendChild(fl);
-    });
-    wrap.appendChild(flowsDiv);
+    wrap.className='mu-slides';
+    for(let i=0;i<4;i++){
+      const s=document.createElement('div');
+      s.className='mu-slide show';
+      ['t','a','b'].forEach(b=>{
+        const bar=document.createElement('div');
+        bar.className='sb '+b;
+        s.appendChild(bar);
+      });
+      wrap.appendChild(s);
+    }
     c.appendChild(wrap);
+    setStatus('');
+    await wait(600);
 
-    // Animate: show source
-    await wait(200);
-    const src=document.getElementById('cvSrc');
-    if(src) { src.classList.add('show'); src.classList.add('active'); }
-    setStatus('<span class="ds-spin"></span> Reading slides...');
-    await wait(500);
-
-    // Show arrow
-    const arrow=document.getElementById('cvArrow');
-    if(arrow) { arrow.classList.add('show'); }
+    // Cursor moves to the tab and right-clicks
+    const tab=$('muTab0');
+    if(!tab) return;
+    await moveCursorTo(tab);
+    clickRipple();
+    setStatus('Right-click tab…');
     await wait(300);
 
-    // Show target
-    const dst=document.getElementById('cvDst');
-    if(dst) dst.classList.add('show');
+    // Show context menu
+    const frame=$('muFrame');
+    if(!frame) return;
+    const ctx=document.createElement('div');
+    ctx.className='mu-ctx';
+    const tRect=tab.getBoundingClientRect();
+    const fRect=frame.getBoundingClientRect();
+    ctx.style.left=(tRect.left-fRect.left)+'px';
+    ctx.style.top=(tRect.bottom-fRect.top+2)+'px';
+    ctx.innerHTML=`
+      <div class="mu-ctx-item">Rename</div>
+      <div class="mu-ctx-item">Duplicate</div>
+      <div class="mu-ctx-sep"></div>
+      <div class="mu-ctx-item" id="ctxConvert">Convert to Doc</div>
+      <div class="mu-ctx-item">Convert to Sheet</div>
+      <div class="mu-ctx-sep"></div>
+      <div class="mu-ctx-item" style="color:#D55B5B;">Delete</div>`;
+    frame.appendChild(ctx);
+    await wait(50);
+    ctx.classList.add('show');
     await wait(400);
 
-    // Animate arrow pulse + conversion steps
-    if(arrow) { arrow.classList.add('active'); arrow.classList.add('pulse'); }
-    if(src) src.classList.remove('active');
-
-    const flows=flowsDiv.querySelectorAll('.demo-cv-flow');
-    for(let i=0;i<flows.length;i++){
-      if(!alive()) return;
+    // Cursor moves to "Convert to Doc" and clicks
+    const cvItem=document.getElementById('ctxConvert');
+    if(cvItem){
+      await moveCursorTo(cvItem);
+      cvItem.classList.add('hover');
       await wait(300);
-      flows[i].classList.add('show');
-      setStatus(`<span class="ds-spin"></span> Converting ${steps[i].from.toLowerCase()}...`);
-      await wait(250);
-      flows[i].classList.add('done');
+      clickRipple();
+      await wait(200);
     }
+    // Remove context menu
+    ctx.classList.remove('show');
+    await wait(200);
+    ctx.remove();
 
-    await wait(300);
-    if(src) src.classList.add('done');
-    if(dst) { dst.classList.add('done'); dst.classList.add('active'); }
+    setStatus('<span class="ds-spin"></span> Converting slides → doc...');
+    hideCursor();
+
+    // Show conversion progress in canvas
+    c.style.transition='opacity 0.3s'; c.style.opacity='0';
+    await wait(350);
+    c.innerHTML='';
+    c.style.opacity='1';
+
+    // Mini conversion flow
+    const flowWrap=document.createElement('div');
+    flowWrap.style.cssText='width:100%;display:flex;flex-direction:column;gap:3px;padding:4px;';
+    const steps=[
+      {from:'6 slides',to:'6 sections'},
+      {from:'Titles',to:'Headings'},
+      {from:'Bullets',to:'Paragraphs'},
+      {from:'Images',to:'Inline imgs'},
+      {from:'Theme',to:'Doc styles'},
+    ];
+    steps.forEach(s=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:3px;font-size:6px;opacity:0;transition:all 0.2s;';
+      row.innerHTML=`<span style="color:#7886A5;min-width:32px;">${s.from}</span><span style="color:#555;">→</span><span style="color:#5A9E5A;min-width:36px;">${s.to}</span><span class="stepcheck" style="color:#5A9E5A;opacity:0;transition:opacity 0.3s;">✓</span>`;
+      flowWrap.appendChild(row);
+    });
+    c.appendChild(flowWrap);
+
+    const flowRows=flowWrap.children;
+    for(let i=0;i<flowRows.length;i++){
+      if(!alive()) return;
+      await wait(280);
+      flowRows[i].style.opacity='1';
+      setStatus(`<span class="ds-spin"></span> ${steps[i].from} → ${steps[i].to}...`);
+      await wait(200);
+      flowRows[i].querySelector('.stepcheck').style.opacity='1';
+    }
+    await wait(400);
+
+    // Update mode & tab to show conversion done
+    setMode('Doc');
+    setTab('pitch-deck');
     setStatus('<span class="ds-ok">✓ Converted to document</span>');
 
-    // Phase 2: result card
-    await showResultCard(c,`
+    await showResult(`
       <div class="demo-result-card">
         <div class="demo-rc-header">
           <div class="demo-rc-icon" style="background:rgba(120,134,165,0.2);color:#B8C4D8;">⇄</div>
@@ -701,10 +853,11 @@ ui.renderApp();
       </div>`);
   }
 
+  /* ── Scene loop ── */
   const SCENES=[sceneSlides, sceneContext, sceneSheet, sceneDoc, sceneConvert];
 
   function updateDots(){
-    const d=el('llDemoDots');
+    const d=$('llDemoDots');
     if(!d) return;
     d.innerHTML=SCENES.map((_,i)=>`<span class="${i===sceneIdx%SCENES.length?'active':''}"></span>`).join('');
   }
@@ -719,11 +872,17 @@ ui.renderApp();
         continue;
       }
       updateDots();
-      const scene=SCENES[sceneIdx%SCENES.length];
-      // Clear state
-      const t=el('demoInputText'); if(t) t.textContent='';
+      // Reset UI
       clearCanvas();
+      clearPrompt();
+      lightSend(false);
+      hideCursor();
       setStatus('');
+      // Reset cursor position to bottom-right
+      const cur=$('muCursor');
+      if(cur){ cur.style.left='80%'; cur.style.top='70%'; }
+
+      const scene=SCENES[sceneIdx%SCENES.length];
       await scene();
       sceneIdx++;
     }

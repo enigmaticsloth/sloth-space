@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PptxGenJS/3.12.0/pptxgen.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<link rel="stylesheet" href="css/styles.css?v=20260317c4">
+<link rel="stylesheet" href="css/styles.css?v=20260317c5">
 </head>
 <body>
 
@@ -268,20 +268,23 @@
       </div>
     </div>
 
-    <!-- Demo showcase -->
+    <!-- Demo showcase — mini Sloth UI -->
     <div class="ll-demo" id="llDemo">
       <div class="ll-demo-label">See what Sloth can do</div>
-      <div class="ll-demo-screen" id="llDemoScreen">
-        <!-- Prompt bar (mini input) -->
-        <div class="demo-input" id="demoInput">
-          <span class="demo-input-text" id="demoInputText"></span>
-          <span class="demo-input-cursor"></span>
+      <div class="mu" id="muFrame">
+        <div class="mu-top"><span class="mu-logo">Sloth Space</span><span class="mu-mode" id="muMode">Slide</span></div>
+        <div class="mu-tabs" id="muTabs"><span class="mu-tab active" id="muTab0">Untitled</span></div>
+        <div class="mu-content">
+          <div class="mu-canvas" id="muCanvas"></div>
+          <div class="mu-prompt" id="muPrompt">
+            <span class="mu-prompt-text" id="muPromptText"></span><span class="mu-prompt-cursor"></span>
+            <div class="mu-send" id="muSend"></div>
+          </div>
         </div>
-        <!-- Visual canvas (mini mockups render here) -->
-        <div class="demo-canvas" id="demoCanvas"></div>
-        <!-- Status line -->
-        <div class="demo-status" id="demoStatus"></div>
+        <!-- Animated cursor -->
+        <div class="mu-cursor" id="muCursor"><svg viewBox="0 0 12 16"><path d="M1 1 L1 12 L4 9 L7 14 L9 13 L6 8 L10 8 Z" fill="#fff" stroke="#000" stroke-width="0.8"/></svg></div>
       </div>
+      <div class="mu-status" id="muStatus"></div>
       <div class="ll-demo-dots" id="llDemoDots"></div>
     </div>
 
