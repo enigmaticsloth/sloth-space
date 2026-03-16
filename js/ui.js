@@ -32,6 +32,11 @@ function renderApp(){
   if(deckNameEl&&document.activeElement!==deckNameEl){
     deckNameEl.value=S.currentDeck?.title||'';
   }
+  // Sync tab bar filename
+  const mtbFn=document.getElementById('mtbFilename');
+  if(mtbFn&&document.activeElement!==mtbFn){
+    mtbFn.value=S.currentDeck?.title||'';
+  }
 
   // Vivid preset pill colors
   const PILL_COLORS={
@@ -41,7 +46,9 @@ function renderApp(){
     'monet':{bg:'#B8C4D8',fg:'#2C2C3A',bd:'#7886A5',aBg:'#7886A5',aFg:'#fff'},
     'seurat':{bg:'#E8C89A',fg:'#2A2A1E',bd:'#C67A3C',aBg:'#C67A3C',aFg:'#fff'}
   };
-  document.getElementById('presetPills').innerHTML=Object.values(PRESETS).map(pr=>{
+  // Render preset pills into tab bar row2
+  const presetTarget=document.getElementById('mtbPresets')||document.getElementById('presetPills');
+  if(presetTarget) presetTarget.innerHTML=Object.values(PRESETS).map(pr=>{
     const p=PILL_COLORS[pr.id]||{bg:'#333',fg:'#ccc',bd:'#555',aBg:'#666',aFg:'#fff'};
     const isActive=pr.id===S.currentPreset;
     return `<button class="${isActive?'active':''}" data-preset="${pr.id}" onclick="window.setPreset('${pr.id}')" style="background:${isActive?p.aBg:p.bg};color:${isActive?p.aFg:p.fg};">${pr.name}</button>`;
@@ -632,23 +639,44 @@ function modeShowUI(mode){
     wc.style.display='';
   }
 
-  // Move input area into chat panel for workspace mode (chat-app feel)
+  // Move input area into chat panel for ALL modes (unified prompt)
   const inputArea=document.getElementById('inputArea');
   const chatPanel=document.getElementById('chatPanel');
-  const bottomInner=document.querySelector('.bottom-panel-inner');
-  if(inputArea && chatPanel && bottomInner){
-    if(mode==='workspace'){
-      // Move input + img staging into chat panel
-      const imgStaging=document.getElementById('imgStaging');
-      if(imgStaging) chatPanel.appendChild(imgStaging);
-      chatPanel.appendChild(inputArea);
-    } else {
-      // Restore input back to bottom-panel-inner (imgStaging and inputArea are its children)
-      const imgStaging=document.getElementById('imgStaging');
-      if(imgStaging) bottomInner.appendChild(imgStaging);
-      bottomInner.appendChild(inputArea);
-    }
+  if(inputArea && chatPanel){
+    const imgStaging=document.getElementById('imgStaging');
+    if(imgStaging) chatPanel.appendChild(imgStaging);
+    chatPanel.appendChild(inputArea);
   }
+}
+
+// ═══════════════════════════════════════════
+// TAB BAR FILENAME INPUT — syncs with active mode
+// ═══════════════════════════════════════════
+function _syncTabBarFilename(mode){
+  const el=document.getElementById('mtbFilename');
+  if(!el) return;
+  // Remove old handler
+  el.oninput=null;
+  if(mode==='slide'){
+    el.placeholder='Untitled Presentation';
+    el.value=S.currentDeck?.title||'';
+    el.oninput=function(){ if(S.currentDeck){ S.currentDeck.title=this.value.trim()||'Untitled'; window.autoSave(); } modeTabUpdateTitle(); };
+  } else if(mode==='doc'){
+    el.placeholder='Untitled Document';
+    el.value=S.currentDoc?.title||'';
+    el.oninput=function(){ if(S.currentDoc){ S.currentDoc.title=this.value; S.currentDoc.updated=new Date().toISOString(); window.docAutoSave(); } modeTabUpdateTitle(); };
+  } else if(mode==='sheet'){
+    el.placeholder='Untitled Sheet';
+    el.value=S.sheet.current?.title||'';
+    el.oninput=function(){ if(S.sheet.current){ S.sheet.current.title=this.value.trim()||'Untitled Sheet'; S.sheet.current.updated=new Date().toISOString(); try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){} } modeTabUpdateTitle(); };
+  } else if(mode==='workspace'){
+    el.placeholder='Workspace';
+    el.value='Workspace';
+    el.oninput=null;
+  }
+  // Also sync the old deckNameInput (used by existing code paths)
+  const oldInput=document.getElementById('deckNameInput');
+  if(oldInput && document.activeElement!==oldInput) oldInput.value=el.value;
 }
 
 // ═══════════════════════════════════════════
@@ -1126,46 +1154,14 @@ function pickMode(mode){
 }
 
 function updateModeBadge(mode){
-  const label=document.getElementById('modeBadgeLabel');
-  const icon=document.getElementById('modeBadgeIcon');
-  if(!label||!icon) return;
-  const icons={
-    slide:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
-    doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
-    sheet:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/>',
-    workspace:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'
-  };
-  label.textContent=mode.charAt(0).toUpperCase()+mode.slice(1);
-  icon.innerHTML=icons[mode]||icons.slide;
+  // Mode badge removed — tab bar handles mode indication. Kept as no-op for compat.
 }
 
 function toggleModeSwitchMenu(e){
-  e.stopPropagation();
-  const menu=document.getElementById('modeSwitchMenu');
-  if(!menu) return;
-  if(menu.style.display!=='none'){ menu.style.display='none'; return; }
-  const modes=[
-    {id:'slide',label:'Slide',color:'#7886A5',icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'},
-    {id:'doc',label:'Doc',color:'#6B8E7B',icon:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>'},
-    {id:'sheet',label:'Sheet',color:'#A08060',icon:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/>'},
-    {id:'workspace',label:'Workspace',color:'#8B7BA8',icon:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'}
-  ];
-  menu.innerHTML=modes.map(m=>{
-    const isCurrent=m.id===S.currentMode;
-    return `<div class="mode-switch-item${isCurrent?' current':''}" onclick="event.stopPropagation();window.switchToMode('${m.id}')">
-      <div class="msi-icon" style="background:${m.color}30;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${m.color}" stroke-width="2">${m.icon}</svg></div>
-      <span>${m.label}</span>${isCurrent?'<span style="margin-left:auto;font-size:9px;opacity:0.5;">current</span>':''}
-    </div>`;
-  }).join('');
-  menu.style.display='block';
-  // Close on outside click
-  setTimeout(()=>{
-    document.addEventListener('click',function _close(){ menu.style.display='none'; document.removeEventListener('click',_close); },{once:true});
-  },10);
+  // Mode badge removed — no-op for compat.
 }
 
 function switchToMode(mode){
-  document.getElementById('modeSwitchMenu').style.display='none';
   if(mode===S.currentMode) return;
   modeEnter(mode);
 }
@@ -1190,6 +1186,8 @@ function updateModeNameBar(mode){
     nameInput.value='Workspace';
     nameInput.oninput=null;
   }
+  // Keep tab bar filename in sync
+  _syncTabBarFilename(mode);
 }
 
 function modeNew(){
@@ -1280,17 +1278,21 @@ const MODE_EXPORTS={
 };
 
 function updateTopbarForMode(mode){
-  // Preset pills: only for slide mode
-  const pills=document.getElementById('presetPills');
+  // Preset pills: only for slide mode (now in tab bar row2)
+  const pills=document.getElementById('mtbPresets');
   if(pills) pills.style.display=(mode==='slide')?'flex':'none';
 
-  // Export buttons: mode-specific
-  const exArea=document.getElementById('topbarExports');
-  if(!exArea) return;
-  const exports=MODE_EXPORTS[mode]||[];
-  exArea.innerHTML=exports.map(e=>
-    `<button class="export-btn" onclick="${e.action}">${e.label}</button>`
-  ).join('');
+  // Export buttons: render into tab bar exports area
+  const exArea=document.getElementById('mtbExports');
+  if(exArea){
+    const exports=MODE_EXPORTS[mode]||[];
+    exArea.innerHTML=exports.map(e=>
+      `<button class="export-btn" onclick="${e.action}">${e.label}</button>`
+    ).join('');
+  }
+
+  // Sync tab bar filename input
+  _syncTabBarFilename(mode);
 
   // Project badge in topbar: show for editing modes (slide/doc/sheet), hide for workspace
   let projArea=document.getElementById('topbarProjectArea');
@@ -2404,6 +2406,7 @@ export {
   mpAddMsg,
   mpInitInputs,
   // Tab bar
+  _syncTabBarFilename,
   modeTabCreate,
   modeTabSwitch,
   modeTabClose,

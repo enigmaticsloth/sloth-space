@@ -2369,8 +2369,8 @@ async function executeMultiStep(steps, message, userText, wsContext) {
     await new Promise(r => setTimeout(r, 400));
     _updateAIActionOverlay('AI ▸ Showing results...');
     // Animate workspace switch
-    const modeBadge = document.getElementById('modeBadge');
-    if (modeBadge) await _aiSimulateClick(modeBadge);
+    const tabNewBtn = document.getElementById('mtbNewBtn');
+    if (tabNewBtn) await _aiSimulateClick(tabNewBtn);
     window.modeEnter('workspace');
     window.wsSetView('projects');
   }
@@ -2850,7 +2850,7 @@ async function _aiAnimateBeforeAction(fnName, args) {
 
   // Try to find the actual DOM element to animate
   const elFinders = {
-    modeEnter: () => document.getElementById('modeBadge'),
+    modeEnter: () => document.getElementById('mtbNewBtn') || document.querySelector('.mtb-new'),
     wsSetView: () => {
       const tabs = document.querySelectorAll('.ws-nav-tab');
       for (const t of tabs) { if (t.textContent.toLowerCase().includes(args[0])) return t; }

@@ -1240,6 +1240,10 @@ export function renderDocMode(){
   if(nameInput&&document.activeElement!==nameInput&&S.currentDoc){
     nameInput.value=S.currentDoc.title||'';
   }
+  const mtbFn=document.getElementById('mtbFilename');
+  if(mtbFn&&document.activeElement!==mtbFn&&S.currentDoc){
+    mtbFn.value=S.currentDoc.title||'';
+  }
   if(!S.currentDoc||!S.currentDoc.blocks||S.currentDoc.blocks.length===0){
     canvas.innerHTML=`
       <div class="doc-page">
