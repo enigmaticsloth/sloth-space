@@ -270,6 +270,7 @@ async function testConnection() {
 
 let landingProvider = 'groq';
 let _landingApiOpen = false;
+let _isPopState = false; // guard: skip pushState during popstate handling
 
 function showLanding(){
   const overlay=document.getElementById('landingOverlay');
@@ -278,6 +279,10 @@ function showLanding(){
   sessionStorage.setItem('sloth_on_picker','1');
   _initLandingProviderGrid();
   _prefillLandingFromConfig();
+  // History API: push landing state (skip if triggered by popstate)
+  if(!_isPopState && location.hash!=='#home'){
+    history.pushState({mode:'home'},'','#home');
+  }
 }
 
 function hideLanding(){
@@ -543,6 +548,9 @@ function modeShowUI(mode){
   const docCanvas=document.getElementById('docCanvas');
   const wsCanvas=document.getElementById('workspaceCanvas');
 
+  // Hide new tab page
+  _hideNewTabPage();
+
   // Hide everything first
   if(slideCanvas) slideCanvas.style.display='none';
   if(slideBar) slideBar.style.display='none';
@@ -643,35 +651,434 @@ function modeShowUI(mode){
   }
 }
 
-function modeEnter(mode){
-  // Universal mode entry — call this for all mode switches
+// ═══════════════════════════════════════════
+// MODE TAB BAR (browser-like tabs)
+// ═══════════════════════════════════════════
+const _TAB_ICONS={
+  slide:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+  sheet:'<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/>',
+  workspace:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  newtab:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'
+};
+const _TAB_COLORS={slide:'#7886A5',doc:'#6B8E7B',sheet:'#A08060',workspace:'#8B7BA8',newtab:'#999'};
+
+function _nextTabId(){ return ++S._tabIdCounter; }
+
+function _getTabTitle(mode){
+  if(mode==='slide') return S.currentDeck?.title||'Untitled Slide';
+  if(mode==='doc') return S.currentDoc?.title||'Untitled Doc';
+  if(mode==='sheet') return S.sheet.current?.title||'Untitled Sheet';
+  if(mode==='workspace') return 'Workspace';
+  if(mode==='newtab') return 'New Tab';
+  return mode;
+}
+
+function _snapshotCurrentTab(){
+  // Save current mode's state into the active tab's snapshot
+  const tab=S.modeTabs.find(t=>t.id===S.activeTabId);
+  if(!tab) return;
+  tab.title=_getTabTitle(tab.mode);
+  if(tab.mode==='slide'){
+    tab.snapshot={
+      deck: S.currentDeck ? JSON.parse(JSON.stringify(S.currentDeck)) : null,
+      preset: S.currentPreset,
+      currentSlide: S.currentSlide,
+      undoStack: JSON.parse(JSON.stringify(S.undoStack)),
+      redoStack: JSON.parse(JSON.stringify(S.redoStack)),
+    };
+  } else if(tab.mode==='doc'){
+    tab.snapshot={
+      doc: S.currentDoc ? JSON.parse(JSON.stringify(S.currentDoc)) : null,
+      undoStack: JSON.parse(JSON.stringify(S.docUndoStack)),
+      redoStack: JSON.parse(JSON.stringify(S.docRedoStack)),
+    };
+  } else if(tab.mode==='sheet'){
+    tab.snapshot={
+      sheet: S.sheet.current ? JSON.parse(JSON.stringify(S.sheet.current)) : null,
+      undoStack: JSON.parse(JSON.stringify(S.sheet.undoStack)),
+      redoStack: JSON.parse(JSON.stringify(S.sheet.redoStack)),
+    };
+  } else if(tab.mode==='workspace'){
+    tab.snapshot={}; // workspace uses global state
+  }
+}
+
+function _restoreTabSnapshot(tab){
+  // Restore mode-specific state from tab's snapshot
+  if(!tab.snapshot) return;
+  if(tab.mode==='slide'){
+    S.currentDeck=tab.snapshot.deck ? JSON.parse(JSON.stringify(tab.snapshot.deck)) : null;
+    S.currentPreset=tab.snapshot.preset||'clean-white';
+    S.currentSlide=tab.snapshot.currentSlide||0;
+    S.undoStack=tab.snapshot.undoStack ? JSON.parse(JSON.stringify(tab.snapshot.undoStack)) : [];
+    S.redoStack=tab.snapshot.redoStack ? JSON.parse(JSON.stringify(tab.snapshot.redoStack)) : [];
+  } else if(tab.mode==='doc'){
+    S.currentDoc=tab.snapshot.doc ? JSON.parse(JSON.stringify(tab.snapshot.doc)) : null;
+    S.docUndoStack=tab.snapshot.undoStack ? JSON.parse(JSON.stringify(tab.snapshot.undoStack)) : [];
+    S.docRedoStack=tab.snapshot.redoStack ? JSON.parse(JSON.stringify(tab.snapshot.redoStack)) : [];
+  } else if(tab.mode==='sheet'){
+    S.sheet.current=tab.snapshot.sheet ? JSON.parse(JSON.stringify(tab.snapshot.sheet)) : null;
+    S.sheet.undoStack=tab.snapshot.undoStack ? JSON.parse(JSON.stringify(tab.snapshot.undoStack)) : [];
+    S.sheet.redoStack=tab.snapshot.redoStack ? JSON.parse(JSON.stringify(tab.snapshot.redoStack)) : [];
+  }
+}
+
+function _renderTabBar(){
+  const bar=document.getElementById('modeTabBar');
+  const list=document.getElementById('modeTabList');
+  if(!bar||!list) return;
+  if(S.modeTabs.length===0){
+    bar.style.display='none';
+    return;
+  }
+  bar.style.display='flex';
+  list.innerHTML=S.modeTabs.map(t=>{
+    const active=t.id===S.activeTabId?'active':'';
+    const color=_TAB_COLORS[t.mode]||'#999';
+    const icon=_TAB_ICONS[t.mode]||_TAB_ICONS.slide;
+    return `<div class="mtb-tab ${active}" data-tabid="${t.id}" title="${t.title}">
+      <svg class="mtb-tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${active?color:'currentColor'}" stroke-width="2">${icon}</svg>
+      <span class="mtb-tab-title">${_escHtml(t.title)}</span>
+      <span class="mtb-tab-close" onclick="event.stopPropagation();window.modeTabClose(${t.id})">&times;</span>
+    </div>`;
+  }).join('');
+  // Attach click + drag handlers
+  list.querySelectorAll('.mtb-tab').forEach(el=>{
+    const tabId=parseInt(el.dataset.tabid);
+    el.addEventListener('mousedown', e=>_tabDragStart(e, tabId));
+    el.addEventListener('click', e=>{
+      if(_tabDragState.didDrag) return; // suppress click after drag
+      window.modeTabSwitch(tabId);
+    });
+  });
+}
+
+// ── Tab drag-to-reorder ──
+const _tabDragState={dragging:false, tabId:null, el:null, ghost:null, startX:0, didDrag:false};
+
+function _tabDragStart(e, tabId){
+  if(e.button!==0) return; // left click only
+  const closeBtn=e.target.closest('.mtb-tab-close');
+  if(closeBtn) return; // don't drag from close button
+  _tabDragState.dragging=false;
+  _tabDragState.tabId=tabId;
+  _tabDragState.startX=e.clientX;
+  _tabDragState.didDrag=false;
+  _tabDragState.el=e.currentTarget;
+  const onMove=ev=>_tabDragMove(ev);
+  const onUp=ev=>{
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    _tabDragEnd(ev);
+  };
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+
+function _tabDragMove(e){
+  const dx=e.clientX-_tabDragState.startX;
+  if(!_tabDragState.dragging){
+    if(Math.abs(dx)<5) return; // dead zone
+    _tabDragState.dragging=true;
+    _tabDragState.didDrag=true;
+    // Create ghost
+    const el=_tabDragState.el;
+    if(!el) return;
+    el.classList.add('mtb-tab-dragging');
+  }
+  // Find which tab we're hovering over and swap if needed
+  const list=document.getElementById('modeTabList');
+  if(!list) return;
+  const tabs=Array.from(list.querySelectorAll('.mtb-tab'));
+  const dragIdx=S.modeTabs.findIndex(t=>t.id===_tabDragState.tabId);
+  if(dragIdx===-1) return;
+
+  for(let i=0;i<tabs.length;i++){
+    if(i===dragIdx) continue;
+    const rect=tabs[i].getBoundingClientRect();
+    const mid=rect.left+rect.width/2;
+    // If dragging right and past midpoint of next tab, swap
+    if(i>dragIdx && e.clientX>mid){
+      const tmp=S.modeTabs[dragIdx];
+      S.modeTabs[dragIdx]=S.modeTabs[i];
+      S.modeTabs[i]=tmp;
+      _renderTabBar();
+      // Re-mark dragging class
+      const newEl=document.querySelector(`.mtb-tab[data-tabid="${_tabDragState.tabId}"]`);
+      if(newEl){ newEl.classList.add('mtb-tab-dragging'); _tabDragState.el=newEl; }
+      break;
+    }
+    // If dragging left and past midpoint of prev tab, swap
+    if(i<dragIdx && e.clientX<mid){
+      const tmp=S.modeTabs[dragIdx];
+      S.modeTabs[dragIdx]=S.modeTabs[i];
+      S.modeTabs[i]=tmp;
+      _renderTabBar();
+      const newEl=document.querySelector(`.mtb-tab[data-tabid="${_tabDragState.tabId}"]`);
+      if(newEl){ newEl.classList.add('mtb-tab-dragging'); _tabDragState.el=newEl; }
+      break;
+    }
+  }
+}
+
+function _tabDragEnd(e){
+  _tabDragState.dragging=false;
+  if(_tabDragState.el) _tabDragState.el.classList.remove('mtb-tab-dragging');
+  _tabDragState.el=null;
+  // didDrag stays true until next mousedown to suppress click
+  setTimeout(()=>{ _tabDragState.didDrag=false; },50);
+}
+
+function _escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function modeTabCreate(mode, enterMode){
+  // Create a new tab for the given mode
+  const id=_nextTabId();
+  const tab={id, mode, title:_getTabTitle(mode), snapshot:null};
+  S.modeTabs.push(tab);
+  S.activeTabId=id;
+  _renderTabBar();
+  if(enterMode!==false) _modeEnterInternal(mode, true); // true = fresh (new file)
+}
+
+function modeTabSwitch(tabId){
+  if(tabId===S.activeTabId) return;
+  const target=S.modeTabs.find(t=>t.id===tabId);
+  if(!target) return;
+  // Save current tab state (skip if current is newtab)
+  if(S.activeTabId){
+    const curTab=S.modeTabs.find(t=>t.id===S.activeTabId);
+    if(curTab && curTab.mode!=='newtab') _snapshotCurrentTab();
+  }
+  // Restore target tab
+  S.activeTabId=tabId;
+  _renderTabBar();
+  if(target.mode==='newtab'){
+    // Show new tab page
+    _showNewTabPage();
+  } else {
+    _restoreTabSnapshot(target);
+    _modeEnterInternal(target.mode, false);
+  }
+}
+
+function modeTabClose(tabId){
+  const idx=S.modeTabs.findIndex(t=>t.id===tabId);
+  if(idx===-1) return;
+  S.modeTabs.splice(idx,1);
+  if(S.modeTabs.length===0){
+    // No tabs left → show landing
+    S.activeTabId=null;
+    _renderTabBar();
+    showLanding();
+    return;
+  }
+  if(tabId===S.activeTabId){
+    // Switch to adjacent tab
+    const newIdx=Math.min(idx, S.modeTabs.length-1);
+    const newTab=S.modeTabs[newIdx];
+    S.activeTabId=newTab.id;
+    _renderTabBar();
+    if(newTab.mode==='newtab'){
+      _showNewTabPage();
+    } else {
+      _restoreTabSnapshot(newTab);
+      _modeEnterInternal(newTab.mode, false);
+    }
+  } else {
+    _renderTabBar();
+  }
+}
+
+function modeTabNew(){
+  // Save current tab before switching away
+  if(S.activeTabId) _snapshotCurrentTab();
+  // Create a virtual "newtab" tab
+  const id=_nextTabId();
+  const tab={id, mode:'newtab', title:'New Tab', snapshot:null};
+  S.modeTabs.push(tab);
+  S.activeTabId=id;
+  _renderTabBar();
+  _showNewTabPage();
+}
+
+function _showNewTabPage(){
+  const ntp=document.getElementById('newTabPage');
+  if(!ntp) return;
+  // Hide all canvases
+  const slideCanvas=document.getElementById('slideCanvas');
+  const slideBar=document.querySelector('.slide-bar');
+  const docCanvas=document.getElementById('docCanvas');
+  const wsCanvas=document.getElementById('workspaceCanvas');
+  const sheetCanvas=document.getElementById('sheetCanvas');
+  const nameBar=document.getElementById('modeNameBar');
+  const sp=document.querySelector('.slide-panel');
+  if(slideCanvas) slideCanvas.style.display='none';
+  if(slideBar) slideBar.style.display='none';
+  if(docCanvas) docCanvas.style.display='none';
+  if(wsCanvas) wsCanvas.style.display='none';
+  if(sheetCanvas) sheetCanvas.style.display='none';
+  if(nameBar) nameBar.style.display='none';
+  if(sp) sp.style.display='none';
+  ntp.style.display='flex';
+  _renderNtpRecents();
+}
+
+function _hideNewTabPage(){
+  const ntp=document.getElementById('newTabPage');
+  if(ntp) ntp.style.display='none';
+}
+
+function _renderNtpRecents(){
+  const list=document.getElementById('ntpRecentList');
+  if(!list) return;
+  const recents=[];
+  const typeIcons={doc:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    slide:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>',
+    sheet:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>'};
+
+  // Workspace files (docs, sheets)
+  if(window.wsLoad){
+    const wsFiles=window.wsLoad();
+    wsFiles.forEach(f=>{
+      recents.push({id:f.id, title:f.title, type:f.type, updated:new Date(f.updated).getTime(),
+        meta: f.type==='doc'? `${(f.content?.blocks||[]).length} blocks` :
+              f.type==='sheet'? `${(f.content?.rows||[]).length} rows` : ''});
+    });
+  }
+  // Local slides
+  const localSlides=getLocalFiles();
+  localSlides.forEach(f=>{
+    recents.push({id:f.id, title:f.title, type:'slide', updated:f.updated,
+      meta:`${f.slides} slides`, data:f.data, key:f.key});
+  });
+  // Sort by updated desc
+  recents.sort((a,b)=>(b.updated||0)-(a.updated||0));
+  const shown=recents.slice(0,12);
+  if(shown.length===0){
+    list.innerHTML='<div style="color:var(--text2);font-size:13px;padding:12px 0;font-family:Arial;">No recent files yet. Pick a mode above to get started!</div>';
+    return;
+  }
+  list.innerHTML=shown.map(f=>{
+    const t=f.type==='slides'?'slide':f.type;
+    const icon=typeIcons[t]||typeIcons.doc;
+    const ago=_timeAgo(f.updated);
+    return `<div class="ntp-recent" onclick="window.ntpOpenRecent('${_escHtml(f.id)}','${t}')">
+      <div class="ntp-recent-icon type-${t}">${icon}</div>
+      <div class="ntp-recent-info">
+        <div class="ntp-recent-title">${_escHtml(f.title)}</div>
+        <div class="ntp-recent-meta">${_escHtml(f.meta||'')}${f.meta?' · ':''}${ago}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _timeAgo(ts){
+  if(!ts) return '';
+  const diff=Date.now()-ts;
+  const mins=Math.floor(diff/60000);
+  if(mins<1) return 'just now';
+  if(mins<60) return mins+'m ago';
+  const hrs=Math.floor(mins/60);
+  if(hrs<24) return hrs+'h ago';
+  const days=Math.floor(hrs/24);
+  if(days<30) return days+'d ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+function ntpPickMode(mode){
+  // Convert the current "newtab" tab into a real mode tab
+  const tab=S.modeTabs.find(t=>t.id===S.activeTabId);
+  if(tab) tab.mode=mode;
+  _hideNewTabPage();
+  _modeEnterInternal(mode, true);
+  if(tab) tab.title=_getTabTitle(mode);
+  _renderTabBar();
+}
+
+function ntpOpenRecent(fileId, type){
+  // Convert the current "newtab" tab into the file's mode
+  const tab=S.modeTabs.find(t=>t.id===S.activeTabId);
+  const mode=type==='slide'?'slide':type==='sheet'?'sheet':type==='doc'?'doc':'doc';
+  if(tab) tab.mode=mode;
+  _hideNewTabPage();
+
+  // Load the file into state before entering mode
+  if(type==='doc'||type==='sheet'){
+    // Load from workspace
+    const wsFiles=window.wsLoad?window.wsLoad():[];
+    const f=wsFiles.find(w=>w.id===fileId);
+    if(f&&f.content){
+      if(type==='doc'){
+        S.currentDoc=JSON.parse(JSON.stringify(f.content));
+        if(!S.currentDoc.title) S.currentDoc.title=f.title;
+      } else if(type==='sheet'){
+        S.sheet.current=JSON.parse(JSON.stringify(f.content));
+        if(!S.sheet.current.title) S.sheet.current.title=f.title;
+      }
+    }
+  } else if(type==='slide'){
+    // Load from local storage
+    const localFiles=getLocalFiles();
+    const f=localFiles.find(lf=>lf.id===fileId);
+    if(f&&f.data){
+      if(window.loadFromData) window.loadFromData(f.data);
+    }
+  }
+
+  _modeEnterInternal(mode, false);
+  if(tab) tab.title=_getTabTitle(mode);
+  _renderTabBar();
+}
+
+function modeTabUpdateTitle(){
+  // Update the active tab's title from current state
+  const tab=S.modeTabs.find(t=>t.id===S.activeTabId);
+  if(!tab) return;
+  tab.title=_getTabTitle(tab.mode);
+  _renderTabBar();
+}
+
+function _modeEnterInternal(mode, fresh){
+  // Internal: switch to mode. If fresh=true, create new file for that mode.
+  // If fresh=false, assume state already restored (from tab snapshot or existing memory).
   modeSaveCurrent();
   S.currentMode=mode;
-  // Set body class for mode-specific CSS (touch-action, layout, etc.)
   document.body.classList.remove('mode-slide','mode-doc','mode-sheet','mode-workspace');
   document.body.classList.add('mode-'+mode);
   hideLanding();
+  // History API
+  if(!_isPopState && location.hash!=='#'+mode){
+    history.pushState({mode},'','#'+mode);
+  }
   sessionStorage.setItem('sloth_active','1');
   sessionStorage.setItem('sloth_mode',mode);
   sessionStorage.removeItem('sloth_on_picker');
-  if(window.saveCurrentMode) window.saveCurrentMode(); // persist to localStorage too
+  if(window.saveCurrentMode) window.saveCurrentMode();
   updateModeBadge(mode);
   modeShowUI(mode);
   updateToolbarForMode(mode);
   // Mode-specific initialization
   if(mode==='slide'){
+    if(fresh && !S.currentDeck){
+      // Will be handled by existing auto-creation in renderApp
+    }
     updateModeNameBar('slide');
     renderApp();
   } else if(mode==='doc'){
-    // Restore doc: memory → localStorage → workspace → new
-    if(!S.currentDoc){
-      try{
-        const saved=localStorage.getItem('sloth_current_doc');
-        if(saved){
-          const parsed=JSON.parse(saved);
-          if(parsed&&parsed.blocks&&parsed.blocks.length) S.currentDoc=parsed;
-        }
-      }catch(e){}
+    if(fresh || !S.currentDoc){
+      if(!S.currentDoc){
+        try{
+          const saved=localStorage.getItem('sloth_current_doc');
+          if(saved){
+            const parsed=JSON.parse(saved);
+            if(parsed&&parsed.blocks&&parsed.blocks.length) S.currentDoc=parsed;
+          }
+        }catch(e){}
+      }
       if(!S.currentDoc) S.currentDoc=window.docCreateNew('Untitled Document');
     }
     window.docRestoreUndoStacks();
@@ -679,15 +1086,16 @@ function modeEnter(mode){
     window.docUpdateUndoUI();
     window.renderDocMode();
   } else if(mode==='sheet'){
-    // Restore sheet: memory → localStorage → new
-    if(!S.sheet.current){
-      try{
-        const saved=localStorage.getItem('sloth_current_sheet');
-        if(saved){
-          const parsed=JSON.parse(saved);
-          if(parsed&&parsed.columns&&parsed.rows) S.sheet.current=parsed;
-        }
-      }catch(e){}
+    if(fresh || !S.sheet.current){
+      if(!S.sheet.current){
+        try{
+          const saved=localStorage.getItem('sloth_current_sheet');
+          if(saved){
+            const parsed=JSON.parse(saved);
+            if(parsed&&parsed.columns&&parsed.rows) S.sheet.current=parsed;
+          }
+        }catch(e){}
+      }
       if(!S.sheet.current) S.sheet.current=window.shCreateNew('Untitled Sheet');
     }
     updateModeNameBar('sheet');
@@ -696,6 +1104,21 @@ function modeEnter(mode){
     updateModeNameBar('workspace');
     window.renderWorkspaceMode();
   }
+  // Update tab title after initialization
+  modeTabUpdateTitle();
+}
+
+function modeEnter(mode){
+  // Public entry point — creates or reuses a tab
+  // Save current tab snapshot before switching
+  if(S.activeTabId) _snapshotCurrentTab();
+  // Create a new tab for the mode
+  const id=_nextTabId();
+  const tab={id, mode, title:mode.charAt(0).toUpperCase()+mode.slice(1), snapshot:null};
+  S.modeTabs.push(tab);
+  S.activeTabId=id;
+  _renderTabBar();
+  _modeEnterInternal(mode, true);
 }
 
 function pickMode(mode){
@@ -753,15 +1176,15 @@ function updateModeNameBar(mode){
   if(mode==='slide'){
     nameInput.placeholder='Untitled Presentation';
     nameInput.value=S.currentDeck?.title||'';
-    nameInput.oninput=function(){ if(S.currentDeck){ S.currentDeck.title=this.value.trim()||'Untitled'; window.autoSave(); }};
+    nameInput.oninput=function(){ if(S.currentDeck){ S.currentDeck.title=this.value.trim()||'Untitled'; window.autoSave(); } modeTabUpdateTitle(); };
   } else if(mode==='doc'){
     nameInput.placeholder='Untitled Document';
     nameInput.value=S.currentDoc?.title||'';
-    nameInput.oninput=function(){ if(S.currentDoc){ S.currentDoc.title=this.value; S.currentDoc.updated=new Date().toISOString(); window.docAutoSave(); }};
+    nameInput.oninput=function(){ if(S.currentDoc){ S.currentDoc.title=this.value; S.currentDoc.updated=new Date().toISOString(); window.docAutoSave(); } modeTabUpdateTitle(); };
   } else if(mode==='sheet'){
     nameInput.placeholder='Untitled Sheet';
     nameInput.value=S.sheet.current?.title||'';
-    nameInput.oninput=function(){ if(S.sheet.current){ S.sheet.current.title=this.value.trim()||'Untitled Sheet'; S.sheet.current.updated=new Date().toISOString(); try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){} }};
+    nameInput.oninput=function(){ if(S.sheet.current){ S.sheet.current.title=this.value.trim()||'Untitled Sheet'; S.sheet.current.updated=new Date().toISOString(); try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){} } modeTabUpdateTitle(); };
   } else if(mode==='workspace'){
     nameInput.placeholder='Workspace';
     nameInput.value='Workspace';
@@ -995,6 +1418,17 @@ function enterDocMode(){
 // ═══════════════════════════════════════════
 function checkWelcomeScreen() {
   const hasConfig = window.loadConfig();
+
+  // History API: check URL hash for deep-linking (e.g. #doc, #slide)
+  const validModes=['slide','doc','sheet','workspace'];
+  const hashMode=location.hash.replace('#','');
+  if(hasConfig && window.isConfigured() && validModes.includes(hashMode)){
+    // Replace current history entry so initial load has correct state
+    history.replaceState({mode:hashMode},'','#'+hashMode);
+    pickMode(hashMode);
+    return;
+  }
+
   // Restore sessionStorage from localStorage backup (survives tab close)
   // Must happen here BEFORE the check, since autoLoad runs after this
   if(hasConfig && !sessionStorage.getItem('sloth_active')){
@@ -1012,14 +1446,46 @@ function checkWelcomeScreen() {
   // Only skip welcome if user was actively working (refresh or restored), not fresh setup
   if (hasConfig && window.isConfigured() && sessionStorage.getItem('sloth_active')) {
     const savedMode=sessionStorage.getItem('sloth_mode')||'slide';
-    if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
-    else { pickMode(savedMode); }
+    // On refresh, replace (not push) so we don't stack duplicate entries
+    history.replaceState({mode:savedMode},'','#'+savedMode);
+    _isPopState=true; // suppress pushState inside modeEnter for this restore
+    try{
+      if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
+      else { pickMode(savedMode); }
+    }finally{ _isPopState=false; }
   }
   // Otherwise show landing page (always — it IS the homepage now)
   else {
+    // Set initial history state for landing
+    history.replaceState({mode:'home'},'','#home');
     showLanding();
   }
 }
+
+// History API: handle browser back/forward
+window.addEventListener('popstate', function(e){
+  _isPopState=true;
+  try{
+    const st=e.state;
+    if(st&&st.mode&&st.mode!=='home'){
+      const validModes=['slide','doc','sheet','workspace'];
+      if(validModes.includes(st.mode)){
+        // Try to find existing tab for this mode and switch to it
+        const existingTab=S.modeTabs.find(t=>t.mode===st.mode);
+        if(existingTab && existingTab.id!==S.activeTabId){
+          modeTabSwitch(existingTab.id);
+        } else if(!existingTab){
+          pickMode(st.mode);
+        }
+      }
+    } else {
+      // No state or mode==='home' → show landing
+      showLanding();
+    }
+  }finally{
+    _isPopState=false;
+  }
+});
 
 function getOS(){
   const ua=navigator.userAgent;
@@ -1936,5 +2402,16 @@ export {
   mpToggleSidebar,
   mpDetectMode,
   mpAddMsg,
-  mpInitInputs
+  mpInitInputs,
+  // Tab bar
+  modeTabCreate,
+  modeTabSwitch,
+  modeTabClose,
+  modeTabNew,
+  modeTabUpdateTitle,
+  _renderTabBar,
+  _snapshotCurrentTab,
+  // New tab page
+  ntpPickMode,
+  ntpOpenRecent,
 };

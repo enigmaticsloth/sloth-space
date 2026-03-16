@@ -235,6 +235,11 @@ export const S = {
     autoSaveTimer: null,
   },
 
+  // ── Mode Tabs (browser-like tab bar) ──
+  modeTabs: [],          // [{id, mode, title, snapshot:{...mode-specific state}}]
+  activeTabId: null,     // id of currently active tab
+  _tabIdCounter: 0,      // auto-increment for tab IDs
+
   // ── Touch / Mobile ──
   touchStartX: 0,
   touchStartY: 0,

@@ -347,6 +347,22 @@ INTENTS:
   - "open settings" → {"intent":"ui_action","actions":[{"fn":"openSettings","args":[]}],"message":"Opening settings"}
   - "switch to doc mode" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["doc"]}],"message":"Switching to Doc mode"}
 
+  TAB OPERATIONS — the app has a browser-like tab bar. Use tab functions when:
+  - User says "switch to the X tab", "go back to my doc/slide/sheet" → modeTabSwitch(tabId). Look up tabId from context.
+  - User says "close this tab", "close the slide tab" → modeTabClose(tabId). Use activeTabId for "this tab".
+  - User says "open a new slide/doc/sheet tab" → modeTabCreate(mode).
+  - If there are MULTIPLE tabs of the same mode (e.g. two doc tabs) and the user says "switch to doc", you MUST ask which one instead of guessing. Output: {"intent":"chat"} and ask which tab they want (list the tab names).
+  - When the user says "switch to slide" and there is exactly ONE slide tab open, use modeTabSwitch(tabId) NOT modeEnter.
+  - PREFER modeTabSwitch over modeEnter when a tab for that mode already exists. Only use modeTabNew+ntpPickMode to create a NEW tab.
+  - To CREATE a new tab: use TWO actions in sequence: modeTabNew() then ntpPickMode(mode). This shows the new-tab page first, then picks the mode — so the user sees the full animation.
+  - Do NOT use modeEnter to open new tabs. Always use modeTabNew+ntpPickMode for new tabs.
+  Examples:
+  - "switch to slide tab" (one slide tab, tabId:2) → {"intent":"ui_action","actions":[{"fn":"modeTabSwitch","args":[2]}],"message":"Switching to Slide tab"}
+  - "close this tab" (active tab is tabId:3) → {"intent":"ui_action","actions":[{"fn":"modeTabClose","args":[3]}],"message":"Closing current tab"}
+  - "open a new doc" → {"intent":"ui_action","actions":[{"fn":"modeTabNew","args":[]},{"fn":"ntpPickMode","args":["doc"]}],"message":"Opening new Doc tab"}
+  - "close the Budget Report tab" (tabId:5) → {"intent":"ui_action","actions":[{"fn":"modeTabClose","args":[5]}],"message":"Closing Budget Report tab"}
+  - "open new slide" → {"intent":"ui_action","actions":[{"fn":"modeTabNew","args":[]},{"fn":"ntpPickMode","args":["slide"]}],"message":"Opening new Slide tab"}
+
   CRITICAL DISTINCTION — "create project" vs "create document":
   - "create a PROJECT" → ui_action (wsCreateProject). A project is an organizational container, NOT content.
   - "create/write a DOCUMENT/FILE/REPORT/SLIDES" → generate. This is content creation.
@@ -1609,6 +1625,11 @@ ${ABOUT_TEXTS.sheet}
       }
     }
     if(S.currentMode==='slide'&&!S.currentDeck) ctx.push('No deck loaded yet.');
+    // Tab bar context — list open tabs so LLM can switch/close by ID or name
+    if(S.modeTabs.length>0){
+      const tabList=S.modeTabs.map(t=>`[tabId:${t.id}] "${t.title}" (${t.mode})${t.id===S.activeTabId?' *active*':''}`).join(', ');
+      ctx.push('Open tabs: '+tabList+'. Use modeTabSwitch(tabId) to switch, modeTabClose(tabId) to close, modeTabCreate(mode) to open new tab.');
+    }
     // Recent action memory — so router can resolve "that file", "the report I just made", etc.
     const recentActions=S.chatHistory.slice(-8).filter(m=>m.role==='assistant'&&m.content.startsWith('['));
     if(recentActions.length>0){
@@ -2094,8 +2115,8 @@ ${sourceContent}`;
             return {id:'row_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), cells};
           });
           const sheetData={id:sheetId, title:result.title||'Extracted Data', columns:cols, rows, created:new Date().toISOString(), updated:new Date().toISOString()};
-          // Switch to sheet mode and load data
-          window.modeEnter('sheet');
+          // Switch to sheet mode with animated new tab
+          await _aiEnsureModeForGenerate('sheet');
           if(window.shLoadData) window.shLoadData(sheetData);
           statusDiv.remove();
           _updateAIActionOverlay(`AI ▸ Created sheet with ${rows.length} rows ✓`);
@@ -2128,9 +2149,7 @@ ${sourceContent}`;
           addMessage(`📊 Converting slides to document...`,'system');
         }
       }
-      if(S.currentMode!=='doc'){
-        window.modeEnter('doc');
-      }
+      await _aiEnsureModeForGenerate('doc');
       await doDocGenerate(statusDiv,text,docWsContext);
       _autoLinkToProject(_resolvedProjectId);
 
@@ -2152,9 +2171,7 @@ ${sourceContent}`;
           addMessage(`📊 Converting document to slides...`,'system');
         }
       }
-      if(S.currentMode!=='slide'){
-        window.modeEnter('slide');
-      }
+      await _aiEnsureModeForGenerate('slide');
       await doGenerate(statusDiv,slideWsContext);
       _autoLinkToProject(_resolvedProjectId);
 
@@ -2307,25 +2324,18 @@ async function executeMultiStep(steps, message, userText, wsContext) {
         _updateAIActionOverlay(`AI ▸ ${stepLabel}: Generating ${step.target || 'doc'}...`);
         _aiShowStepProgress(steps.length, i);
 
-        // Animate mode switch
         const targetMode = step.target === 'slide' ? 'slide' : 'doc';
-        const modeBadge = document.getElementById('modeBadge');
-        if (modeBadge && S.currentMode !== targetMode) {
-          await _aiSimulateClick(modeBadge);
-          await new Promise(r => setTimeout(r, 300));
-        }
+        await _aiEnsureModeForGenerate(targetMode);
 
         const tempStatus = document.createElement('div');
         tempStatus.className = 'chat-status';
         const topic = step.topic || userText;
         if (step.target === 'slide') {
-          window.modeEnter('slide');
           const prevHistory = [...S.chatHistory];
           S.chatHistory = [{ role: 'user', content: topic }];
           await doGenerate(tempStatus, wsContext);
           S.chatHistory = prevHistory;
         } else {
-          window.modeEnter('doc');
           await doDocGenerate(tempStatus, topic, wsContext);
         }
         tempStatus.remove();
@@ -2635,6 +2645,11 @@ const ALLOWED_ACTIONS = {
   // ── Search / sort ──
   wsSetSearch:        { confirm: false, label: 'Search files' },
   wsSetSort:          { confirm: false, label: 'Sort files' },
+  // ── Mode Tabs ──
+  modeTabSwitch:      { confirm: false, label: 'Switch tab' },
+  modeTabClose:       { confirm: false, label: 'Close tab' },
+  modeTabNew:         { confirm: false, label: 'Open new tab page' },
+  ntpPickMode:        { confirm: false, label: 'Pick mode on new tab page' },
 };
 
 // Parameter validation schemas (lightweight — type checks only)
@@ -2657,6 +2672,11 @@ const ACTION_SCHEMA = {
   setPreset:      [{ type: 'string' }],
   wsSetSearch:    [{ type: 'string' }],
   wsSetSort:      [{ type: 'string', enum: ['date', 'name', 'type'] }],
+  // Tab operations
+  modeTabSwitch:  [{ type: 'number' }],
+  modeTabClose:   [{ type: 'number' }],
+  modeTabNew:     [],
+  ntpPickMode:    [{ type: 'string', enum: ['slide', 'doc', 'sheet', 'workspace'] }],
 };
 
 // ══════════════════════════════════════════════════════════
@@ -2821,6 +2841,11 @@ async function _aiAnimateBeforeAction(fnName, args) {
     openFileNav:        { icon: _svgI('<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>'), label: () => `Opening file navigator` },
     wsSetSearch:        { icon: _svgI('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'), label: () => `Searching files` },
     wsSetSort:          { icon: _svgI('<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>'), label: () => `Sorting files` },
+    // Tab operations
+    modeTabSwitch:      { icon: _svgI('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/>'), label: () => { const t=S.modeTabs.find(t=>t.id===args[0]); return `Switching to tab "${t?.title||'unknown'}"` } },
+    modeTabClose:       { icon: _svgI('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'), label: () => { const t=S.modeTabs.find(t=>t.id===args[0]); return `Closing tab "${t?.title||'unknown'}"` } },
+    modeTabNew:         { icon: _svgI('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'), label: () => `Opening new tab` },
+    ntpPickMode:        { icon: _svgI('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'), label: () => `Selecting ${args[0]}` },
   };
 
   // Try to find the actual DOM element to animate
@@ -2866,6 +2891,22 @@ async function _aiAnimateBeforeAction(fnName, args) {
   };
   // setPreset is an alias for applyPreset
   elFinders.setPreset = elFinders.applyPreset;
+  // Tab operations
+  elFinders.modeTabSwitch = () => document.querySelector(`.mtb-tab[data-tabid="${args[0]}"]`);
+  elFinders.modeTabClose = () => {
+    const tab = document.querySelector(`.mtb-tab[data-tabid="${args[0]}"]`);
+    return tab ? tab.querySelector('.mtb-tab-close') : null;
+  };
+  elFinders.modeTabNew = () => document.querySelector('.mtb-new');
+  elFinders.ntpPickMode = () => {
+    // Find the NTP mode icon by mode name
+    const ntp = document.getElementById('newTabPage');
+    if (!ntp || ntp.style.display === 'none') return null;
+    const modes = ntp.querySelectorAll('.ntp-mode');
+    const modeMap = { doc: 0, slide: 1, sheet: 2, workspace: 3 };
+    const idx = modeMap[args[0]];
+    return idx !== undefined ? modes[idx] : null;
+  };
 
   const finder = elFinders[fnName];
   const el = finder ? finder() : null;
@@ -2903,6 +2944,65 @@ function _aiShowStepProgress(totalSteps, currentStep) {
     if (i < currentStep) dot.classList.add('done');
     if (i === currentStep) dot.classList.add('active');
     progressEl.appendChild(dot);
+  }
+}
+
+/**
+ * Animated "open new tab → pick mode" sequence.
+ * Shows AI cursor clicking "+" then clicking the mode on the NTP.
+ * Returns after the mode is fully entered.
+ */
+async function _aiOpenNewTabForMode(mode) {
+  _aiEnsureCursor();
+
+  // Step 1: Click "+" button
+  _updateAIActionOverlay(`AI ▸ Opening new tab...`);
+  const plusBtn = document.querySelector('.mtb-new');
+  if (plusBtn) {
+    await _aiSimulateClick(plusBtn);
+    await new Promise(r => setTimeout(r, 300));
+  }
+  window.modeTabNew();
+  await new Promise(r => setTimeout(r, 600));
+
+  // Step 2: Click mode icon on NTP
+  const modeLabels = { slide:'slides', doc:'document', sheet:'spreadsheet', workspace:'workspace' };
+  _updateAIActionOverlay(`AI ▸ Selecting ${mode}...`);
+  const ntp = document.getElementById('newTabPage');
+  if (ntp) {
+    const modeMap = { doc: 0, slide: 1, sheet: 2, workspace: 3 };
+    const modes = ntp.querySelectorAll('.ntp-mode');
+    const el = modes[modeMap[mode]];
+    if (el) {
+      await _aiSimulateClick(el);
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+  window.ntpPickMode(mode);
+  await new Promise(r => setTimeout(r, 500));
+
+  // Step 3: Deliberate pause — "Generating..."
+  _updateAIActionOverlay(`AI ▸ Generating ${modeLabels[mode]||mode}...`);
+  await new Promise(r => setTimeout(r, 800));
+  _aiHideCursor();
+}
+
+/**
+ * Shared helper: ensure we're in targetMode before generating.
+ * If not in targetMode → animated new tab + mode pick.
+ * If already in targetMode → show overlay + deliberate pause.
+ * The overlay stays visible — doGenerate/doDocGenerate manage its lifecycle.
+ */
+async function _aiEnsureModeForGenerate(targetMode) {
+  const modeLabels = { slide:'slides', doc:'document', sheet:'spreadsheet' };
+  if (S.currentMode !== targetMode) {
+    _showAIBlocker();
+    _showAIActionOverlay(`AI ▸ Preparing new ${modeLabels[targetMode]||targetMode}...`);
+    await _aiOpenNewTabForMode(targetMode);
+  } else {
+    _showAIBlocker();
+    _showAIActionOverlay(`AI ▸ Generating ${modeLabels[targetMode]||targetMode}...`);
+    await new Promise(r => setTimeout(r, 600));
   }
 }
 
@@ -3193,6 +3293,17 @@ function resolveActionRefs(actions) {
         const name = a.args[1].toLowerCase();
         const p = projects.find(p => (p.name || '').toLowerCase().includes(name));
         if (p) resolved.args[1] = p.id;
+      }
+    }
+
+    // modeTabSwitch / modeTabClose: if arg is string (tab name), resolve to tabId
+    if ((a.fn === 'modeTabSwitch' || a.fn === 'modeTabClose') && typeof a.args[0] === 'string') {
+      const name = a.args[0].toLowerCase();
+      const tab = S.modeTabs.find(t => (t.title || '').toLowerCase().includes(name));
+      if (tab) resolved.args[0] = tab.id;
+      else {
+        console.warn(`[AI UI] Tab not found: "${a.args[0]}"`);
+        return null;
       }
     }
 

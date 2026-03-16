@@ -5,15 +5,15 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317fff';
-import * as slide from './slide.js?v=20260317fff';
-import * as doc from './doc.js?v=20260317fff';
-import * as workspace from './workspace.js?v=20260317fff';
-import * as ai from './ai.js?v=20260317fff';
-import * as ui from './ui.js?v=20260317fff';
-import * as storage from './storage.js?v=20260317fff';
-import * as keys from './keys.js?v=20260317fff';
-import * as sheet from './sheet.js?v=20260317fff';
+import { S } from './state.js?v=20260317mmm';
+import * as slide from './slide.js?v=20260317mmm';
+import * as doc from './doc.js?v=20260317mmm';
+import * as workspace from './workspace.js?v=20260317mmm';
+import * as ai from './ai.js?v=20260317mmm';
+import * as ui from './ui.js?v=20260317mmm';
+import * as storage from './storage.js?v=20260317mmm';
+import * as keys from './keys.js?v=20260317mmm';
+import * as sheet from './sheet.js?v=20260317mmm';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
