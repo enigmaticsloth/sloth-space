@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c1';
-import * as slide from './slide.js?v=20260317c1';
-import * as doc from './doc.js?v=20260317c1';
-import * as workspace from './workspace.js?v=20260317c1';
-import * as ai from './ai.js?v=20260317c1';
-import * as ui from './ui.js?v=20260317c1';
-import * as storage from './storage.js?v=20260317c1';
-import * as keys from './keys.js?v=20260317c1';
-import * as sheet from './sheet.js?v=20260317c1';
-import * as bench from './bench.js?v=20260317c1';
+import { S } from './state.js?v=20260317c2';
+import * as slide from './slide.js?v=20260317c2';
+import * as doc from './doc.js?v=20260317c2';
+import * as workspace from './workspace.js?v=20260317c2';
+import * as ai from './ai.js?v=20260317c2';
+import * as ui from './ui.js?v=20260317c2';
+import * as storage from './storage.js?v=20260317c2';
+import * as keys from './keys.js?v=20260317c2';
+import * as sheet from './sheet.js?v=20260317c2';
+import * as bench from './bench.js?v=20260317c2';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -327,111 +327,233 @@ ui.renderApp();
   setTimeout(runDemo,1200);
 })();
 
-// ─── Left sidebar demo showcase animation ───
+// ─── Left sidebar demo showcase animation (visual mockups) ───
 (function(){
-  const SCENES=[
-    {
-      prompt:'Create a pitch deck for our startup',
-      action:'Generating 6 slides with Monet theme...',
-      title:'Startup Pitch Deck',
-      icon:'doc',
-      items:[
-        {dot:'#7886A5',text:'Cover — company name & tagline'},
-        {dot:'#9BA8C4',text:'Problem & Solution'},
-        {dot:'#A899C4',text:'Market Opportunity ($4.2B TAM)'},
-        {dot:'#C8A870',text:'Revenue Model & Pricing'},
-      ],
-      done:'6 slides generated'
-    },
-    {
-      prompt:'Summarize all files in Project Alpha',
-      action:'Reading 12 files from Project Alpha...',
-      title:'Project Alpha Summary',
-      icon:'ctx',
-      items:[
-        {dot:'#5A9E5A',text:'pitch-deck.sloth — 8 slides, Monet'},
-        {dot:'#7886A5',text:'market-research.doc — 2,400 words'},
-        {dot:'#C8A870',text:'budget-q4.sheet — 3 tabs, 140 rows'},
-        {dot:'#A899C4',text:'AI cross-referenced all 12 files'},
-      ],
-      done:'Summary ready — 5 key insights found'
-    },
-    {
-      prompt:'Set up a new project and add a doc',
-      action:'Creating project & document...',
-      title:'New Project Created',
-      icon:'auto',
-      items:[
-        {dot:'#7886A5',text:'Created project "Q1 Planning"'},
-        {dot:'#5A9E5A',text:'Created "Kickoff Notes" doc'},
-        {dot:'#C8A870',text:'Linked doc to project'},
-        {dot:'#9BA8C4',text:'Opened doc in editor'},
-      ],
-      done:'Project ready — start editing'
-    }
-  ];
-  let sceneIdx=0, timer=null;
-
+  let sceneIdx=0, _timer=null, _running=false;
   function el(id){ return document.getElementById(id); }
+  function wait(ms){ return new Promise(r=>{ _timer=setTimeout(r,ms); }); }
+  function alive(){ return !!el('llDemo'); }
 
-  function updateDots(total,current){
+  // Typewriter into the mini prompt bar
+  async function typePrompt(text){
+    const t=el('demoInputText');
+    if(!t) return;
+    t.textContent='';
+    for(let i=0;i<text.length;i++){
+      if(!alive()) return;
+      t.textContent=text.slice(0,i+1);
+      await wait(28+Math.random()*18);
+    }
+    await wait(350);
+  }
+
+  function setStatus(html){ const s=el('demoStatus'); if(s) s.innerHTML=html; }
+  function clearCanvas(){ const c=el('demoCanvas'); if(c) c.innerHTML=''; }
+
+  // ──── Scene 1: Generate Slides ────
+  async function sceneSlides(){
+    await typePrompt('Create a pitch deck for our startup');
+    setStatus('<span class="ds-spin"></span> Generating slides...');
+    clearCanvas();
+    const c=el('demoCanvas');
+    if(!c) return;
+    // Build 6 mini slide cards
+    const slides=[
+      {bars:['title','w1','w2']},
+      {bars:['title','w3','w1','w2']},
+      {bars:['title','w2 accent','w1']},
+      {bars:['title','w1','w3','w2']},
+      {bars:['title','w2','w1 accent']},
+      {bars:['title','w3','w1','w2']},
+    ];
+    const wrap=document.createElement('div');
+    wrap.className='demo-slides';
+    slides.forEach(s=>{
+      const card=document.createElement('div');
+      card.className='demo-slide';
+      s.bars.forEach(b=>{
+        const bar=document.createElement('div');
+        bar.className='ds-bar '+b;
+        card.appendChild(bar);
+      });
+      wrap.appendChild(card);
+    });
+    c.appendChild(wrap);
+    // Stagger reveal
+    const cards=wrap.querySelectorAll('.demo-slide');
+    for(let i=0;i<cards.length;i++){
+      if(!alive()) return;
+      await wait(180);
+      cards[i].classList.add('show');
+      setStatus(`<span class="ds-spin"></span> Slide ${i+1} of 6`);
+    }
+    await wait(300);
+    setStatus('<span class="ds-ok">✓ 6 slides generated — Monet theme</span>');
+    await wait(3000);
+  }
+
+  // ──── Scene 2: AI reads project files ────
+  async function sceneContext(){
+    await typePrompt('Summarize all files in Project Alpha');
+    setStatus('<span class="ds-spin"></span> Scanning project files...');
+    clearCanvas();
+    const c=el('demoCanvas');
+    if(!c) return;
+    const files=[
+      {icon:'#7886A5',label:'SL',name:'pitch-deck.sloth'},
+      {icon:'#5A9E5A',label:'DC',name:'market-research.doc'},
+      {icon:'#C8A870',label:'SH',name:'budget-q4.sheet'},
+      {icon:'#A899C4',label:'DC',name:'strategy-notes.doc'},
+      {icon:'#7886A5',label:'SL',name:'team-intro.sloth'},
+      {icon:'#C8A870',label:'SH',name:'metrics.sheet'},
+    ];
+    const wrap=document.createElement('div');
+    wrap.className='demo-files';
+    files.forEach(f=>{
+      const row=document.createElement('div');
+      row.className='demo-file';
+      row.innerHTML=`<div class="df-icon" style="background:${f.icon}">${f.label}</div><span class="df-name">${f.name}</span><span class="df-check">✓</span>`;
+      wrap.appendChild(row);
+    });
+    c.appendChild(wrap);
+    // Stagger reveal + scan
+    const rows=wrap.querySelectorAll('.demo-file');
+    for(let i=0;i<rows.length;i++){
+      if(!alive()) return;
+      await wait(120);
+      rows[i].classList.add('show');
+    }
+    await wait(400);
+    for(let i=0;i<rows.length;i++){
+      if(!alive()) return;
+      await wait(250);
+      rows[i].classList.add('scanned');
+      setStatus(`<span class="ds-spin"></span> Reading ${files[i].name}...`);
+    }
+    await wait(300);
+    setStatus('<span class="ds-ok">✓ 6 files analyzed — 5 insights found</span>');
+    await wait(3000);
+  }
+
+  // ──── Scene 3: Build a spreadsheet ────
+  async function sceneSheet(){
+    await typePrompt('Create a Q4 budget spreadsheet');
+    setStatus('<span class="ds-spin"></span> Building spreadsheet...');
+    clearCanvas();
+    const c=el('demoCanvas');
+    if(!c) return;
+    const wrap=document.createElement('div');
+    wrap.className='demo-sheet';
+    // Header row
+    const hdr=document.createElement('div');
+    hdr.className='demo-sheet-header';
+    ['A','B','C','D'].forEach(l=>{
+      const s=document.createElement('span');
+      s.textContent=l;
+      hdr.appendChild(s);
+    });
+    wrap.appendChild(hdr);
+    // Data rows
+    const data=[
+      ['Revenue','$48K','$52K','$61K'],
+      ['COGS','$18K','$19K','$22K'],
+      ['Gross','$30K','$33K','$39K'],
+      ['Opex','$12K','$11K','$13K'],
+      ['EBITDA','$18K','$22K','$26K'],
+      ['Margin','37%','42%','43%'],
+    ];
+    const rowEls=[];
+    data.forEach((r,ri)=>{
+      const row=document.createElement('div');
+      row.className='demo-sheet-row';
+      r.forEach((v,ci)=>{
+        const cell=document.createElement('div');
+        cell.className='demo-sheet-cell'+(ri===4&&ci>0?' highlight':'');
+        cell.textContent=v;
+        row.appendChild(cell);
+      });
+      wrap.appendChild(row);
+      rowEls.push(row);
+    });
+    c.appendChild(wrap);
+    // Stagger rows
+    for(let i=0;i<rowEls.length;i++){
+      if(!alive()) return;
+      await wait(200);
+      rowEls[i].classList.add('show');
+      setStatus(`<span class="ds-spin"></span> Row ${i+1} of ${data.length}`);
+    }
+    await wait(300);
+    setStatus('<span class="ds-ok">✓ Budget sheet ready — 6 rows, 4 columns</span>');
+    await wait(3000);
+  }
+
+  // ──── Scene 4: Generate a doc ────
+  async function sceneDoc(){
+    await typePrompt('Write a project proposal for Q1');
+    setStatus('<span class="ds-spin"></span> Writing document...');
+    clearCanvas();
+    const c=el('demoCanvas');
+    if(!c) return;
+    const wrap=document.createElement('div');
+    wrap.className='demo-doc';
+    const title=document.createElement('div');
+    title.className='dd-title';
+    wrap.appendChild(title);
+    const widths=['w1','w3','w2','w5','w4','w6','w1','w3'];
+    const lines=[];
+    widths.forEach(w=>{
+      const l=document.createElement('div');
+      l.className='dd-line '+w;
+      wrap.appendChild(l);
+      lines.push(l);
+    });
+    c.appendChild(wrap);
+    await wait(200);
+    if(!alive()) return;
+    title.classList.add('show');
+    setStatus('<span class="ds-spin"></span> Writing title...');
+    await wait(350);
+    for(let i=0;i<lines.length;i++){
+      if(!alive()) return;
+      await wait(140);
+      lines[i].classList.add('show');
+      if(i===0) setStatus('<span class="ds-spin"></span> Introduction...');
+      if(i===3) setStatus('<span class="ds-spin"></span> Key objectives...');
+      if(i===6) setStatus('<span class="ds-spin"></span> Timeline...');
+    }
+    await wait(300);
+    setStatus('<span class="ds-ok">✓ Proposal ready — 8 paragraphs</span>');
+    await wait(3000);
+  }
+
+  const SCENES=[sceneSlides, sceneContext, sceneSheet, sceneDoc];
+
+  function updateDots(){
     const d=el('llDemoDots');
     if(!d) return;
-    d.innerHTML=Array.from({length:total},(_,i)=>`<span class="${i===current?'active':''}"></span>`).join('');
+    d.innerHTML=SCENES.map((_,i)=>`<span class="${i===sceneIdx%SCENES.length?'active':''}"></span>`).join('');
   }
 
-  function typeText(target,text,speed,cb){
-    let i=0;
-    function tick(){
-      if(!el('llDemo')) return;
-      if(i<=text.length){
-        target.innerHTML=`<div class="dp-label">You type:</div><div class="dp-text">${text.slice(0,i)}<span class="dp-cursor"></span></div>`;
-        i++;
-        timer=setTimeout(tick,speed+Math.random()*15);
-      } else {
-        target.innerHTML=`<div class="dp-label">You type:</div><div class="dp-text">${text}</div>`;
-        if(cb) timer=setTimeout(cb,400);
+  async function loop(){
+    if(_running) return;
+    _running=true;
+    while(alive()){
+      const overlay=document.getElementById('landingOverlay');
+      if(!overlay||overlay.classList.contains('hidden')){
+        await wait(2000);
+        continue;
       }
+      updateDots();
+      const scene=SCENES[sceneIdx%SCENES.length];
+      // Clear state
+      const t=el('demoInputText'); if(t) t.textContent='';
+      clearCanvas();
+      setStatus('');
+      await scene();
+      sceneIdx++;
     }
-    tick();
+    _running=false;
   }
-
-  function showAction(scene,cb){
-    const r=el('llDemoResult');
-    if(!r) return;
-    r.innerHTML=`<div class="dr-action"><span class="dr-spinner"></span>${scene.action}</div>`;
-    timer=setTimeout(cb,1200);
-  }
-
-  function showResult(scene,cb){
-    const r=el('llDemoResult');
-    if(!r) return;
-    let html=`<div class="dr-preview"><div class="dr-title">${scene.title}</div><div class="dr-items">`;
-    scene.items.forEach(it=>{
-      html+=`<div class="dr-item"><span class="dr-dot" style="background:${it.dot}"></span>${it.text}</div>`;
-    });
-    html+=`</div></div><div class="dr-done">✓ ${scene.done}</div>`;
-    r.innerHTML=html;
-    timer=setTimeout(cb,3500);
-  }
-
-  function runScene(){
-    const overlay=document.getElementById('landingOverlay');
-    if(!overlay||overlay.classList.contains('hidden')){
-      timer=setTimeout(runScene,2000);
-      return;
-    }
-    const p=el('llDemoPrompt'), r=el('llDemoResult');
-    if(!p||!r){ timer=setTimeout(runScene,2000); return; }
-    const scene=SCENES[sceneIdx%SCENES.length];
-    updateDots(SCENES.length,sceneIdx%SCENES.length);
-    sceneIdx++;
-    p.innerHTML=''; r.innerHTML='';
-    typeText(p,scene.prompt,25,function(){
-      showAction(scene,function(){
-        showResult(scene,runScene);
-      });
-    });
-  }
-  setTimeout(runScene,2000);
+  setTimeout(loop,1500);
 })();
