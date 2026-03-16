@@ -1598,49 +1598,89 @@ function _mpClickEffect(el) {
 }
 
 /**
- * Send a prompt from the mode picker — animate clicking the mode card, then enter mode and send.
+ * Use the LLM router to detect which mode to enter for this prompt.
+ * Falls back to keyword-based detection if LLM is unavailable.
+ */
+async function _mpRouterDetectMode(text) {
+  // Try LLM router first
+  if (window.callLLM && window.ROUTER_PROMPT) {
+    try {
+      const msgs = [
+        { role: 'system', content: '[Context: User is on the mode picker (landing page). No mode is active yet. User wants to CREATE content. Determine the correct mode to enter.]' },
+        { role: 'user', content: text }
+      ];
+      const raw = await window.callLLM(window.ROUTER_PROMPT, msgs, { useRouter: true, temperature: 0, max_tokens: 256, json: true });
+      const data = JSON.parse(raw);
+      // Extract mode from router response
+      if (data.intent === 'generate' || data.intent === 'multi_step') {
+        const target = data.target || (data.steps && data.steps.find(s => s.type === 'generate')?.target);
+        if (target === 'doc') return 'doc';
+        if (target === 'sheet') return 'sheet';
+        if (target === 'slide') return 'slide';
+      }
+      if (data.intent === 'ui_action') {
+        const modeAction = data.actions?.find(a => a.fn === 'modeEnter');
+        if (modeAction) return modeAction.args[0];
+      }
+      // Fallback: if router says generate without target, use keyword detection
+    } catch (e) {
+      console.warn('Mode picker LLM router failed, using keyword fallback:', e);
+    }
+  }
+  // Keyword fallback (same as mpDetectMode but as fallback)
+  return mpDetectMode(text);
+}
+
+/**
+ * Find a mode card element by mode name.
+ */
+function _mpFindCard(mode) {
+  const modeKeywords = { slide: 'Slide', doc: 'Doc', sheet: 'Sheet', workspace: 'Workspace' };
+  const cards = document.querySelectorAll('.mode-card');
+  for (const card of cards) {
+    const name = card.querySelector('.mode-card-name');
+    if (name && name.textContent.trim() === modeKeywords[mode]) return card;
+  }
+  return null;
+}
+
+/**
+ * Send a prompt from the mode picker — uses LLM router, animates clicking the mode card, enters mode, sends to AI.
+ * The main sendMessage() handles all multi-step AI operations with visual animations.
  */
 function mpSendPrompt(text) {
   // Show user message in mode picker chat
   mpAddMsg(text, 'user');
 
-  // Detect mode
-  const mode = mpDetectMode(text);
   const modeNames = { slide: 'Slides', doc: 'Document', sheet: 'Spreadsheet', workspace: 'Workspace' };
   const thinkingEl = mpShowThinking();
 
-  // Step 1: Show thinking briefly
-  setTimeout(async () => {
+  // Async flow
+  (async () => {
+    // Step 1: Ask LLM router which mode to enter
+    const mode = await _mpRouterDetectMode(text);
+
+    // Step 2: Update chat
     if (thinkingEl) thinkingEl.remove();
     mpAddMsg(`Selecting ${modeNames[mode] || mode}...`, 'ai');
+    await new Promise(r => setTimeout(r, 200));
 
-    // Step 2: Find the mode card and simulate clicking it
-    const cards = document.querySelectorAll('.mode-card');
-    let targetCard = null;
-    const modeKeywords = { slide: 'Slide', doc: 'Doc', sheet: 'Sheet', workspace: 'Workspace' };
-    for (const card of cards) {
-      const name = card.querySelector('.mode-card-name');
-      if (name && name.textContent.trim() === modeKeywords[mode]) {
-        targetCard = card;
-        break;
-      }
-    }
-
-    // Step 3: Animate the click on the card
+    // Step 3: Find and animate clicking the mode card
+    const targetCard = _mpFindCard(mode);
     if (targetCard) {
       await _mpClickEffect(targetCard);
-      // Pause after click so user sees the effect
       await new Promise(r => setTimeout(r, 400));
     }
 
-    // Step 4: Show "entering" message
+    // Step 4: Show entering message
     mpAddMsg(`Entering ${modeNames[mode] || mode} mode...`, 'ai');
     await new Promise(r => setTimeout(r, 300));
 
-    // Step 5: Enter the mode (hides the overlay)
+    // Step 5: Enter the mode (hides overlay, renders mode UI)
     modeEnter(mode);
 
-    // Step 6: After mode renders, inject prompt and send to AI
+    // Step 6: After mode renders, inject prompt into main chat and call sendMessage
+    // sendMessage() handles the full AI pipeline: LLM router → intent dispatch → visual operations
     setTimeout(() => {
       const chatInput = document.getElementById('chatInput');
       if (chatInput) {
@@ -1648,7 +1688,7 @@ function mpSendPrompt(text) {
         if (window.sendMessage) window.sendMessage();
       }
     }, 400);
-  }, 600);
+  })();
 }
 
 /**
