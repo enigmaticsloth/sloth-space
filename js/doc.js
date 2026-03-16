@@ -404,21 +404,129 @@ export function exportDocPDF(){
   }
 }
 
-// Doc DOCX export (simple plaintext .docx via blob)
+// ── Doc DOCX export (real OOXML via JSZip) ──
+
+function _escXml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function _runsToOoxml(block){
+  // Convert block content (string or run array) to <w:r> elements
+  const content=block.content;
+  if(!content) return '';
+  const runs=typeof content==='string' ? [{text:content,marks:[]}] : content;
+  return runs.map(r=>{
+    const marks=r.marks||[];
+    let rPr='';
+    if(marks.includes('bold')) rPr+='<w:b/>';
+    if(marks.includes('italic')) rPr+='<w:i/>';
+    if(marks.includes('underline')) rPr+='<w:u w:val="single"/>';
+    if(marks.includes('strike')) rPr+='<w:strike/>';
+    if(marks.includes('code')) rPr+='<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/><w:sz w:val="20"/>';
+    const rPrXml=rPr?`<w:rPr>${rPr}</w:rPr>`:'';
+    // Preserve whitespace: split by newline for <w:br/>
+    const parts=_escXml(r.text||'').split('\n');
+    const textXml=parts.map((p,i)=>`<w:t xml:space="preserve">${p}</w:t>${i<parts.length-1?'<w:br/>':''}`).join('');
+    return `<w:r>${rPrXml}${textXml}</w:r>`;
+  }).join('');
+}
+
+function _blockToOoxml(block){
+  const t=block.type||'paragraph';
+  const runs=_runsToOoxml(block);
+
+  if(t==='heading1') return `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>${runs}</w:p>`;
+  if(t==='heading2') return `<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>${runs}</w:p>`;
+  if(t==='heading3') return `<w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr>${runs}</w:p>`;
+  if(t==='quote') return `<w:p><w:pPr><w:pStyle w:val="Quote"/><w:ind w:left="720"/><w:pBdr><w:left w:val="single" w:sz="12" w:space="8" w:color="888888"/></w:pBdr></w:pPr>${runs}</w:p>`;
+  if(t==='code') return `<w:p><w:pPr><w:pStyle w:val="Code"/><w:shd w:val="clear" w:fill="F0F0F0"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${_escXml(blockPlainText(block))}</w:t></w:r></w:p>`;
+  if(t==='divider') return `<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="CCCCCC"/></w:pBdr></w:pPr></w:p>`;
+  if(t==='list') return `<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>${runs}</w:p>`;
+  if(t==='numbered') return `<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>${runs}</w:p>`;
+  if(t==='caption') return `<w:p><w:pPr><w:jc w:val="center"/><w:rPr><w:i/><w:sz w:val="20"/><w:color w:val="666666"/></w:rPr></w:pPr>${runs}</w:p>`;
+  // paragraph (default)
+  return `<w:p>${runs}</w:p>`;
+}
+
 export function exportDocDocx(){
   if(!S.currentDoc||!S.currentDoc.blocks.length){
     window.addMessage('No document content to export.','system');
     return;
   }
-  // Build simple XML-based .docx content
-  const text=S.currentDoc.blocks.map(b=>blockPlainText(b)).join('\n\n');
-  const blob=new Blob([text],{type:'text/plain'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=(S.currentDoc.title||'Untitled')+'.txt';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  window.addMessage('Document exported as .txt (full .docx support coming soon).','system');
+  try {
+    const zip=new JSZip();
+    const title=_escXml(S.currentDoc.title||'Untitled');
+
+    // [Content_Types].xml
+    zip.file('[Content_Types].xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+</Types>`);
+
+    // _rels/.rels
+    zip.file('_rels/.rels',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+
+    // word/_rels/document.xml.rels
+    zip.file('word/_rels/document.xml.rels',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+</Relationships>`);
+
+    // word/styles.xml
+    zip.file('word/styles.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="360" w:after="120"/></w:pPr><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="240" w:after="80"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="200" w:after="60"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:rPr><w:i/><w:color w:val="555555"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Code"><w:name w:val="Code"/><w:basedOn w:val="Normal"/><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/><w:sz w:val="20"/></w:rPr></w:style>
+</w:styles>`);
+
+    // word/numbering.xml (bullet + numbered list definitions)
+    zip.file('word/numbering.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="\u2022"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>
+<w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>
+<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
+<w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>`);
+
+    // word/document.xml
+    const bodyXml=S.currentDoc.blocks.map(b=>_blockToOoxml(b)).join('\n');
+    zip.file('word/document.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>
+${bodyXml}
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>
+</w:body>
+</w:document>`);
+
+    // Generate and download
+    zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}).then(blob=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=(S.currentDoc.title||'Untitled')+'.docx';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      window.addMessage('Document exported as .docx','system');
+    });
+  } catch(e){
+    console.error('DOCX export error:',e);
+    window.addMessage('Export failed: '+e.message,'system');
+  }
 }
 
 // ── Doc zoom ──

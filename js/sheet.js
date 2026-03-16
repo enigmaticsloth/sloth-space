@@ -2095,6 +2095,161 @@ export function sheetToCSV(sheetData) {
   return lines.join('\n');
 }
 
+// ═══════════════════════════════════════════
+// XLSX EXPORT (OOXML via JSZip)
+// ═══════════════════════════════════════════
+
+function _escXml(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+export function shExportXlsx(){
+  const sh=S.sheet.current;
+  if(!sh||!sh.columns||!sh.rows){
+    window.addMessage('No sheet data to export.','system');
+    return;
+  }
+  try {
+    const zip=new JSZip();
+    const cols=sh.columns;
+    const rows=sh.rows;
+    const numCols=cols.length;
+    const numRows=rows.length;
+
+    // Shared strings table — collect all string values
+    const ssMap=new Map(); // string → index
+    const ssList=[];
+    function ssIdx(str){
+      const s=String(str);
+      if(ssMap.has(s)) return ssMap.get(s);
+      const i=ssList.length;
+      ssMap.set(s,i);
+      ssList.push(s);
+      return i;
+    }
+
+    // Build sheet data — resolve formulas, collect shared strings
+    const sheetRows=[];
+    // Header row
+    const hdrCells=cols.map((c,ci)=>{
+      const ref=colIndexToLetter(ci)+'1';
+      const idx=ssIdx(c.name||c.id);
+      return `<c r="${ref}" t="s"><v>${idx}</v></c>`;
+    });
+    sheetRows.push(`<row r="1">${hdrCells.join('')}</row>`);
+
+    // Data rows
+    for(let ri=0;ri<numRows;ri++){
+      const row=rows[ri];
+      const rowNum=ri+2; // 1-based, after header
+      const cellsXml=cols.map((col,ci)=>{
+        const ref=colIndexToLetter(ci)+rowNum;
+        let raw=row.cells?.[col.id]??'';
+        // Evaluate formulas
+        if(typeof raw==='string'&&raw.startsWith('=')){
+          try{
+            const v=shEvalFormula(raw,sh);
+            if(typeof v==='number'&&isFinite(v)) return `<c r="${ref}"><v>${v}</v></c>`;
+            const idx=ssIdx(typeof v==='object'?'#ERR':String(v));
+            return `<c r="${ref}" t="s"><v>${idx}</v></c>`;
+          }catch{ const idx=ssIdx(raw); return `<c r="${ref}" t="s"><v>${idx}</v></c>`; }
+        }
+        // Number check
+        if(raw!==''&&!isNaN(Number(raw))&&raw!==true&&raw!==false){
+          return `<c r="${ref}"><v>${Number(raw)}</v></c>`;
+        }
+        if(raw==='') return '';
+        const idx=ssIdx(String(raw));
+        return `<c r="${ref}" t="s"><v>${idx}</v></c>`;
+      }).filter(Boolean);
+      if(cellsXml.length) sheetRows.push(`<row r="${rowNum}">${cellsXml.join('')}</row>`);
+    }
+
+    const lastRef=colIndexToLetter(numCols-1)+(numRows+1);
+
+    // [Content_Types].xml
+    zip.file('[Content_Types].xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
+</Types>`);
+
+    // _rels/.rels
+    zip.file('_rels/.rels',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`);
+
+    // xl/_rels/workbook.xml.rels
+    zip.file('xl/_rels/workbook.xml.rels',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
+</Relationships>`);
+
+    // xl/workbook.xml
+    zip.file('xl/workbook.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="${_escXml(sh.title||'Sheet1')}" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`);
+
+    // xl/styles.xml (minimal — just default font)
+    zip.file('xl/styles.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2">
+<font><sz val="11"/><name val="Arial"/></font>
+<font><b/><sz val="11"/><name val="Arial"/></font>
+</fonts>
+<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="2">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+</cellXfs>
+</styleSheet>`);
+
+    // xl/sharedStrings.xml
+    const ssXml=ssList.map(s=>`<si><t xml:space="preserve">${_escXml(s)}</t></si>`).join('');
+    zip.file('xl/sharedStrings.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${ssList.length}" uniqueCount="${ssList.length}">
+${ssXml}
+</sst>`);
+
+    // xl/worksheets/sheet1.xml
+    zip.file('xl/worksheets/sheet1.xml',
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<dimension ref="A1:${lastRef}"/>
+<sheetData>
+${sheetRows.join('\n')}
+</sheetData>
+</worksheet>`);
+
+    // Generate and download
+    zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}).then(blob=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=(sh.title||'Untitled Sheet')+'.xlsx';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      window.addMessage('Sheet exported as .xlsx','system');
+    });
+  } catch(e){
+    console.error('XLSX export error:',e);
+    window.addMessage('Export failed: '+e.message,'system');
+  }
+}
+
 /**
  * Get info about the current selection (cell, range) for AI context.
  */

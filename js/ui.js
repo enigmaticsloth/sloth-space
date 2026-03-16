@@ -898,7 +898,7 @@ function modeExportDocx(){
 }
 
 function modeExportXlsx(){
-  window.addMessage('Sheet export coming soon!','system');
+  window.shExportXlsx();
 }
 
 function modeUndo(){
