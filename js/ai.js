@@ -285,14 +285,18 @@ INTENTS:
   WORKSPACE MODE: If the user is in workspace mode and asks about a specific project by name (e.g. "what is project X about", "summarize project Y"), this is "describe" — NOT "about" or "chat".
   EXCEPTION: If the user asks to CREATE/MAKE/WRITE a document or file (e.g. "make a document explaining project X", "write a report about project Y content"), this is ALWAYS "generate" NOT "describe".
 
-"about" — user is asking ABOUT Sloth (the AI) or Sloth Space THE APP itself: who are you, what is it, features, how to use it, a specific mode. Also triggers on: "你是誰", "自我介紹", "introduce yourself", "who are you", "what's your name".
-  Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
+"about" — user is asking ABOUT Sloth (the AI) or Sloth Space THE APP itself: who are you, what is it, features, how to use it, a specific mode or feature. Also triggers on: "你是誰", "自我介紹", "introduce yourself", "who are you", "what's your name".
+  Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace|generation|context_injection|conversion|ui_ops"}
   topic guide:
-    "general" — asking about Sloth or Sloth Space overall: "who are you", "你是誰", "自我介紹", "what is Sloth Space", "what is this app", "tell me about it", "what features does it have"
-    "slides" — asking about slide/presentation mode: "how do I use slide mode", "how do slides work", "how to make a presentation"
-    "doc" — asking about document mode: "what is document mode", "how does doc mode work", "how to write an article"
-    "sheet" — asking about sheet/data mode: "how do I use sheets", "how do sheets work", "how to create a data table"
-    "workspace" — asking about workspace/file management: "what is workspace", "how does workspace work", "how do I manage files"
+    "general" — asking about Sloth or Sloth Space overall: "who are you", "你是誰", "自我介紹", "what is Sloth Space", "what is this app", "tell me about it"
+    "slides" — asking about slide/presentation mode: "how do I use slide mode", "how do slides work"
+    "doc" — asking about document mode: "what is document mode", "how does doc mode work"
+    "sheet" — asking about sheet/data mode: "how do I use sheets", "how do sheets work"
+    "workspace" — asking about workspace/file management: "what is workspace", "how does workspace work", "how to manage projects"
+    "generation" — asking about content generation: "how does generation work", "how do you create content", "內容生成", "怎麼生成"
+    "context_injection" — asking about AI Context Injection: "what is context injection", "how does project context work", "什麼是AI Context Injection", "專案怎麼讀取檔案"
+    "conversion" — asking about format conversion: "how do I convert formats", "how to turn doc into slides", "怎麼轉換格式"
+    "ui_ops" — asking about UI operations: "what can you operate", "how do you control the interface", "介面操作", "你能操作什麼"
   CRITICAL DISTINCTIONS for "about":
     - "about" is ONLY for meta-questions about the app's features/usage/identity.
     - If user mentions specific files, items, or data INSIDE workspace (e.g. "files in workspace", "can you see my file", "do I have a document", "open that file"), this is NOT about — it is "chat" or "generate" depending on context.
@@ -441,147 +445,138 @@ Rules:
 
 // ── Hardcoded Sloth Space intros (English = source of truth, non-EN → LLM translate) ──
 const ABOUT_TEXTS={
-  general:`🦥 **Sloth Space** — AI-Powered Content Creation Platform
+  // ── General: concise self-intro with 4 core capabilities ──
+  general:`🦥 Hi, I'm **Sloth** — your AI creative assistant in Sloth Space!
 
-**What is it?**
-Hi, I'm **Sloth** — your AI creative assistant! Sloth Space is an AI-native content creation tool that lets you build beautiful presentations, documents, and data sheets using natural language. No blank pages, no templates to hunt for — just tell me your topic and I'll generate complete, polished content for you.
+I can help you with four things:
+• **Content Generation** — give me a topic, I'll create complete slides, documents, or spreadsheets
+• **AI Context Injection** 🧠 — put files into a Project, and I automatically read them all as context. Cross-reference, summarize, or generate new content from your entire project
+• **Format Conversion** — turn docs into slides, slides into docs, extract data into sheets
+• **UI Operations** — create projects, organize files, switch modes, style content — all through natural language
 
-**Four Modes:**
-• **Slides** — Auto-generate multi-page presentations with 5 design themes and real-time style tweaks
-• **Doc** — AI-powered long-form writing with rich block types (headings, tables, images, quotes)
-• **Sheet** — Create and manage structured data tables right inside your workspace
-• **Workspace** — Organize all your files into projects, cross-reference data, and let AI use your materials as context
+Ask me about any of these to learn more! Or just type a topic to get started.`,
 
-**Core Superpower — AI Context Injection 🧠:**
-When you work inside a Project, I automatically read ALL linked files (docs, sheets, slides) as context. This means I can:
-• Cross-reference data across multiple files — your slides can pull from your research docs and data sheets
-• Synthesize information from your entire project into summaries, reports, or presentations
-• Generate new content that's grounded in YOUR actual data, not hallucinated
-Example: "summarize this project" → I read every linked file and produce a unified summary. "Create slides from the research" → I pull from all linked docs and sheets to build a coherent deck.
-
-**Key Features:**
-• 🎨 Natural language styling — "make the background Monet blue", "bigger title font"
-• 📁 Project management — organize files into projects, AI uses them as context automatically
-• 🔄 Cross-mode conversion — turn docs into slides, slides into docs, extract data into sheets
-• 📎 Cross-file references — mention a doc or sheet by name and I use its data
-• 🖼️ Smart image placement — drag, drop, or paste; AI picks the best position
-• 📤 Export to PPTX — one-click PowerPoint export
-• ↩️ Unlimited Undo/Redo — go back to any state
-
-**How to start?**
-Just type a topic below! Examples:
-"Create a pitch deck about AI trends"
-"Write an article about sustainable energy"
-"Create a project called Q1 Report and write a summary"`,
-
+  // ── Mode-specific ──
   slides:`📊 **Slides Mode**
 
-Slides mode lets you create professional presentations entirely through natural language.
+Type a topic and I generate a complete presentation — title, content, tables, quotes, closing slide. 5 themes: clean-white, clean-gray, clean-dark, monet, seurat. 10 layouts including two-column, data-table, and image variants.
 
-**How it works:**
-1. Type a topic (e.g. "AI trends in healthcare") and I'll generate a complete deck — title slide, content slides, data tables, quotes, and a closing slide.
-2. Edit any region by clicking on it and typing instructions like "rewrite this in English" or "add more detail".
-3. Change styles naturally — "background to dark blue", "title font bigger", "Monet theme".
-
-**Design Themes:** clean-white, clean-gray, clean-dark, monet (impressionist), seurat (pointillist)
-**Layouts:** title, content, two-column, quote, data-table, image-top/left/right/bottom, closing
-**Image Support:** Paste or drag images onto slides; AI auto-positions them based on aspect ratio and content density.
-
-**Key commands:**
-• Type a topic → generates a new deck
-• Click a region + type instruction → edits that specific region
-• "translate to English" → translates entire deck
-• "export ppt" → downloads as .pptx file
-• Undo/Redo available at any time`,
+**What you can do:**
+• Generate a full deck from a topic: "AI trends in healthcare"
+• Edit specific regions: click a region, then type "rewrite in English" or "add more detail"
+• Style with natural language: "background to dark blue", "title font bigger", "Monet theme"
+• Paste or drag images — I auto-position them
+• "translate to English" → translates the entire deck
+• "export ppt" → downloads as .pptx
+• Undo/Redo anytime`,
 
   doc:`📝 **Doc Mode**
 
-Doc mode is an AI-powered document editor for long-form writing — articles, reports, memos, and more.
+Type a topic and I generate a structured document with headings, paragraphs, lists, tables, quotes, code blocks, and dividers.
 
-**How it works:**
-1. Type a topic and I'll generate a complete document with proper structure: headings, paragraphs, lists, tables, quotes, and dividers.
-2. Click any block to select it, then type an instruction to edit just that block.
-3. Supports rich block types: heading1/2/3, paragraph, list, numbered list, quote, code, table, image, divider, and caption.
-
-**Editing capabilities:**
-• "Enrich this paragraph" → expands with more detail
-• "Rewrite in a more professional tone" → rewrites selected block
-• "Add a comparison table" → inserts a table block
-• "Translate to Chinese" → translates entire document
-• Drag-and-drop block reordering (coming soon)
-
-**Tables:** Full support with headers, rows, floating (left/right/center), and captions.
-**Images:** Insert with URL, supports float positioning and captions.
-**Zoom:** Type "zoom 150%" or "zoom in/out" to adjust the editor view.`,
+**What you can do:**
+• Generate a full document from a topic: "write an article about sustainable energy"
+• Click any block to select it, then type an instruction to edit just that block
+• "Enrich this paragraph" → expands with detail
+• "Add a comparison table" → inserts a table
+• "Translate to Chinese" → translates the entire document
+• Tables support headers, rows, and captions
+• Images with float positioning (left/right/center)
+• Zoom: "zoom 150%" or "zoom in/out"`,
 
   sheet:`📈 **Sheet Mode**
 
-Sheet mode lets you create and manage structured data tables with formulas.
+Create and manage structured data tables. Click to select cells, double-click to edit, = to use formulas.
 
-**How it works:**
-1. Switch to Sheet mode from the mode picker or create from Workspace.
-2. Click a cell to select, double-click or press Enter to edit.
-3. Press Enter to confirm and move down, Tab to move right, Escape to cancel.
-4. Shift+Enter inserts a newline inside a cell.
-5. Use the ƒx button in the toolbar or type = to see formula autocomplete.
-
-**Formulas:** Start with = to use formulas. Available functions:
-• =SUM(A1:A10) — sum of range
-• =AVERAGE(A1:A10) — mean value
-• =COUNT(A1:A10) — count non-empty cells
-• =MIN / =MAX — smallest / largest value
-• =STDEV(A1:A10) — standard deviation
-• =MEDIAN(A1:A10) — median value
-• Arithmetic: =A1+B1*2, =A1/A2
-
-**Quick-create from chat:** /sheet Title followed by CSV data.
-**Cross-referencing:** Mention a sheet name when making slides and AI will use the data.`,
+**What you can do:**
+• AI-powered cell filling: "fill column C with estimated prices" → I use existing data to intelligently fill cells
+• Formulas: =SUM, =AVERAGE, =COUNT, =MIN, =MAX, =STDEV, =MEDIAN, arithmetic (=A1+B1*2)
+• Quick-create from chat: /sheet Title + CSV data
+• Cross-reference: mention a sheet name when making slides or docs, and I use its data as context
+• Tab to move right, Enter to move down, Shift+Enter for newline in cell`,
 
   workspace:`📁 **Workspace**
 
-Workspace is where you organize everything in Sloth Space — and **AI Context Injection** is the killer feature that makes it powerful.
+Create **Projects** to organize your files (slides, docs, sheets, images) into logical groups. The killer feature: **AI Context Injection** — when you work inside a Project, I automatically read ALL linked files as context.
 
-**What is a Project?**
-A Project is a smart folder that groups related files together. But it's much more than storage — it's an **AI context container**. When you work inside a Project, I (Sloth) automatically read ALL linked files and use them as context for everything I do.
+**What you can do:**
+• Create projects: "create a project called Q1 Report"
+• Link/unlink files to projects
+• Open any file by name: "open Budget Tracker"
+• Search and sort files
+• Ask questions across your entire project: "summarize this project" → I read every linked file
+• Generate content from project data: "create slides from the research" → I cross-reference all linked docs and sheets`,
 
-**🧠 AI Context Injection — How it works:**
-1. Create a Project (e.g. "Q1 Report", "Product Launch")
-2. Link your files to it — Docs, Sheets, Slides, Images
-3. When you create or edit content inside that Project, I automatically inject all linked files as context
-4. This means: "summarize this project" → I read EVERY linked file and give you a unified summary. "Create slides from the research" → I pull data from your docs AND sheets to build a coherent presentation. "Write a report based on the data" → I cross-reference all your sheets and docs.
+  // ── Core feature deep-dives ──
+  generation:`✨ **Content Generation**
 
-**Why this matters:**
-• No more copy-pasting between files — I see everything in the project
-• Your slides can reference actual data from your sheets
-• Your documents can synthesize insights from multiple sources
-• Ask questions across your entire project: "what conclusions can we draw from all the data?"
+Give me a topic in any language, and I'll create complete, polished content from scratch.
 
-**How Projects work:**
-• Create a Project for any initiative
-• Link files to a Project — Slides, Docs, Sheets, Images all live together
-• I auto-reference linked files when generating new content
-• Search and filter across Projects as your workspace grows
-• Unlink or reorganize files between Projects at any time
+**Slides:** I generate 5-8 slides with varied layouts (title, content, two-column, data-table, quote, closing), speaker notes, and a design theme. Each bullet is 1-2 full sentences with specific details — not just outlines.
 
-**File types you can create:**
-• **Slides** — AI-generated presentations
-• **Doc** — long-form documents and articles
-• **Sheet** — structured data tables (CSV-style)
-• **Images** — drag-drop or paste; stored with compression
+**Documents:** I generate a fully structured document with headings, paragraphs, lists, tables, quotes, and dividers. Rich block types let you build professional reports, articles, and memos.
 
-**Quick-create commands:**
-• /doc Title — creates a new document
-• /sheet Title + CSV data — creates a new data sheet
-• Use the "+" menu for slides, docs, sheets, or images`
+**Sheets:** Describe what data you need and I'll create a structured spreadsheet. Or use AI Fill to intelligently populate cells based on existing data — "fill column C with estimated market share" and I'll reason from your data.
+
+**Editing:** After generation, keep chatting to refine. "add more detail to slide 3", "rewrite this paragraph in a professional tone", "translate everything to English". I modify in-place without losing your existing work.`,
+
+  context_injection:`🧠 **AI Context Injection**
+
+This is the core superpower of Sloth Space's Workspace.
+
+**How it works:**
+1. Create a Project (e.g. "Q1 Report")
+2. Link files to it — docs, sheets, slides, images
+3. When you work inside that Project, I automatically inject ALL linked files into my context
+4. Every generation, edit, or question benefits from the full project knowledge
+
+**What this enables:**
+• "Summarize this project" → I read every linked file and produce a unified summary
+• "Create slides from the research" → I pull from your docs AND sheets to build a coherent deck
+• "Write a report based on the data" → I cross-reference your sheets and docs
+• "What conclusions can we draw?" → I analyze across all files and synthesize insights
+
+**Why it matters:**
+No copy-pasting between files. No manual context-setting. Your slides reference real data from your sheets, your documents synthesize insights from multiple sources. It all just works because I see everything in the project.
+
+**Cross-file references also work outside projects:** mention any file by name in chat (e.g. "use data from Budget Sheet") and I'll pull it in automatically.`,
+
+  conversion:`🔄 **Format Conversion**
+
+Convert between any content format using natural language.
+
+**Supported conversions:**
+• **Doc → Slides:** "turn this into a presentation" → I restructure your document into a multi-slide deck with proper layouts
+• **Slides → Doc:** "convert to a document" → I merge your slide content into a structured, readable document
+• **Doc/Slides → Sheet:** "extract the data into a spreadsheet" → I pull actual data values (numbers, dates, metrics) into a clean table
+• **Sheet → Slides:** "make a presentation from this data" → I create slides that visualize and explain your spreadsheet data
+• **Sheet → Doc:** "write a report from this data" → I generate a document that analyzes and presents your data
+
+**Important:** I only use data that actually exists in your source content. I won't fabricate numbers or statistics that aren't there.
+
+**Inside a Project:** conversions are even more powerful because I can pull context from ALL linked files, not just the currently open one.`,
+
+  ui_ops:`🎛️ **UI Operations**
+
+I can control the entire Sloth Space interface through natural language — no buttons needed.
+
+**Mode switching:** "switch to doc mode", "go to workspace", "open slides"
+**Project management:** "create a project called Q1 Report", "delete project X", "link this file to project Y"
+**File operations:** "open Budget Tracker", "create a new doc", "create a new sheet"
+**Navigation:** "go to projects tab", "search for budget", "sort by date"
+**Styling (Slides):** "background to dark blue", "title font bigger", "use Monet theme", "make heading red"
+**Settings:** "open settings"
+
+All of these work in any language — just describe what you want to do and I'll handle it.`
 };
 
 // Translation prompt for about texts
 const ABOUT_TRANSLATE_PROMPT=`You are a translator. Translate the following product introduction text to the target language.
 
 CRITICAL — DO NOT translate these terms (keep them exactly as-is in English):
-Sloth Space, Slides, Doc, Sheet, Workspace, Project, PPTX, PowerPoint, CSV, AI, Undo, Redo, Monet, Seurat
+Sloth, Sloth Space, Slides, Doc, Sheet, Workspace, Project, AI Context Injection, AI Fill, PPTX, PowerPoint, CSV, AI, Undo, Redo, Monet, Seurat
 
-Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, emojis, markdown bold markers, numbered lists, line breaks.
+Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, 🧠, ✨, 🔄, 🎛️, emojis, markdown bold markers, numbered lists, line breaks.
 Only translate the regular text content. Output ONLY the translated text, nothing else.`;
 
 // Sheet Fill prompt — AI as a Function
@@ -3239,5 +3234,6 @@ export {
   _hideAIActionOverlay,
   _updateAIActionOverlay,
   _showAIBlocker,
-  _hideAIBlocker
+  _hideAIBlocker,
+  ABOUT_TEXTS
 };

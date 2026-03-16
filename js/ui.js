@@ -1692,6 +1692,7 @@ async function _mpRouterDetectMode(text) {
       if (data.intent === 'generate') return data.target || 'doc';  // generate without recognized target → default doc
       if (data.intent === 'multi_step') return 'workspace';         // multi_step from landing → project + content
       if (data.intent === 'chat') return null;                      // let keyword fallback handle greetings
+      if (data.intent === 'about' || data.intent === 'describe') return '__about__'; // handle in mpSendPrompt, don't enter a mode
       // For any other recognized intent, try data.target or data.message for hints
       if (data.target === 'doc' || data.target === 'sheet' || data.target === 'slide') return data.target;
       // If router returned SOMETHING but we can't extract mode, still better than blind fallback
@@ -1742,7 +1743,34 @@ function mpSendPrompt(text) {
     // Step 2: Ask LLM router which mode to enter
     const mode = await _mpRouterDetectMode(text);
 
-    // Step 3: Update chat + overlay
+    // Step 3: Handle about/describe on landing page — answer in chat without entering a mode
+    if (mode === '__about__') {
+      if (thinkingEl) thinkingEl.remove();
+      if (window._hideAIActionOverlay) window._hideAIActionOverlay();
+      if (window._hideAIBlocker) window._hideAIBlocker();
+      // Use the ABOUT_TEXTS if available, otherwise let LLM handle it
+      if (window.ABOUT_TEXTS) {
+        const isZh = /[\u4e00-\u9fff]/.test(text);
+        const src = window.ABOUT_TEXTS.general || '';
+        if (isZh && window.callLLM) {
+          try {
+            const translated = await window.callLLM(
+              'Translate the following to the same language as the user message. Keep it concise.',
+              [{ role: 'user', content: `User: "${text}"\n\n${src}` }],
+              { max_tokens: 512 }
+            );
+            mpAddMsg(translated, 'ai');
+          } catch (e) { mpAddMsg(src, 'ai'); }
+        } else {
+          mpAddMsg(src.replace(/\*\*/g, ''), 'ai');
+        }
+      } else {
+        mpAddMsg("I'm Sloth 🦥 — your AI creative assistant in Sloth Space! I help you create slides, docs, and sheets. Try typing a topic!", 'ai');
+      }
+      return;
+    }
+
+    // Step 3b: Update chat + overlay
     if (thinkingEl) thinkingEl.remove();
     if (window._updateAIActionOverlay) window._updateAIActionOverlay(`AI ▸ Selecting ${modeNames[mode] || mode}...`);
     mpAddMsg(`Selecting ${modeNames[mode] || mode}...`, 'ai');
