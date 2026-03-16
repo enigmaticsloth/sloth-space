@@ -93,16 +93,20 @@
 @keyframes mu-pop { 0%{transform:translate(-50%,-50%) scale(0);opacity:0.7} 100%{transform:translate(-50%,-50%) scale(1.5);opacity:0} }
 
 /* ── AI activity indicator (Monet orange glow) ── */
-.mu-ai-bar { position:absolute; top:0; left:0; right:0; height:2px; z-index:12; overflow:hidden; opacity:0; transition:opacity 0.3s; }
+.mu-ai-bar { position:absolute; top:0; left:0; right:0; height:3px; z-index:12; overflow:hidden; opacity:0; transition:opacity 0.3s; }
 .mu-ai-bar.active { opacity:1; }
 .mu-ai-bar::after { content:''; position:absolute; top:0; left:-40%; width:40%; height:100%; background:linear-gradient(90deg,transparent,#E8913A,#F0A050,#E8913A,transparent); animation:mu-ai-sweep 1.2s ease-in-out infinite; }
 @keyframes mu-ai-sweep { 0%{left:-40%} 100%{left:100%} }
-.mu.ai-active { box-shadow:0 0 12px rgba(232,145,58,0.15), inset 0 0 8px rgba(232,145,58,0.04); border-color:rgba(232,145,58,0.3); transition:all 0.4s ease; }
-.mu-ai-badge { position:absolute; top:3px; right:4px; z-index:12; display:flex; align-items:center; gap:3px; background:rgba(232,145,58,0.15); border:1px solid rgba(232,145,58,0.3); border-radius:3px; padding:1px 5px; opacity:0; transition:all 0.3s ease; }
-.mu-ai-badge.show { opacity:1; }
-.mu-ai-badge::before { content:''; width:5px; height:5px; border-radius:50%; background:#E8913A; animation:mu-ai-pulse 1s ease-in-out infinite; }
-.mu-ai-badge span { font-size:6px; color:#E8913A; font-weight:700; letter-spacing:0.3px; }
-@keyframes mu-ai-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+.mu.ai-active { box-shadow:0 0 18px rgba(232,145,58,0.25), inset 0 0 12px rgba(232,145,58,0.06); border-color:rgba(232,145,58,0.45); transition:all 0.4s ease; }
+/* AI badge — prominent label */
+.mu-ai-badge { position:absolute; top:20px; left:50%; transform:translateX(-50%) translateY(-4px); z-index:14; display:flex; align-items:center; gap:4px; background:rgba(232,145,58,0.18); border:1.5px solid rgba(232,145,58,0.5); border-radius:5px; padding:3px 10px; opacity:0; transition:all 0.35s cubic-bezier(0.22,1,0.36,1); backdrop-filter:blur(6px); }
+.mu-ai-badge.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.mu-ai-badge::before { content:''; width:7px; height:7px; border-radius:50%; background:#E8913A; box-shadow:0 0 6px rgba(232,145,58,0.6); animation:mu-ai-pulse 1s ease-in-out infinite; flex-shrink:0; }
+.mu-ai-badge span { font-size:9px; color:#E8913A; font-weight:700; letter-spacing:0.5px; }
+@keyframes mu-ai-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+/* Status line turns orange during AI ops */
+.mu-status.ai { color:#E8913A; }
+.mu-status .ds-spin.ai { border-color:rgba(232,145,58,0.3); border-top-color:#E8913A; }
 
 /* ── Mini slide cards inside mu-canvas ── */
 .mu-slides { display:flex; gap:3px; flex-wrap:wrap; justify-content:center; width:100%; }

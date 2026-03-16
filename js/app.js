@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c6';
-import * as slide from './slide.js?v=20260317c6';
-import * as doc from './doc.js?v=20260317c6';
-import * as workspace from './workspace.js?v=20260317c6';
-import * as ai from './ai.js?v=20260317c6';
-import * as ui from './ui.js?v=20260317c6';
-import * as storage from './storage.js?v=20260317c6';
-import * as keys from './keys.js?v=20260317c6';
-import * as sheet from './sheet.js?v=20260317c6';
-import * as bench from './bench.js?v=20260317c6';
+import { S } from './state.js?v=20260317c7';
+import * as slide from './slide.js?v=20260317c7';
+import * as doc from './doc.js?v=20260317c7';
+import * as workspace from './workspace.js?v=20260317c7';
+import * as ai from './ai.js?v=20260317c7';
+import * as ui from './ui.js?v=20260317c7';
+import * as storage from './storage.js?v=20260317c7';
+import * as keys from './keys.js?v=20260317c7';
+import * as sheet from './sheet.js?v=20260317c7';
+import * as bench from './bench.js?v=20260317c7';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -377,13 +377,20 @@ ui.renderApp();
   }
 
   /* ── AI activity indicator (Monet orange) ── */
-  function aiActive(on){
+  let _aiOn=false;
+  function aiActive(on, label){
+    _aiOn=on;
     const frame=$('muFrame');
     const bar=$('muAiBar');
     const badge=$('muAiBadge');
+    const status=$('muStatus');
     if(frame){ if(on) frame.classList.add('ai-active'); else frame.classList.remove('ai-active'); }
     if(bar){ if(on) bar.classList.add('active'); else bar.classList.remove('active'); }
-    if(badge){ if(on) badge.classList.add('show'); else badge.classList.remove('show'); }
+    if(badge){
+      if(on){ badge.classList.add('show'); if(label){ const sp=badge.querySelector('span'); if(sp) sp.textContent=label; } }
+      else badge.classList.remove('show');
+    }
+    if(status){ if(on) status.classList.add('ai'); else status.classList.remove('ai'); }
   }
 
   /* ── UI helpers ── */
@@ -395,7 +402,14 @@ ui.renderApp();
     const t=$('muTab0');
     if(t){ t.textContent=text; t.classList.add('active'); }
   }
-  function setStatus(html){ const s=$('muStatus'); if(s) s.innerHTML=html; }
+  function setStatus(html){
+    const s=$('muStatus');
+    if(!s) return;
+    // When AI is active, make spinner orange too
+    if(_aiOn) html=html.replace('ds-spin','ds-spin ai');
+    s.innerHTML=html;
+    if(_aiOn) s.classList.add('ai'); else s.classList.remove('ai');
+  }
   function clearCanvas(){
     const c=$('muCanvas');
     if(c) c.innerHTML='';
@@ -428,13 +442,13 @@ ui.renderApp();
   }
 
   /* ── Click the send button (auto-activates AI indicator) ── */
-  async function clickSend(){
+  async function clickSend(aiLabel){
     const btn=$('muSend');
     if(!btn) return;
     await clickEl(btn);
     lightSend(false);
     clearPrompt();
-    aiActive(true);
+    aiActive(true, aiLabel||'AI Generating');
     await wait(200);
   }
 
@@ -468,7 +482,7 @@ ui.renderApp();
 
     // Cursor types prompt → clicks send
     await typeInPrompt('Create a pitch deck');
-    await clickSend();
+    await clickSend('AI Building Slides');
     setStatus('<span class="ds-spin"></span> Generating slides...');
 
     // Build mini slides in canvas
@@ -529,7 +543,7 @@ ui.renderApp();
     showCursor();
 
     await typeInPrompt('Summarize all project files');
-    await clickSend();
+    await clickSend('AI Scanning');
     setStatus('<span class="ds-spin"></span> Scanning files...');
 
     const c=$('muCanvas'); if(!c) return;
@@ -602,7 +616,7 @@ ui.renderApp();
     showCursor();
 
     await typeInPrompt('Create Q4 budget sheet');
-    await clickSend();
+    await clickSend('AI Building Sheet');
     setStatus('<span class="ds-spin"></span> Building spreadsheet...');
 
     const c=$('muCanvas'); if(!c) return;
@@ -678,7 +692,7 @@ ui.renderApp();
     showCursor();
 
     await typeInPrompt('Write a project proposal');
-    await clickSend();
+    await clickSend('AI Writing Doc');
     setStatus('<span class="ds-spin"></span> Writing document...');
 
     const c=$('muCanvas'); if(!c) return;
@@ -805,7 +819,7 @@ ui.renderApp();
     await wait(200);
     ctx.remove();
 
-    aiActive(true);
+    aiActive(true, 'AI Converting');
     setStatus('<span class="ds-spin"></span> Converting slides → doc...');
     hideCursor();
 
