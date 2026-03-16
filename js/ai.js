@@ -1634,12 +1634,13 @@ ${ABOUT_TEXTS.sheet}
       }
     }
 
-    // ── Smart fallback: generate → describe when user just wants a summary (not a file) ──
+    // ── Smart fallback: ANY intent → describe when user just wants a summary (not a file) ──
     // "總結這個專案" / "summarize this" → should show summary in chat, not generate a doc
+    // The router often misclassifies summarize requests as "generate", "chat", etc.
     const isSummarizeOnly=/^(summarize|summary|sum up|overview|recap|總結|摘要|概述|整理|歸納)/i.test(text.trim())
       && !/file|document|doc|report|slide|presentation|sheet|檔案|文件|文檔|簡報|報告|投影片|試算表/i.test(text);
-    if(intent==='generate' && isSummarizeOnly){
-      console.log('Smart fallback: generate → describe (user wants summary, not file creation)');
+    if(isSummarizeOnly && intent!=='describe'){
+      console.log(`Smart fallback: ${intent} → describe (user wants summary, not file creation)`);
       intent='describe';
     }
 
