@@ -5,15 +5,15 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260316aaa';
-import * as slide from './slide.js?v=20260316aaa';
-import * as doc from './doc.js?v=20260316aaa';
-import * as workspace from './workspace.js?v=20260316aaa';
-import * as ai from './ai.js?v=20260316aaa';
-import * as ui from './ui.js?v=20260316aaa';
-import * as storage from './storage.js?v=20260316aaa';
-import * as keys from './keys.js?v=20260316aaa';
-import * as sheet from './sheet.js?v=20260316aaa';
+import { S } from './state.js?v=20260316ddd';
+import * as slide from './slide.js?v=20260316ddd';
+import * as doc from './doc.js?v=20260316ddd';
+import * as workspace from './workspace.js?v=20260316ddd';
+import * as ai from './ai.js?v=20260316ddd';
+import * as ui from './ui.js?v=20260316ddd';
+import * as storage from './storage.js?v=20260316ddd';
+import * as keys from './keys.js?v=20260316ddd';
+import * as sheet from './sheet.js?v=20260316ddd';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -36,6 +36,9 @@ for (const [name, fn] of Object.entries(allExports)) {
 
 // Also expose the state object
 window.S = S;
+
+// ─── Function aliases (so AI router can use either name) ───
+window.applyPreset = window.setPreset;
 
 // ─── Initialization sequence (order matches app.html exactly) ───
 // 1. Init slide infrastructure (toolbar, canvas, keys)

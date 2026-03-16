@@ -44,7 +44,7 @@ function renderApp(){
   document.getElementById('presetPills').innerHTML=Object.values(PRESETS).map(pr=>{
     const p=PILL_COLORS[pr.id]||{bg:'#333',fg:'#ccc',bd:'#555',aBg:'#666',aFg:'#fff'};
     const isActive=pr.id===S.currentPreset;
-    return `<button class="${isActive?'active':''}" onclick="window.setPreset('${pr.id}')" style="background:${isActive?p.aBg:p.bg};color:${isActive?p.aFg:p.fg};border:1.5px solid ${isActive?p.aBg:p.bd};">${pr.name}</button>`;
+    return `<button class="${isActive?'active':''}" data-preset="${pr.id}" onclick="window.setPreset('${pr.id}')" style="background:${isActive?p.aBg:p.bg};color:${isActive?p.aFg:p.fg};">${pr.name}</button>`;
   }).join('');
 
   // Toolbar visibility is ONLY controlled by updateToolbarForMode().

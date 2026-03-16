@@ -1473,6 +1473,21 @@ async function sendMessage(){
     addMessage(`📎 Using workspace data: ${refNames}`,'system');
   }
 
+  // ── Inject Sloth Space product info when user asks to generate content about it ──
+  if(/sloth\s*space/i.test(text)){
+    wsContext+=`\n\n## SLOTH SPACE PRODUCT REFERENCE
+When generating content about Sloth Space, use this AUTHORITATIVE description as your source of truth. Do NOT invent features or descriptions — use the information below:
+
+${ABOUT_TEXTS.general}
+
+${ABOUT_TEXTS.slides}
+
+${ABOUT_TEXTS.doc}
+
+${ABOUT_TEXTS.sheet}
+`;
+  }
+
   try{
     // ── If user attached images, go to image path ──
     if(pendingImages.length>0){
@@ -2529,6 +2544,7 @@ const ALLOWED_ACTIONS = {
   openFileNav:        { confirm: false, label: 'Open file navigator' },
   // ── Slide/doc operations ──
   applyPreset:        { confirm: false, label: 'Apply theme' },
+  setPreset:          { confirm: false, label: 'Apply theme' },
   // ── Search / sort ──
   wsSetSearch:        { confirm: false, label: 'Search files' },
   wsSetSort:          { confirm: false, label: 'Sort files' },
@@ -2551,6 +2567,7 @@ const ACTION_SCHEMA = {
   wsUnlinkFile:   [{ type: 'string' }, { type: 'string' }],
   wsSetActiveProject: [{ type: 'string' }],
   applyPreset:    [{ type: 'string' }],
+  setPreset:      [{ type: 'string' }],
   wsSetSearch:    [{ type: 'string' }],
   wsSetSort:      [{ type: 'string', enum: ['date', 'name', 'type'] }],
 };
@@ -2665,60 +2682,119 @@ async function _aiShowPhantomInput(label, value) {
  * Map function names to their corresponding DOM elements and animate.
  * Returns the element that was animated (or null if no animation available).
  */
+/**
+ * Show a floating "phantom action" label when the target button doesn't exist on screen.
+ * This ensures the user always sees what AI is doing, even if the relevant UI isn't rendered yet.
+ */
+async function _aiShowPhantomAction(icon, label) {
+  const phantom = document.createElement('div');
+  phantom.className = 'ai-phantom-action';
+  Object.assign(phantom.style, {
+    position: 'fixed', top: '60px', left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: '100002',
+    background: 'linear-gradient(135deg, #1e1e1e, #2a2a2a)',
+    border: '1px solid rgba(200,168,112,0.4)',
+    borderRadius: '10px', padding: '12px 24px',
+    boxShadow: '0 6px 24px rgba(0,0,0,0.4), 0 0 12px rgba(200,168,112,0.15)',
+    display: 'flex', alignItems: 'center', gap: '10px',
+    fontFamily: 'inherit', fontSize: '14px', color: '#e0e0e0',
+    animation: 'aiOverlayIn 0.25s ease',
+    pointerEvents: 'none',
+  });
+  // icon can be an SVG string or a text icon
+  phantom.innerHTML = `<span style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;flex-shrink:0;">${icon}</span><span>${label}</span>`;
+  document.body.appendChild(phantom);
+  await new Promise(r => setTimeout(r, 800));
+  phantom.style.animation = 'aiOverlayOut 0.25s ease forwards';
+  await new Promise(r => setTimeout(r, 260));
+  phantom.remove();
+}
+
 async function _aiAnimateBeforeAction(fnName, args) {
-  const mapping = {
-    modeEnter: () => {
-      // Find the mode switch item in the menu, or the mode badge itself
-      const mode = args[0];
-      const badge = document.getElementById('modeBadge');
-      return badge;
-    },
+  // Flat SVG icons (Feather-style, matches app design)
+  const _svgI = (d) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(200,168,112,0.9)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const actionLabels = {
+    modeEnter:          { icon: _svgI('<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>'), label: () => `Switching to ${args[0]} mode` },
+    wsSetView:          { icon: _svgI('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'), label: () => `Opening ${args[0]} view` },
+    wsCreateProject:    { icon: _svgI('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>'), label: () => `Creating project "${args[0]}"` },
+    wsOpenProject:      { icon: _svgI('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'), label: () => `Opening project` },
+    openWorkspaceItem:  { icon: _svgI('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>'), label: () => `Opening file` },
+    wsNewFile:          { icon: _svgI('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>'), label: () => `Creating new ${args[0]}` },
+    wsCreateDoc:        { icon: _svgI('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>'), label: () => `Creating document "${args[0]}"` },
+    wsCreateSheet:      { icon: _svgI('<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/>'), label: () => `Creating spreadsheet "${args[0]}"` },
+    wsDeleteFile:       { icon: _svgI('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'), label: () => `Deleting file` },
+    wsDeleteProject:    { icon: _svgI('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'), label: () => `Deleting project` },
+    wsLinkFile:         { icon: _svgI('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'), label: () => `Linking file to project` },
+    wsUnlinkFile:       { icon: _svgI('<path d="M18 13h4"/><path d="M2 11h4"/><line x1="15" y1="5" x2="9" y2="19"/>'), label: () => `Unlinking file` },
+    wsSetActiveProject: { icon: _svgI('<line x1="12" y1="2" x2="12" y2="15"/><circle cx="12" cy="19" r="3"/>'), label: () => `Setting active project` },
+    applyPreset:        { icon: _svgI('<circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 0 0 0 14 4 4 0 0 1 0 8 10 10 0 0 0 0-20z"/>'), label: () => `Applying ${args[0]} theme` },
+    setPreset:          { icon: _svgI('<circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 0 0 0 14 4 4 0 0 1 0 8 10 10 0 0 0 0-20z"/>'), label: () => `Applying ${args[0]} theme` },
+    openSettings:       { icon: _svgI('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'), label: () => `Opening settings` },
+    openFileNav:        { icon: _svgI('<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>'), label: () => `Opening file navigator` },
+    wsSetSearch:        { icon: _svgI('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'), label: () => `Searching files` },
+    wsSetSort:          { icon: _svgI('<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>'), label: () => `Sorting files` },
+  };
+
+  // Try to find the actual DOM element to animate
+  const elFinders = {
+    modeEnter: () => document.getElementById('modeBadge'),
     wsSetView: () => {
-      // Find workspace nav tab
-      const view = args[0];
       const tabs = document.querySelectorAll('.ws-nav-tab');
-      for (const tab of tabs) {
-        if (tab.textContent.toLowerCase().includes(view)) return tab;
-      }
+      for (const t of tabs) { if (t.textContent.toLowerCase().includes(args[0])) return t; }
       return null;
     },
     wsCreateProject: () => {
-      // Find the "+ New Project" button
-      const btns = document.querySelectorAll('.ws-new-btn.project, button');
-      for (const btn of btns) {
-        if (btn.textContent.includes('New Project')) return btn;
-      }
+      const btn = document.querySelector('.ws-new-btn.project');
+      if (btn) return btn;
+      // Also search by text content
+      const allBtns = document.querySelectorAll('button');
+      for (const b of allBtns) { if (b.textContent.trim().includes('New Project')) return b; }
       return null;
     },
     wsOpenProject: () => {
-      // Find the project card
       const cards = document.querySelectorAll('.ws-project-card');
-      for (const card of cards) {
-        if (card.textContent.includes(args[0])) return card;
-      }
+      for (const c of cards) { if (c.textContent.includes(args[0])) return c; }
       return null;
     },
     openWorkspaceItem: () => {
-      // Find file card by index
       const cards = document.querySelectorAll('.ws-file-card');
       return cards[args[0]] || null;
     },
-    openSettings: () => document.querySelector('[onclick*="openSettings"]') || document.querySelector('.settings-btn'),
-    openFileNav: () => document.querySelector('[onclick*="openFileNav"]') || document.querySelector('.file-nav-btn'),
-    wsNewFile: () => {
-      const btn = document.querySelector('.ws-new-btn');
-      return btn;
+    wsNewFile: () => document.querySelector('.ws-new-btn'),
+    openSettings: () => document.querySelector('[onclick*="openSettings"]'),
+    openFileNav: () => document.querySelector('[onclick*="openFileNav"]'),
+    applyPreset: () => {
+      // Find preset pill button by data-preset attribute or text match
+      const presetName = args[0];
+      const byData = document.querySelector(`#presetPills button[data-preset="${presetName}"]`);
+      if (byData) return byData;
+      // Fallback: match by display name
+      const pills = document.querySelectorAll('#presetPills button');
+      const nameMap = {'clean-white':'White','clean-gray':'Gray','clean-dark':'Dark','monet':'Monet','seurat':'Seurat'};
+      const displayName = nameMap[presetName] || presetName;
+      for (const p of pills) { if (p.textContent.trim() === displayName) return p; }
+      return null;
     },
   };
+  // setPreset is an alias for applyPreset
+  elFinders.setPreset = elFinders.applyPreset;
 
-  const finder = mapping[fnName];
-  if (!finder) return null;
+  const finder = elFinders[fnName];
+  const el = finder ? finder() : null;
 
-  const el = finder();
-  if (!el) return null;
-
-  await _aiSimulateClick(el);
-  return el;
+  if (el) {
+    // Element found — do full click animation with cursor
+    await _aiSimulateClick(el);
+    return el;
+  } else {
+    // Element NOT on screen — show phantom action label as fallback
+    const desc = actionLabels[fnName];
+    if (desc) {
+      await _aiShowPhantomAction(desc.icon, desc.label());
+    }
+    return null;
+  }
 }
 
 /**
