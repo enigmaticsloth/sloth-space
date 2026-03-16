@@ -609,14 +609,31 @@ CROSS-FILE PROJECT CONTEXT — if the user's file belongs to a project, you will
 - The user may ask from the workspace page (no current file open). In that case, you will only have PROJECT CONTEXT. Summarize the entire project: what it contains, key findings, conclusions, and how the files relate to each other.`;
 
 // Helper: serialize current content as readable text for LLM
+function _serializeSlideTable(v){
+  if(!v||v.type!=='table') return '';
+  const headers=v.headers||[];
+  const rows=v.rows||[];
+  const lines=[];
+  if(headers.length>0) lines.push('| '+headers.join(' | ')+' |');
+  if(headers.length>0) lines.push('|'+headers.map(()=>' --- ').join('|')+'|');
+  for(const row of rows){
+    if(Array.isArray(row)) lines.push('| '+row.join(' | ')+' |');
+    else lines.push('| '+String(row)+' |');
+  }
+  return lines.join('\n');
+}
+
 function getCurrentContentText(){
   if(S.currentMode==='slide'&&S.currentDeck&&S.currentDeck.slides.length>0){
     const lines=S.currentDeck.slides.map((s,i)=>{
       const parts=[`[Slide ${i+1} — ${s.layout}]`];
       for(const[k,v]of Object.entries(s.content)){
         if(typeof v==='string') parts.push(`  ${k}: ${v}`);
-        else if(v&&v.type==='list'&&v.items) parts.push(`  ${k}: `+v.items.join(', '));
-        else if(v&&v.type==='table') parts.push(`  ${k}: [table ${v.headers?.length||0} cols × ${v.rows?.length||0} rows]`);
+        else if(v&&v.type==='list'&&v.items) parts.push(`  ${k}:\n`+v.items.map(item=>`    - ${item}`).join('\n'));
+        else if(v&&v.type==='table'){
+          const tbl=_serializeSlideTable(v);
+          parts.push(`  ${k} (table):\n${tbl}`);
+        }
         else parts.push(`  ${k}: ${JSON.stringify(v)}`);
       }
       return parts.join('\n');
@@ -626,6 +643,16 @@ function getCurrentContentText(){
   if(S.currentMode==='doc'&&S.currentDoc&&S.currentDoc.blocks.length>0){
     const lines=S.currentDoc.blocks.map(b=>{
       const text=window.blockPlainText(b);
+      // For table blocks, serialize the cells as markdown table
+      if(b.type==='table'&&b.meta?.cells){
+        const cells=b.meta.cells;
+        const tblLines=[];
+        cells.forEach((row,ri)=>{
+          tblLines.push('| '+row.join(' | ')+' |');
+          if(ri===0) tblLines.push('|'+row.map(()=>' --- ').join('|')+'|');
+        });
+        return `[table]\n${tblLines.join('\n')}`;
+      }
       return `[${b.type}] ${text}`;
     }).filter(l=>l.trim().length>3);
     return `Document "${S.currentDoc.title||'Untitled'}" (${S.currentDoc.blocks.length} blocks):\n\n`+lines.join('\n');
@@ -1925,10 +1952,20 @@ async function sendMessage(){
       }else{
         _showAIActionOverlay('AI ▸ Converting to spreadsheet...');
         addMessage(`📊 Converting ${S.currentMode} data to spreadsheet...`,'system');
-        const convertPrompt=`You are a data extraction AI. Convert the following content into a spreadsheet format.
+        const convertPrompt=`You are a data extraction AI. Your job is to extract ACTUAL DATA VALUES (numbers, amounts, dates, percentages, metrics) from the content and organize them into a spreadsheet.
+
 Output ONLY a JSON object: {"title":"sheet title","columns":[{"name":"col1"},{"name":"col2"}],"rows":[{"cells":{"col1":"val","col2":"val"}},...]}
-Extract structured data: names, numbers, dates, categories. Create meaningful column headers.
-If the content has tables, extract them. If it's prose, extract key entities and facts into columns.
+
+CRITICAL RULES:
+- Extract REAL DATA: dollar amounts, percentages, quantities, dates, names — NOT slide titles or section headings.
+- If the content contains tables (markdown table format), extract every row of data from those tables.
+- If the content contains bullet lists with numbers/values, extract those values into columns.
+- Column names should describe the DATA (e.g. "Category", "Amount", "Growth %"), not the slide/section name.
+- Every row should be one data record with actual values, NOT a summary of a section.
+- If there are budget items, list each item as a row with columns like "Item", "Amount", "Category".
+- If there are projections, list each projection as a row with "Metric", "Q1", "Q2", etc.
+- NEVER make rows like {"Title":"Introduction","Description":"..."} — that's useless. Extract the DATA inside.
+- If no structured data can be found, try to extract quantitative claims from the prose.
 
 SOURCE CONTENT:
 ${sourceContent}`;
