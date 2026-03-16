@@ -1540,7 +1540,7 @@ async function sendMessage(){
       if(selCtx) ctx.push(selCtx);
       ctx.push('Available functions: SUM, AVERAGE, COUNT, MIN, MAX, STDEV, MEDIAN. Formulas start with =.');
     }
-    if(S.currentMode==='slide'&&S.currentDeck) ctx.push('User has a deck loaded with '+S.currentDeck.slides.length+' slides.');
+    if(S.currentMode==='slide'&&S.currentDeck) ctx.push(`User is in Slide mode viewing "${S.currentDeck.title||'Untitled'}" with ${S.currentDeck.slides.length} slides. "這份文件/this file/this deck" refers to THIS deck.`);
     if(S.currentMode==='slide'&&hasImageOnCurrentSlide()) ctx.push('Current slide has floating images.');
     if(S.selectedRegion) ctx.push(`User has selected region "${S.selectedRegion.regionId}" (${S.selectedRegion.role}) on slide ${S.selectedRegion.slideIdx+1}.`);
     if(wsRefs.length>0) ctx.push('User referenced workspace files: '+wsRefs.map(f=>f.title).join(', ')+'.');
@@ -1590,11 +1590,29 @@ async function sendMessage(){
     // If still "chat" and message has substance → generate
     if(intent==='chat'){
       const hasSubject=text.length>4&&!/^(hi|hello|hey|what|how|why|who|when|where|help|sup|yo)$/i.test(text.trim());
-      const hasGenerateHint=/create|make|write|about|build|draft|pitch|deck|report|article|content|generate/i.test(text);
+      const hasGenerateHint=/create|make|write|about|build|draft|pitch|deck|report|article|content|generate|轉成|轉換|convert|turn.*into|extract/i.test(text);
       const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2))||(S.currentMode==='workspace');
       if(hasSubject&&(hasGenerateHint||noDeckOrDoc)){
         console.log('Smart fallback: chat → generate (message has topic substance)');
         intent='generate';
+      }
+    }
+
+    // ── Smart fallback: cross-mode conversion target detection ──
+    // If the router returned "generate" but missed the target, detect conversion keywords
+    if(intent==='generate' && !routerData.target){
+      const wantsSheet=/試算表|表格|spreadsheet|轉成sheet|轉換成sheet|extract.*data|轉成表/i.test(text);
+      const wantsDoc=/轉成文件|轉成doc|轉換成文件|轉成文檔|make.*doc|convert.*doc|turn.*into.*doc/i.test(text);
+      const wantsSlide=/轉成簡報|轉成slide|轉換成簡報|make.*slide|make.*presentation|convert.*slide|turn.*into.*slide|turn.*into.*presentation/i.test(text);
+      if(wantsSheet){
+        routerData.target='sheet';
+        console.log('Smart fallback: generate → target:sheet (detected conversion keywords)');
+      }else if(wantsDoc && S.currentMode!=='doc'){
+        routerData.target='doc';
+        console.log('Smart fallback: generate → target:doc (detected conversion keywords)');
+      }else if(wantsSlide && S.currentMode!=='slide'){
+        routerData.target='slide';
+        console.log('Smart fallback: generate → target:slide (detected conversion keywords)');
       }
     }
 
@@ -2089,7 +2107,7 @@ ${sourceContent}`;
           addMessage(`⚠️ ${message}\nAI wants to perform a destructive action. Reply "yes" to confirm.`, 'system');
           S.chatHistory.push({role:'assistant',content:`[Waiting for confirmation: ${message}]`});
         } else {
-          const results = executeUIActions(resolved, message);
+          const results = await executeUIActions(resolved, message);
           const failCount = results.filter(r => r.error).length;
           if(failCount > 0){
             addMessage(`⚠️ ${failCount} action(s) failed. Check console for details.`, 'system');
@@ -2135,45 +2153,81 @@ ${sourceContent}`;
 
 // ── Multi-step executor: sequentially runs mixed ui_action / generate / link steps ──
 async function executeMultiStep(steps, message, userText, wsContext) {
-  _showAIActionOverlay(`AI multi-step: ${message}`);
+  _showAIActionOverlay(`AI ▸ ${message}`);
   addMessage(`✦ ${message}`, 'system');
+  _aiEnsureCursor();
 
   let lastCreatedProjectId = null;
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     const stepLabel = `Step ${i+1}/${steps.length}`;
-    _updateAIActionOverlay(`AI ▸ ${stepLabel}: ${step.type}`);
 
-    // Small delay between steps so user can see what's happening
-    if (i > 0) await new Promise(r => setTimeout(r, 400));
+    // Update overlay with step progress dots
+    const stepDescriptions = {
+      ui_action: step.actions?.map(a => ALLOWED_ACTIONS[a.fn]?.label || a.fn).join(', ') || 'UI action',
+      generate: `Creating ${step.target || 'doc'}`,
+      link_last: `Linking to ${step.project || 'project'}`,
+    };
+    _updateAIActionOverlay(`AI ▸ ${stepLabel}: ${stepDescriptions[step.type] || step.type}`);
+    _aiShowStepProgress(steps.length, i);
+
+    // Delay between steps (≥0.5s) so user can see each step clearly
+    if (i > 0) await new Promise(r => setTimeout(r, 600));
 
     try {
       if (step.type === 'ui_action') {
-        // Re-resolve refs with fresh data each time (projects created in earlier steps now exist)
         const resolved = resolveActionRefs(step.actions || []);
-        const results = executeUIActions(resolved, '', {quiet:true});
-        // Track if a project was created
-        for (const a of (step.actions || [])) {
-          if (a.fn === 'wsCreateProject' && a.args?.[0]) {
-            // Find the just-created project by name
+
+        // Animated execution: process each action with visual feedback
+        for (const action of resolved) {
+          const fnName = action.fn;
+          const args = action.args || [];
+          const rule = ALLOWED_ACTIONS[fnName];
+          if (!rule) continue;
+
+          // Step 1: Animate — show cursor moving to button + click effect
+          await _aiAnimateBeforeAction(fnName, args);
+
+          // Step 2: For wsCreateProject, show phantom typing for the name
+          if (fnName === 'wsCreateProject' && args[0]) {
+            await _aiShowPhantomInput('Project Name', args[0]);
+          }
+
+          // Step 3: Execute the actual function
+          const fn = window[fnName];
+          if (typeof fn === 'function') {
+            try { fn(...args); } catch(e) { console.error(`[AI UI] Error: ${fnName}:`, e); }
+          }
+
+          // Step 4: Brief pause to let user see the result
+          await new Promise(r => setTimeout(r, 500));
+
+          // Track project creation
+          if (fnName === 'wsCreateProject' && args[0]) {
             const projects = window.wsListProjects ? window.wsListProjects() : [];
-            const p = projects.find(p => (p.name || '').toLowerCase() === a.args[0].toLowerCase());
+            const p = projects.find(p => (p.name || '').toLowerCase() === args[0].toLowerCase());
             if (p) lastCreatedProjectId = p.id;
           }
         }
-        const failCount = results.filter(r => r.error).length;
-        if (failCount > 0) addMessage(`⚠️ ${stepLabel}: ${failCount} action(s) failed.`, 'system');
 
       } else if (step.type === 'generate') {
         _updateAIActionOverlay(`AI ▸ ${stepLabel}: Generating ${step.target || 'doc'}...`);
-        // Create a temporary status div for the generate functions
+        _aiShowStepProgress(steps.length, i);
+
+        // Animate mode switch
+        const targetMode = step.target === 'slide' ? 'slide' : 'doc';
+        const modeBadge = document.getElementById('modeBadge');
+        if (modeBadge && S.currentMode !== targetMode) {
+          await _aiSimulateClick(modeBadge);
+          await new Promise(r => setTimeout(r, 300));
+        }
+
         const tempStatus = document.createElement('div');
         tempStatus.className = 'chat-status';
         const topic = step.topic || userText;
         if (step.target === 'slide') {
           window.modeEnter('slide');
-          // Build minimal chat history with just the topic
           const prevHistory = [...S.chatHistory];
           S.chatHistory = [{ role: 'user', content: topic }];
           await doGenerate(tempStatus, wsContext);
@@ -2183,13 +2237,11 @@ async function executeMultiStep(steps, message, userText, wsContext) {
           await doDocGenerate(tempStatus, topic, wsContext);
         }
         tempStatus.remove();
-        // Auto-link to the project created earlier in this multi-step
         if (lastCreatedProjectId) {
           _autoLinkToProject(lastCreatedProjectId);
         }
 
       } else if (step.type === 'link_last') {
-        // Link the most recently created/active file to a project
         const projectName = step.project || '';
         let projectId = lastCreatedProjectId;
         if (!projectId && projectName) {
@@ -2207,14 +2259,21 @@ async function executeMultiStep(steps, message, userText, wsContext) {
     }
   }
 
+  // Mark all steps done
+  _aiShowStepProgress(steps.length, steps.length);
+
   // Final: navigate to workspace projects to show result
   if (lastCreatedProjectId) {
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 400));
     _updateAIActionOverlay('AI ▸ Showing results...');
+    // Animate workspace switch
+    const modeBadge = document.getElementById('modeBadge');
+    if (modeBadge) await _aiSimulateClick(modeBadge);
     window.modeEnter('workspace');
     window.wsSetView('projects');
   }
 
+  _aiHideCursor();
   _updateAIActionOverlay('AI ▸ All steps done ✓');
   setTimeout(_hideAIActionOverlay, 1500);
 }
@@ -2496,6 +2555,194 @@ const ACTION_SCHEMA = {
   wsSetSort:      [{ type: 'string', enum: ['date', 'name', 'type'] }],
 };
 
+// ══════════════════════════════════════════════════════════
+// AI Visual Operations — animate UI actions so users can follow
+// ══════════════════════════════════════════════════════════
+
+/** Show a floating cursor SVG that moves to target elements */
+function _aiEnsureCursor() {
+  let cursor = document.getElementById('ai-cursor');
+  if (!cursor) {
+    cursor = document.createElement('div');
+    cursor.id = 'ai-cursor';
+    // Simple cursor SVG pointing top-left
+    cursor.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 3l14 8-6.5 1.5L11 19z" fill="rgba(200,168,112,0.95)" stroke="#fff" stroke-width="1.5"/></svg>`;
+    cursor.style.left = '-40px';
+    cursor.style.top = '-40px';
+    document.body.appendChild(cursor);
+  }
+  return cursor;
+}
+function _aiHideCursor() {
+  const c = document.getElementById('ai-cursor');
+  if (c) { c.style.opacity = '0'; setTimeout(() => c.remove(), 300); }
+}
+
+/** Move the AI cursor to the center of a DOM element, returns a Promise */
+function _aiMoveCursorTo(el) {
+  return new Promise(resolve => {
+    const cursor = _aiEnsureCursor();
+    cursor.style.opacity = '1';
+    const rect = el.getBoundingClientRect();
+    cursor.style.left = (rect.left + rect.width / 2 - 4) + 'px';
+    cursor.style.top = (rect.top + rect.height / 2 - 4) + 'px';
+    setTimeout(resolve, 450); // wait for transition
+  });
+}
+
+/** Simulate a click on a DOM element with visual ripple */
+async function _aiSimulateClick(el) {
+  if (!el) return;
+  // Scroll into view if needed
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  await new Promise(r => setTimeout(r, 150));
+  // Move cursor to element
+  await _aiMoveCursorTo(el);
+  // Add ripple
+  el.classList.add('ai-click-ripple');
+  await new Promise(r => setTimeout(r, 600));
+  el.classList.remove('ai-click-ripple');
+}
+
+/** Highlight an element briefly */
+async function _aiHighlight(el, duration = 800) {
+  if (!el) return;
+  el.classList.add('ai-target-highlight');
+  await new Promise(r => setTimeout(r, duration));
+  el.classList.remove('ai-target-highlight');
+}
+
+/** Type text into a visible element char by char (visual only — for display) */
+async function _aiSimulateType(targetEl, text, charDelay = 40) {
+  if (!targetEl) return;
+  targetEl.classList.add('ai-typing-active');
+  targetEl.textContent = '';
+  // Add blinking cursor span
+  const cursorSpan = document.createElement('span');
+  cursorSpan.className = 'ai-typing-cursor';
+  targetEl.appendChild(cursorSpan);
+  for (let i = 0; i < text.length; i++) {
+    targetEl.insertBefore(document.createTextNode(text[i]), cursorSpan);
+    await new Promise(r => setTimeout(r, charDelay));
+  }
+  // Remove cursor after a brief pause
+  await new Promise(r => setTimeout(r, 300));
+  cursorSpan.remove();
+  targetEl.classList.remove('ai-typing-active');
+}
+
+/**
+ * Create a temporary "phantom" input field for showing typing animation
+ * when no real input exists on screen (e.g. for wsCreateProject which uses prompt())
+ */
+async function _aiShowPhantomInput(label, value) {
+  const phantom = document.createElement('div');
+  phantom.className = 'ai-phantom-input';
+  Object.assign(phantom.style, {
+    position: 'fixed', top: '50%', left: '50%',
+    transform: 'translate(-50%, -50%)',
+    zIndex: '100002',
+    background: '#1e1e1e', border: '1px solid rgba(200,168,112,0.5)',
+    borderRadius: '12px', padding: '20px 28px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,168,112,0.15)',
+    minWidth: '300px', fontFamily: 'inherit',
+    animation: 'aiOverlayIn 0.25s ease',
+  });
+  phantom.innerHTML = `
+    <div style="font-size:11px;color:#999;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">${label}</div>
+    <div class="ai-phantom-text" style="font-size:16px;color:#e0e0e0;min-height:24px;padding:8px 0;border-bottom:2px solid rgba(200,168,112,0.4);"></div>
+  `;
+  document.body.appendChild(phantom);
+  const textEl = phantom.querySelector('.ai-phantom-text');
+  await _aiSimulateType(textEl, value, 35);
+  await new Promise(r => setTimeout(r, 400));
+  phantom.style.animation = 'aiOverlayOut 0.25s ease forwards';
+  await new Promise(r => setTimeout(r, 260));
+  phantom.remove();
+}
+
+/**
+ * Map function names to their corresponding DOM elements and animate.
+ * Returns the element that was animated (or null if no animation available).
+ */
+async function _aiAnimateBeforeAction(fnName, args) {
+  const mapping = {
+    modeEnter: () => {
+      // Find the mode switch item in the menu, or the mode badge itself
+      const mode = args[0];
+      const badge = document.getElementById('modeBadge');
+      return badge;
+    },
+    wsSetView: () => {
+      // Find workspace nav tab
+      const view = args[0];
+      const tabs = document.querySelectorAll('.ws-nav-tab');
+      for (const tab of tabs) {
+        if (tab.textContent.toLowerCase().includes(view)) return tab;
+      }
+      return null;
+    },
+    wsCreateProject: () => {
+      // Find the "+ New Project" button
+      const btns = document.querySelectorAll('.ws-new-btn.project, button');
+      for (const btn of btns) {
+        if (btn.textContent.includes('New Project')) return btn;
+      }
+      return null;
+    },
+    wsOpenProject: () => {
+      // Find the project card
+      const cards = document.querySelectorAll('.ws-project-card');
+      for (const card of cards) {
+        if (card.textContent.includes(args[0])) return card;
+      }
+      return null;
+    },
+    openWorkspaceItem: () => {
+      // Find file card by index
+      const cards = document.querySelectorAll('.ws-file-card');
+      return cards[args[0]] || null;
+    },
+    openSettings: () => document.querySelector('[onclick*="openSettings"]') || document.querySelector('.settings-btn'),
+    openFileNav: () => document.querySelector('[onclick*="openFileNav"]') || document.querySelector('.file-nav-btn'),
+    wsNewFile: () => {
+      const btn = document.querySelector('.ws-new-btn');
+      return btn;
+    },
+  };
+
+  const finder = mapping[fnName];
+  if (!finder) return null;
+
+  const el = finder();
+  if (!el) return null;
+
+  await _aiSimulateClick(el);
+  return el;
+}
+
+/**
+ * Show step progress dots in the action overlay.
+ */
+function _aiShowStepProgress(totalSteps, currentStep) {
+  const overlay = document.getElementById('ai-action-overlay');
+  if (!overlay) return;
+  let progressEl = overlay.querySelector('.ai-step-progress');
+  if (!progressEl) {
+    progressEl = document.createElement('div');
+    progressEl.className = 'ai-step-progress';
+    overlay.appendChild(progressEl);
+  }
+  progressEl.innerHTML = '';
+  for (let i = 0; i < totalSteps; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'ai-step-dot';
+    if (i < currentStep) dot.classList.add('done');
+    if (i === currentStep) dot.classList.add('active');
+    progressEl.appendChild(dot);
+  }
+}
+
 /* ── AI Action Overlay ── */
 function _showAIActionOverlay(text) {
   // Remove any existing overlay
@@ -2576,9 +2823,86 @@ function _autoChainActions(actions) {
 function executeUIActions(actions, message, opts={}) {
   if (!opts.quiet) actions = _autoChainActions(actions);
   if (message) addMessage(`✦ ${message}`, 'system');
-  // Show Monet-orange overlay (suppress when called from multi-step which has its own overlay)
   const showOverlay = !opts.quiet;
   if (showOverlay) _showAIActionOverlay(`AI operating: ${message || 'Performing actions...'}`);
+
+  // If animated mode (not quiet), use async animated execution
+  if (!opts.quiet) {
+    // Return a promise for animated execution
+    const animatedExec = async () => {
+      _aiEnsureCursor();
+      const results = [];
+      let stepIdx = 0;
+      for (const action of actions) {
+        stepIdx++;
+        const fnName = action.fn;
+        const args = action.args || [];
+        const rule = ALLOWED_ACTIONS[fnName];
+        _updateAIActionOverlay(`AI ▸ ${rule?.label || fnName} (${stepIdx}/${actions.length})`);
+        if (actions.length > 1) _aiShowStepProgress(actions.length, stepIdx - 1);
+
+        if (!rule) {
+          results.push({ fn: fnName, error: 'not allowed' });
+          continue;
+        }
+        // Schema validation
+        const schema = ACTION_SCHEMA[fnName];
+        if (schema) {
+          let valid = true;
+          for (let i = 0; i < schema.length; i++) {
+            const s = schema[i];
+            if (s.optional && args[i] === undefined) continue;
+            if (s.type === 'number' && typeof args[i] !== 'number') { valid = false; break; }
+            if (s.type === 'string' && typeof args[i] !== 'string') { valid = false; break; }
+            if (s.type === 'object' && typeof args[i] !== 'object') { valid = false; break; }
+            if (s.enum && !s.enum.includes(args[i])) { valid = false; break; }
+          }
+          if (!valid) {
+            results.push({ fn: fnName, error: 'invalid args', args });
+            continue;
+          }
+        }
+
+        // Animate
+        await _aiAnimateBeforeAction(fnName, args);
+        if (fnName === 'wsCreateProject' && args[0]) {
+          await _aiShowPhantomInput('Project Name', args[0]);
+        }
+
+        // Execute
+        const fn = window[fnName];
+        if (typeof fn !== 'function') {
+          results.push({ fn: fnName, error: 'not found' });
+          continue;
+        }
+        try {
+          fn(...args);
+          results.push({ fn: fnName, ok: true });
+        } catch (e) {
+          results.push({ fn: fnName, error: e.message });
+        }
+
+        // Pause between actions
+        if (stepIdx < actions.length) await new Promise(r => setTimeout(r, 500));
+      }
+
+      _aiHideCursor();
+      if (actions.length > 1) _aiShowStepProgress(actions.length, actions.length);
+      const failCount = results.filter(r => r.error).length;
+      if (failCount > 0) {
+        _updateAIActionOverlay(`AI ▸ Done (${failCount} failed)`);
+      } else {
+        _updateAIActionOverlay('AI ▸ Done ✓');
+      }
+      setTimeout(_hideAIActionOverlay, 1200);
+      return results;
+    };
+
+    // Execute asynchronously — return results via promise
+    return animatedExec();
+  }
+
+  // Quiet mode — synchronous execution (used by multi-step which handles its own animation)
   const results = [];
   let stepIdx = 0;
   for (const action of actions) {
@@ -2586,15 +2910,11 @@ function executeUIActions(actions, message, opts={}) {
     const fnName = action.fn;
     const args = action.args || [];
     const rule = ALLOWED_ACTIONS[fnName];
-    // Update overlay with current step
     _updateAIActionOverlay(`AI ▸ ${rule?.label || fnName} (${stepIdx}/${actions.length})`);
-    // Whitelist check
     if (!rule) {
-      console.warn(`[AI UI] Blocked non-whitelisted action: ${fnName}`);
       results.push({ fn: fnName, error: 'not allowed' });
       continue;
     }
-    // Schema validation (lightweight)
     const schema = ACTION_SCHEMA[fnName];
     if (schema) {
       let valid = true;
@@ -2607,15 +2927,12 @@ function executeUIActions(actions, message, opts={}) {
         if (s.enum && !s.enum.includes(args[i])) { valid = false; break; }
       }
       if (!valid) {
-        console.warn(`[AI UI] Invalid args for ${fnName}:`, args);
         results.push({ fn: fnName, error: 'invalid args', args });
         continue;
       }
     }
-    // Execute
     const fn = window[fnName];
     if (typeof fn !== 'function') {
-      console.warn(`[AI UI] Function not found on window: ${fnName}`);
       results.push({ fn: fnName, error: 'not found' });
       continue;
     }
@@ -2623,11 +2940,9 @@ function executeUIActions(actions, message, opts={}) {
       fn(...args);
       results.push({ fn: fnName, ok: true });
     } catch (e) {
-      console.error(`[AI UI] Error executing ${fnName}:`, e);
       results.push({ fn: fnName, error: e.message });
     }
   }
-  // Done — show completion briefly then hide
   if (showOverlay) {
     const failCount = results.filter(r => r.error).length;
     if (failCount > 0) {

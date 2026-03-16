@@ -144,6 +144,41 @@ export function autoSave(){
     saves[saveKey]=JSON.stringify({deck:S.currentDeck,preset:S.currentPreset});
     localStorage.setItem('sloth_space_saves',JSON.stringify(saves));
   }catch(e){console.warn('Auto-save failed:',e);}
+
+  // ── Also save slides to workspace storage (same as doc/sheet) ──
+  if(window.wsLoad && window.wsSave){
+    try{
+      const files=window.wsLoad();
+      // Use existing workspace file ID or generate one
+      const deckId=S.currentDeck._wsId || S._wsCurrentFileId;
+      const wsSlide={
+        id: deckId || ('ws_slide_'+Date.now().toString(36)),
+        type:'slides',
+        title:S.currentDeck.title||'Untitled',
+        created:S.currentDeck.created||new Date().toISOString(),
+        updated:new Date().toISOString(),
+        content:{ slides:S.currentDeck.slides, preset:S.currentPreset, locale:S.currentDeck.locale }
+      };
+      const existing=files.findIndex(f=>f.id===wsSlide.id);
+      if(existing>=0){
+        files[existing]=wsSlide;
+      }else{
+        // Try to find by title match (migration from old saves)
+        const byTitle=files.findIndex(f=>f.type==='slides'&&f.title===wsSlide.title);
+        if(byTitle>=0){
+          wsSlide.id=files[byTitle].id;
+          files[byTitle]=wsSlide;
+        }else{
+          files.push(wsSlide);
+        }
+      }
+      window.wsSave(files);
+      // Track the workspace file ID for future saves
+      if(!S._wsCurrentFileId) S._wsCurrentFileId=wsSlide.id;
+      if(!S.currentDeck._wsId) S.currentDeck._wsId=wsSlide.id;
+    }catch(e){console.warn('Slide workspace save failed:',e);}
+  }
+
   // Trigger cloud sync (debounced)
   _scheduleCloudSync();
 }
