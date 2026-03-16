@@ -284,7 +284,15 @@ export function initKeys(){
     S.dragCounter=0;
     document.getElementById('dropOverlay').classList.remove('show');
     if(e.dataTransfer.files.length>0){
-      handleImageFiles(e.dataTransfer.files);
+      // Split: images → staged images, all files → bench
+      const files=e.dataTransfer.files;
+      const imageFiles=Array.from(files).filter(f=>f.type.startsWith('image/'));
+      if(imageFiles.length>0){
+        // Create a mock FileList-like array for handleImageFiles
+        handleImageFiles(imageFiles);
+      }
+      // Send ALL files (including images) to bench if bench is available
+      if(window.benchAddFiles) window.benchAddFiles(files);
     }
   });
 

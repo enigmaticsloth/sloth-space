@@ -442,11 +442,17 @@
 <div class="mode-tab-bar" id="modeTabBar" style="display:none;">
   <div class="mtb-row1">
     <div class="mtb-tabs" id="modeTabList"></div>
-    <button class="mtb-new" id="mtbNewBtn" onclick="window.modeTabNew()" title="New tab">+</button>
+    <button class="mtb-new" id="mtbNewBtn" onclick="window.modeTabNew()" title="New slide tab" style="display:none">+</button>
+    <div class="mtb-spacer"></div>
+    <div class="mtb-row1-actions" id="mtbRow1Actions">
+      <button class="mtb-action-btn" onclick="window.modeSave()" title="Save locally">Save</button>
+      <button class="mtb-action-btn primary" onclick="window.modeSaveCloud()" title="Save to cloud">Save to Cloud</button>
+    </div>
   </div>
   <div class="mtb-row2" id="mtbRow2">
     <input type="text" class="mtb-filename" id="mtbFilename" placeholder="Untitled" spellcheck="false">
     <div class="mtb-presets" id="mtbPresets"></div>
+    <div class="mtb-row2-project" id="mtbProjectArea"></div>
     <div class="mtb-spacer"></div>
     <div class="mtb-exports" id="mtbExports"></div>
   </div>
@@ -458,9 +464,7 @@
     <div class="deck-name-bar" id="modeNameBar">
       <input type="text" id="deckNameInput" class="deck-name-input" placeholder="Untitled Presentation" spellcheck="false">
       <div class="deck-actions" id="modeActions">
-        <button class="deck-action-btn" onclick="modeNew()">+ New</button>
-        <button class="deck-action-btn" onclick="modeImport()">Import</button>
-        <button class="deck-action-btn primary" onclick="modeSaveCloud()">Save to Cloud</button>
+        <button class="deck-action-btn" id="btnModeNew" onclick="modeNew()" style="display:none">+ New Slide</button>
       </div>
     </div>
     <div class="slide-frame" id="slideCanvas"></div>
@@ -521,6 +525,7 @@
         <div class="insert-menu-title">Insert</div>
         <div class="insert-menu-item" onclick="triggerLocalImageInsert()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Image (file)</div>
         <div class="insert-menu-item" onclick="triggerUrlImageInsert()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Image (URL)</div>
+        <div class="insert-menu-item" onclick="window.benchTriggerFileInput();hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> File (to Bench)</div>
         <div class="insert-menu-item tb-doc-only" onclick="docInsertTablePrompt();hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Table</div>
         <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: content]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg> Content</div>
         <div class="insert-menu-item tb-slide-only" onclick="insertTag('[layout: two-column]');hideInsertMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg> Two Column</div>
@@ -603,6 +608,23 @@
     </div>
     <div class="toolbar-spacer"></div>
   </div>
+  <!-- Bench: context staging area -->
+  <div class="bench-wrapper" id="benchWrapper">
+    <div class="bench-header">
+      <span class="bench-label">📂 Bench</span>
+      <span class="bench-count" id="benchCount"></span>
+      <div class="bench-header-spacer"></div>
+      <button class="bench-add-btn" onclick="window.benchTriggerFileInput()" title="Add file to Bench">+ Add</button>
+      <button class="bench-clear-btn" id="benchClearBtn" onclick="window.benchClear()" title="Clear all" style="display:none;">Clear</button>
+    </div>
+    <div class="bench-area" id="benchArea">
+      <div class="bench-empty" onclick="window.benchTriggerFileInput()">
+        <span class="bench-empty-icon">📂</span>
+        <span>Drop files here or click to add — AI will read them as context</span>
+      </div>
+    </div>
+    <input type="file" id="benchFileInput" multiple accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.tsv,.sloth,.json,.png,.jpg,.jpeg,.gif,.webp,.svg,.txt,.md,.html" style="display:none;" onchange="window.benchHandleFileInput(this)">
+  </div>
   <div class="img-staging" id="imgStaging">
     <span class="img-staging-label">📎 Attached:</span>
   </div>
@@ -618,9 +640,9 @@
 <!-- Drag-drop overlay -->
 <div class="drop-overlay" id="dropOverlay">
   <div class="drop-overlay-inner">
-    <div class="drop-icon">🖼️</div>
-    <div class="drop-text">Drop images here</div>
-    <div class="drop-hint">They'll be staged for your next command</div>
+    <div class="drop-icon">📂</div>
+    <div class="drop-text">Drop files here</div>
+    <div class="drop-hint">Files go to Bench · Images also staged for insertion</div>
   </div>
 </div>
 
@@ -638,6 +660,6 @@ if(location.protocol==='file:'){
   document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
 }
 </script>
-<script type="module" src="js/app.js?v=20260317ppp"></script>
+<script type="module" src="js/app.js?v=20260317ttt"></script>
 </body>
 </html>

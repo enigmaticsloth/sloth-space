@@ -1191,14 +1191,18 @@ function updateModeNameBar(mode){
 }
 
 function modeNew(){
+  // In slide mode: add a blank slide to the current deck
   if(S.currentMode==='slide'){
-    window.newDeck();
-  } else if(S.currentMode==='doc'){
-    window.docNewDocument();
-  } else if(S.currentMode==='workspace'){
-    // In workspace, open new slide deck by default
-    window.newDeck();
-    switchToMode('slide');
+    if(!S.currentDeck){
+      // No deck yet — start a fresh one
+      if(window.newDeck) window.newDeck();
+      return;
+    }
+    const blankSlide={layout:'title', content:{title:'', subtitle:''}, notes:'', style_overrides:{}};
+    S.currentDeck.slides.push(blankSlide);
+    S.currentSlide=S.currentDeck.slides.length-1;
+    window.addMessage('Added blank slide. Use AI to generate content!','system');
+    window.renderApp();
   }
 }
 
@@ -1210,6 +1214,12 @@ function modeImport(){
   } else if(S.currentMode==='workspace'){
     window.loadDeck();
   }
+}
+
+function modeSave(){
+  // Save as .sloth file locally (download)
+  if(window.saveSloth) window.saveSloth();
+  else window.addMessage('Save not available for this mode yet.','system');
 }
 
 function modeSaveCloud(){
@@ -1291,30 +1301,35 @@ function updateTopbarForMode(mode){
     ).join('');
   }
 
+  // "+New Slide" button: only for slide mode
+  const btnNew=document.getElementById('btnModeNew');
+  if(btnNew) btnNew.style.display=(mode==='slide')?'':'none';
+
+  // "+" tab bar button: only for slide mode
+  const mtbNew=document.getElementById('mtbNewBtn');
+  if(mtbNew) mtbNew.style.display=(mode==='slide')?'':'none';
+
   // Sync tab bar filename input
   _syncTabBarFilename(mode);
 
-  // Project badge in topbar: show for editing modes (slide/doc/sheet), hide for workspace
-  let projArea=document.getElementById('topbarProjectArea');
-  if(!projArea){
-    // Create the project area in topbar-left after mode badge
-    const topLeft=document.querySelector('.topbar-left');
-    if(topLeft){
-      projArea=document.createElement('div');
-      projArea.id='topbarProjectArea';
-      projArea.style.cssText='display:inline-flex;align-items:center;gap:4px;margin-left:4px;';
-      topLeft.appendChild(projArea);
-    }
-  }
-  if(projArea){
+  // Project badge: render into tab bar row2 (mtbProjectArea)
+  const mtbProj=document.getElementById('mtbProjectArea');
+  if(mtbProj){
     if(mode==='workspace'||!window.wsRenderTopbarProjectInfo){
-      projArea.style.display='none';
-      projArea.innerHTML='';
+      mtbProj.style.display='none';
+      mtbProj.innerHTML='';
     } else {
-      projArea.style.display='inline-flex';
-      projArea.innerHTML=window.wsRenderTopbarProjectInfo();
+      mtbProj.style.display='flex';
+      mtbProj.innerHTML=window.wsRenderTopbarProjectInfo();
     }
   }
+  // Also hide old topbar project area if it exists
+  const oldProj=document.getElementById('topbarProjectArea');
+  if(oldProj){ oldProj.style.display='none'; oldProj.innerHTML=''; }
+
+  // Save buttons: hide for workspace (no file to save)
+  const row1Actions=document.getElementById('mtbRow1Actions');
+  if(row1Actions) row1Actions.style.display=(mode==='workspace')?'none':'flex';
 }
 
 function modeExportPDF(){
@@ -2358,6 +2373,7 @@ export {
   updateModeNameBar,
   modeNew,
   modeImport,
+  modeSave,
   modeSaveCloud,
   toggleChatPanel,
   updateToolbarForMode,

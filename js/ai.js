@@ -363,6 +363,14 @@ INTENTS:
   - "close the Budget Report tab" (tabId:5) → {"intent":"ui_action","actions":[{"fn":"modeTabClose","args":[5]}],"message":"Closing Budget Report tab"}
   - "open new slide" → {"intent":"ui_action","actions":[{"fn":"modeTabNew","args":[]},{"fn":"ntpPickMode","args":["slide"]}],"message":"Opening new Slide tab"}
 
+  BENCH OPERATIONS — the Bench is a context staging area where users place reference files for AI:
+  - benchRemove(id) — remove a specific file from the Bench
+  - benchClear() — clear all files from the Bench
+  - When the user says "use bench data" or "from bench files", the AI already has access to Bench content as context. Just proceed with generation.
+  - When the user says "use project data AND bench data", both are already injected as context. Just proceed.
+  - "clear the bench" → {"intent":"ui_action","actions":[{"fn":"benchClear","args":[]}],"message":"Clearing the Bench"}
+  - "remove X from bench" → {"intent":"ui_action","actions":[{"fn":"benchRemove","args":[id]}],"message":"Removing X from Bench"}
+
   CRITICAL DISTINCTION — "create project" vs "create document":
   - "create a PROJECT" → ui_action (wsCreateProject). A project is an organizational container, NOT content.
   - "create/write a DOCUMENT/FILE/REPORT/SLIDES" → generate. This is content creation.
@@ -1537,6 +1545,12 @@ ${ABOUT_TEXTS.sheet}
 `;
   }
 
+  // ── Inject Bench context if any files are staged ──
+  if (window.benchGetContext) {
+    const benchCtx = window.benchGetContext();
+    if (benchCtx) wsContext += benchCtx;
+  }
+
   // Block user interaction during AI operations
   _showAIBlocker();
 
@@ -1629,6 +1643,11 @@ ${ABOUT_TEXTS.sheet}
     if(S.modeTabs.length>0){
       const tabList=S.modeTabs.map(t=>`[tabId:${t.id}] "${t.title}" (${t.mode})${t.id===S.activeTabId?' *active*':''}`).join(', ');
       ctx.push('Open tabs: '+tabList+'. Use modeTabSwitch(tabId) to switch, modeTabClose(tabId) to close, modeTabCreate(mode) to open new tab.');
+    }
+    // Bench context — list files on the bench so LLM knows what's available
+    if(S.bench.length>0){
+      const benchList=S.bench.map(b=>`[benchId:${b.id}] "${b.name}" (${b.type})`).join(', ');
+      ctx.push('Bench files: '+benchList+'. Bench content is already injected as context. Use benchRemove(id) to remove, benchClear() to clear.');
     }
     // Recent action memory — so router can resolve "that file", "the report I just made", etc.
     const recentActions=S.chatHistory.slice(-8).filter(m=>m.role==='assistant'&&m.content.startsWith('['));
@@ -2650,6 +2669,8 @@ const ALLOWED_ACTIONS = {
   modeTabClose:       { confirm: false, label: 'Close tab' },
   modeTabNew:         { confirm: false, label: 'Open new tab page' },
   ntpPickMode:        { confirm: false, label: 'Pick mode on new tab page' },
+  benchRemove:        { confirm: false, label: 'Remove file from Bench' },
+  benchClear:         { confirm: true,  label: 'Clear all Bench files' },
 };
 
 // Parameter validation schemas (lightweight — type checks only)
@@ -2677,6 +2698,9 @@ const ACTION_SCHEMA = {
   modeTabClose:   [{ type: 'number' }],
   modeTabNew:     [],
   ntpPickMode:    [{ type: 'string', enum: ['slide', 'doc', 'sheet', 'workspace'] }],
+  // Bench operations
+  benchRemove:    [{ type: 'number' }],
+  benchClear:     [],
 };
 
 // ══════════════════════════════════════════════════════════
@@ -2846,6 +2870,8 @@ async function _aiAnimateBeforeAction(fnName, args) {
     modeTabClose:       { icon: _svgI('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'), label: () => { const t=S.modeTabs.find(t=>t.id===args[0]); return `Closing tab "${t?.title||'unknown'}"` } },
     modeTabNew:         { icon: _svgI('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'), label: () => `Opening new tab` },
     ntpPickMode:        { icon: _svgI('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'), label: () => `Selecting ${args[0]}` },
+    benchRemove:        { icon: _svgI('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'), label: () => { const b=S.bench.find(b=>b.id===args[0]); return `Removing "${b?.name||'file'}" from Bench` } },
+    benchClear:         { icon: _svgI('<path d="M3 6h18"/><path d="M8 6V4h8v2"/>'), label: () => `Clearing Bench` },
   };
 
   // Try to find the actual DOM element to animate
@@ -2907,6 +2933,11 @@ async function _aiAnimateBeforeAction(fnName, args) {
     const idx = modeMap[args[0]];
     return idx !== undefined ? modes[idx] : null;
   };
+  elFinders.benchRemove = () => {
+    const card = document.querySelector(`.bench-card[data-benchid="${args[0]}"]`);
+    return card ? card.querySelector('.bench-card-del') : null;
+  };
+  elFinders.benchClear = () => document.getElementById('benchClearBtn');
 
   const finder = elFinders[fnName];
   const el = finder ? finder() : null;
@@ -3293,6 +3324,17 @@ function resolveActionRefs(actions) {
         const name = a.args[1].toLowerCase();
         const p = projects.find(p => (p.name || '').toLowerCase().includes(name));
         if (p) resolved.args[1] = p.id;
+      }
+    }
+
+    // benchRemove: if arg is string (filename), resolve to bench id
+    if (a.fn === 'benchRemove' && typeof a.args[0] === 'string') {
+      const name = a.args[0].toLowerCase();
+      const item = S.bench.find(b => (b.name || '').toLowerCase().includes(name));
+      if (item) resolved.args[0] = item.id;
+      else {
+        console.warn(`[AI UI] Bench file not found: "${a.args[0]}"`);
+        return null;
       }
     }
 

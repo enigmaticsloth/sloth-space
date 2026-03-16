@@ -1,0 +1,429 @@
+import { S } from './state.js';
+
+// ═══════════════════════════════════════════
+// BENCH — Context staging area for AI
+// ═══════════════════════════════════════════
+// Users drop/import files here. AI reads everything on the Bench
+// as context when generating slides, docs, or sheets.
+
+// ── File type detection ──
+const _BENCH_EXT_MAP = {
+  pdf:'pdf', docx:'docx', doc:'docx',
+  pptx:'pptx', ppt:'pptx',
+  xlsx:'xlsx', xls:'xlsx', csv:'csv', tsv:'csv',
+  sloth:'sloth', json:'sloth',
+  png:'image', jpg:'image', jpeg:'image', gif:'image', webp:'image', svg:'image',
+  txt:'text', md:'text', html:'text'
+};
+
+const _BENCH_ICONS = {
+  pdf:'📕', docx:'📄', pptx:'📊', xlsx:'📗', csv:'📋',
+  sloth:'🦥', image:'🖼️', text:'📝', other:'📎'
+};
+
+const _BENCH_COLORS = {
+  pdf:'#C45C4A', docx:'#4A6FA5', pptx:'#C4783A', xlsx:'#5A8A5A', csv:'#8B7BA8',
+  sloth:'#A08060', image:'#7886A5', text:'#888', other:'#666'
+};
+
+const _BENCH_ACCEPT = '.pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.tsv,.sloth,.json,.png,.jpg,.jpeg,.gif,.webp,.svg,.txt,.md,.html';
+
+function _benchFileType(name) {
+  const ext = (name || '').split('.').pop().toLowerCase();
+  return _BENCH_EXT_MAP[ext] || 'other';
+}
+
+function _sizeStr(bytes) {
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'KB';
+  return (bytes / 1048576).toFixed(1) + 'MB';
+}
+
+// ── Text extraction from various file types ──
+async function _extractText(file, type) {
+  try {
+    if (type === 'text' || type === 'csv') {
+      return await file.text();
+    }
+    if (type === 'sloth') {
+      const raw = await file.text();
+      try {
+        const j = JSON.parse(raw);
+        // Extract meaningful content from sloth format
+        if (j.slides) {
+          return j.slides.map((s, i) => `[Slide ${i + 1}] ${s.title || ''}\n${_flattenSlideText(s)}`).join('\n\n');
+        }
+        if (j.blocks) {
+          return j.blocks.map(b => b.content || b.text || '').join('\n\n');
+        }
+        return JSON.stringify(j, null, 2).slice(0, 8000);
+      } catch { return raw.slice(0, 8000); }
+    }
+    if (type === 'docx') return await _extractDocxText(file);
+    if (type === 'pptx') return await _extractPptxText(file);
+    if (type === 'xlsx') return await _extractXlsxText(file);
+    if (type === 'pdf') return `[PDF file: ${file.name} — ${_sizeStr(file.size)}. PDF text extraction pending. File is available as context reference.]`;
+    if (type === 'image') return `[Image: ${file.name}, ${_sizeStr(file.size)}]`;
+    return await file.text().then(t => t.slice(0, 8000));
+  } catch (e) {
+    return `[Error reading ${file.name}: ${e.message}]`;
+  }
+}
+
+function _flattenSlideText(slide) {
+  const parts = [];
+  if (slide.content) parts.push(slide.content);
+  if (slide.regions) {
+    for (const r of slide.regions) {
+      if (r.text) parts.push(r.text);
+      if (r.items) parts.push(r.items.join(', '));
+    }
+  }
+  return parts.join('\n');
+}
+
+// Extract text from .docx via JSZip
+async function _extractDocxText(file) {
+  if (typeof JSZip === 'undefined') return `[DOCX: ${file.name} — JSZip not loaded]`;
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const xml = await zip.file('word/document.xml')?.async('string');
+    if (!xml) return '[Empty DOCX]';
+    // Extract <w:t> text nodes
+    const texts = [];
+    xml.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, (_, t) => { texts.push(t); });
+    // Group by paragraphs (rough heuristic: split on </w:p>)
+    const paragraphs = xml.split('</w:p>').map(chunk => {
+      const ts = [];
+      chunk.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, (_, t) => { ts.push(t); });
+      return ts.join('');
+    }).filter(Boolean);
+    return paragraphs.join('\n\n').slice(0, 12000) || texts.join(' ').slice(0, 12000);
+  } catch (e) { return `[DOCX parse error: ${e.message}]`; }
+}
+
+// Extract text from .pptx via JSZip
+async function _extractPptxText(file) {
+  if (typeof JSZip === 'undefined') return `[PPTX: ${file.name} — JSZip not loaded]`;
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const slideFiles = Object.keys(zip.files).filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f)).sort();
+    const results = [];
+    for (let i = 0; i < slideFiles.length; i++) {
+      const xml = await zip.file(slideFiles[i])?.async('string');
+      if (!xml) continue;
+      const texts = [];
+      xml.replace(/<a:t>([^<]*)<\/a:t>/g, (_, t) => { texts.push(t); });
+      results.push(`[Slide ${i + 1}] ${texts.join(' ')}`);
+    }
+    return results.join('\n\n').slice(0, 12000);
+  } catch (e) { return `[PPTX parse error: ${e.message}]`; }
+}
+
+// Extract text from .xlsx via JSZip
+async function _extractXlsxText(file) {
+  if (typeof JSZip === 'undefined') return `[XLSX: ${file.name} — JSZip not loaded]`;
+  try {
+    const zip = await JSZip.loadAsync(file);
+    // Read shared strings
+    const ssXml = await zip.file('xl/sharedStrings.xml')?.async('string');
+    const strings = [];
+    if (ssXml) ssXml.replace(/<t[^>]*>([^<]*)<\/t>/g, (_, t) => { strings.push(t); });
+    // Read first sheet
+    const sheetXml = await zip.file('xl/worksheets/sheet1.xml')?.async('string');
+    if (!sheetXml) return strings.length ? `Shared strings: ${strings.join(', ')}` : '[Empty XLSX]';
+    const rows = [];
+    sheetXml.replace(/<row[^>]*>([\s\S]*?)<\/row>/g, (_, rowContent) => {
+      const cells = [];
+      rowContent.replace(/<c[^>]*(?:t="s"[^>]*)?>[\s\S]*?<v>(\d+)<\/v>/g, (_, idx) => {
+        cells.push(strings[parseInt(idx)] || idx);
+      });
+      rowContent.replace(/<c[^>]*(?!t="s")[^>]*>[\s\S]*?<v>([^<]+)<\/v>/g, (_, val) => {
+        cells.push(val);
+      });
+      if (cells.length) rows.push(cells.join('\t'));
+    });
+    return rows.join('\n').slice(0, 12000) || `[XLSX with ${strings.length} strings]`;
+  } catch (e) { return `[XLSX parse error: ${e.message}]`; }
+}
+
+// ── Size limits ──
+const _BENCH_IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8 MB limit for images
+
+// ── localStorage persistence ──
+const _BENCH_STORAGE_KEY = 'sloth_bench';
+
+function _benchSave() {
+  try {
+    // Save bench items (skip dataUrl for images to keep storage small)
+    const stripped = S.bench.map(b => ({
+      id: b.id, name: b.name, type: b.type, size: b.size,
+      extractedText: b.extractedText, addedAt: b.addedAt,
+      // Store small thumbnails only (< 200KB dataUrl), skip large ones
+      dataUrl: (b.dataUrl && b.dataUrl.length < 200000) ? b.dataUrl : null
+    }));
+    localStorage.setItem(_BENCH_STORAGE_KEY, JSON.stringify({
+      items: stripped,
+      idCounter: S._benchIdCounter
+    }));
+  } catch (e) {
+    console.warn('[Bench] localStorage save failed:', e.message);
+  }
+}
+
+function _benchLoad() {
+  try {
+    const raw = localStorage.getItem(_BENCH_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.items && Array.isArray(data.items)) {
+      S.bench = data.items;
+      S._benchIdCounter = data.idCounter || data.items.length;
+    }
+  } catch (e) {
+    console.warn('[Bench] localStorage load failed:', e.message);
+  }
+}
+
+// ── Core bench operations ──
+
+async function benchAddFile(file) {
+  const type = _benchFileType(file.name);
+
+  // Enforce image size limit
+  if (type === 'image' && file.size > _BENCH_IMAGE_MAX_BYTES) {
+    const maxMB = (_BENCH_IMAGE_MAX_BYTES / (1024 * 1024)).toFixed(0);
+    if (window.addMessage) {
+      window.addMessage(`Image "${file.name}" (${_sizeStr(file.size)}) exceeds the ${maxMB}MB limit. Please use a smaller image.`, 'system');
+    }
+    return null;
+  }
+
+  const extractedText = await _extractText(file, type);
+
+  // For images, create data URL thumbnail (resized to save space)
+  let dataUrl = null;
+  if (type === 'image') {
+    dataUrl = await _createThumbnail(file);
+  }
+
+  const item = {
+    id: ++S._benchIdCounter,
+    name: file.name,
+    type,
+    size: file.size,
+    dataUrl,
+    extractedText,
+    addedAt: new Date().toISOString()
+  };
+
+  S.bench.push(item);
+  _benchSave();
+  renderBench();
+  return item;
+}
+
+// Create a resized thumbnail dataUrl to keep localStorage small
+async function _createThumbnail(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        // Resize to max 200px for thumbnail
+        const maxDim = 200;
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = () => resolve(reader.result); // fallback to full dataUrl
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function benchAddFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  const results = await Promise.all(Array.from(fileList).map(f => benchAddFile(f)));
+  return results.filter(Boolean);
+}
+
+function benchRemove(id) {
+  S.bench = S.bench.filter(b => b.id !== id);
+  _benchSave();
+  renderBench();
+}
+
+function benchClear() {
+  S.bench = [];
+  S._benchIdCounter = 0;
+  _benchSave();
+  renderBench();
+}
+
+// Import bench item to workspace
+function benchImportToWs(id) {
+  const item = S.bench.find(b => b.id === id);
+  if (!item) return;
+  // Create a workspace-compatible file entry
+  if (window.wsImportBenchItem) {
+    window.wsImportBenchItem(item);
+    window.addMessage(`Imported "${item.name}" to Workspace.`, 'system');
+  } else {
+    window.addMessage('Workspace import not available yet.', 'system');
+  }
+}
+
+// ── AI context getter ──
+function benchGetContext() {
+  if (S.bench.length === 0) return '';
+  const parts = S.bench.map(b =>
+    `--- [Bench: ${b.name} (${b.type}, ${_sizeStr(b.size)})] ---\n${b.extractedText}`
+  );
+  return '\n\n## BENCH CONTEXT\nThe user has placed the following files on the Bench as reference material. Use this data when the user asks you to generate content from Bench files.\n\n' + parts.join('\n\n');
+}
+
+function benchGetSummary() {
+  if (S.bench.length === 0) return '';
+  return S.bench.map(b => `"${b.name}" (${b.type})`).join(', ');
+}
+
+// ── Render ──
+function renderBench() {
+  const area = document.getElementById('benchArea');
+  if (!area) return;
+
+  const items = S.bench;
+  const wrapper = document.getElementById('benchWrapper');
+  const countEl = document.getElementById('benchCount');
+  const clearBtn = document.getElementById('benchClearBtn');
+
+  // Update header
+  if (countEl) countEl.textContent = items.length > 0 ? `${items.length} file${items.length > 1 ? 's' : ''}` : '';
+  if (clearBtn) clearBtn.style.display = items.length > 0 ? '' : 'none';
+
+  if (items.length === 0) {
+    area.innerHTML = `<div class="bench-empty" onclick="window.benchTriggerFileInput()">
+      <span class="bench-empty-icon">📂</span>
+      <div class="bench-empty-text">
+        <span class="bench-empty-title">Drop or import reference files here</span>
+        <span class="bench-empty-desc">PDF, Word, PPT, Excel, images, .sloth — AI reads everything on the Bench to generate your slides, docs, and sheets.</span>
+      </div>
+    </div>`;
+    if (wrapper) wrapper.classList.remove('has-items');
+    return;
+  }
+
+  if (wrapper) wrapper.classList.add('has-items');
+
+  area.innerHTML = items.map(item => {
+    const icon = _BENCH_ICONS[item.type] || '📎';
+    const color = _BENCH_COLORS[item.type] || '#666';
+    const thumb = item.dataUrl
+      ? `<img class="bench-card-thumb" src="${item.dataUrl}" alt="${_escHtml(item.name)}">`
+      : `<div class="bench-card-icon" style="color:${color}">${icon}</div>`;
+    return `<div class="bench-card" data-benchid="${item.id}">
+      ${thumb}
+      <div class="bench-card-info">
+        <div class="bench-card-name" title="${_escHtml(item.name)}">${_escHtml(item.name)}</div>
+        <div class="bench-card-meta">${item.type.toUpperCase()} · ${_sizeStr(item.size)}</div>
+      </div>
+      <button class="bench-card-action" onclick="event.stopPropagation();window.benchImportToWs(${item.id})" title="Import to Workspace">↗</button>
+      <button class="bench-card-del" onclick="event.stopPropagation();window.benchRemove(${item.id})" title="Remove from Bench">×</button>
+    </div>`;
+  }).join('');
+}
+
+function _escHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── File input trigger ──
+function benchTriggerFileInput() {
+  const inp = document.getElementById('benchFileInput');
+  if (inp) inp.click();
+}
+
+function benchHandleFileInput(input) {
+  if (input.files && input.files.length) {
+    benchAddFiles(input.files);
+  }
+  input.value = '';
+}
+
+// ── Drag-drop helpers (called from keys.js) ──
+function benchHandleDrop(files) {
+  // Filter: images go to staged images (existing behavior), everything else goes to bench
+  const imageFiles = [];
+  const benchFiles = [];
+  Array.from(files).forEach(f => {
+    const type = _benchFileType(f.name);
+    if (type === 'image') {
+      // Images go to both: staged images (for slide insertion) AND bench
+      imageFiles.push(f);
+      benchFiles.push(f);
+    } else {
+      benchFiles.push(f);
+    }
+  });
+  // Add non-image files to bench
+  if (benchFiles.length) benchAddFiles(benchFiles);
+  // Return image files for existing image staging behavior
+  return imageFiles;
+}
+
+// ── Initialize bench area drag highlights ──
+function initBench() {
+  const wrapper = document.getElementById('benchWrapper');
+  if (!wrapper) return;
+
+  // Restore persisted bench items from localStorage
+  _benchLoad();
+
+  wrapper.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    wrapper.classList.add('bench-dragover');
+  });
+  wrapper.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    wrapper.classList.remove('bench-dragover');
+  });
+  wrapper.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    wrapper.classList.remove('bench-dragover');
+    S.dragCounter = 0;
+    document.getElementById('dropOverlay')?.classList.remove('show');
+    if (e.dataTransfer.files.length) {
+      benchAddFiles(e.dataTransfer.files);
+    }
+  });
+
+  renderBench();
+}
+
+export {
+  benchAddFile,
+  benchAddFiles,
+  benchRemove,
+  benchClear,
+  benchImportToWs,
+  benchGetContext,
+  benchGetSummary,
+  renderBench,
+  benchTriggerFileInput,
+  benchHandleFileInput,
+  benchHandleDrop,
+  initBench,
+  _BENCH_ACCEPT
+};

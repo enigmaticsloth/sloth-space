@@ -235,6 +235,10 @@ export const S = {
     autoSaveTimer: null,
   },
 
+  // ── Bench (context staging area for AI) ──
+  bench: [],             // [{id, name, type, size, dataUrl, extractedText, addedAt}]
+  _benchIdCounter: 0,
+
   // ── Mode Tabs (browser-like tab bar) ──
   modeTabs: [],          // [{id, mode, title, snapshot:{...mode-specific state}}]
   activeTabId: null,     // id of currently active tab

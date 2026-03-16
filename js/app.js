@@ -5,15 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317ppp';
-import * as slide from './slide.js?v=20260317ppp';
-import * as doc from './doc.js?v=20260317ppp';
-import * as workspace from './workspace.js?v=20260317ppp';
-import * as ai from './ai.js?v=20260317ppp';
-import * as ui from './ui.js?v=20260317ppp';
-import * as storage from './storage.js?v=20260317ppp';
-import * as keys from './keys.js?v=20260317ppp';
-import * as sheet from './sheet.js?v=20260317ppp';
+import { S } from './state.js?v=20260317ttt';
+import * as slide from './slide.js?v=20260317ttt';
+import * as doc from './doc.js?v=20260317ttt';
+import * as workspace from './workspace.js?v=20260317ttt';
+import * as ai from './ai.js?v=20260317ttt';
+import * as ui from './ui.js?v=20260317ttt';
+import * as storage from './storage.js?v=20260317ttt';
+import * as keys from './keys.js?v=20260317ttt';
+import * as sheet from './sheet.js?v=20260317ttt';
+import * as bench from './bench.js?v=20260317ttt';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -26,6 +27,7 @@ const allExports = {
   ...ui,
   ...storage,
   ...keys,
+  ...bench,
 };
 
 for (const [name, fn] of Object.entries(allExports)) {
@@ -45,6 +47,9 @@ window.applyPreset = window.setPreset;
 slide.initToolbar();
 slide.initFreeformCanvas();
 keys.initKeys();
+
+// 1b. Init bench (context staging area)
+bench.initBench();
 
 // 2. Check welcome screen / enter saved mode (calls loadConfig internally)
 ui.checkWelcomeScreen();
