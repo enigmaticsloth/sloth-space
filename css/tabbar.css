@@ -1,0 +1,61 @@
+/* ─── Mode Tab Bar (two-row) ─── */
+.mode-tab-bar { display:flex; flex-direction:column; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; overflow:hidden; }
+.mtb-row { display:flex; align-items:center; padding:0 4px; gap:0; }
+.mtb-row1 { height:30px; }
+.mtb-row2 { height:24px; border-top:1px solid rgba(255,255,255,0.04); }
+.mtb-tabs { display:flex; align-items:stretch; min-width:0; overflow-x:auto; gap:0; height:100%; flex-shrink:1; }
+.mtb-tabs::-webkit-scrollbar { display:none; }
+.mtb-tab { display:flex; align-items:center; gap:4px; padding:0 9px; height:100%; cursor:pointer; font-size:11px; font-family:Arial; color:var(--text2); white-space:nowrap; border-right:1px solid var(--border); position:relative; min-width:0; max-width:160px; transition:background 0.15s; user-select:none; flex-shrink:0; }
+.mtb-tab:hover { background:rgba(255,255,255,0.06); }
+.mtb-tab.active { background:var(--bg); color:var(--text); font-weight:600; }
+.mtb-tab.active::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:var(--accent,#7886A5); }
+.mtb-tab-icon { width:12px; height:12px; opacity:0.6; flex-shrink:0; }
+.mtb-tab.active .mtb-tab-icon { opacity:1; }
+.mtb-tab-title { overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.mtb-tab-close { display:flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:3px; font-size:13px; line-height:1; color:var(--text2); opacity:0; transition:opacity 0.15s, background 0.15s; flex-shrink:0; margin-left:2px; }
+.mtb-tab:hover .mtb-tab-close, .mtb-tab.active .mtb-tab-close { opacity:0.6; }
+.mtb-tab-close:hover { opacity:1 !important; background:rgba(255,80,80,0.2); color:#f55; }
+.mtb-tab { cursor:grab; }
+.mtb-tab:active { cursor:grabbing; }
+.mtb-tab-dragging { opacity:0.7; background:rgba(200,168,112,0.12) !important; outline:1px dashed rgba(200,168,112,0.4); cursor:grabbing !important; }
+.mtb-new { background:none; border:none; color:var(--text2); font-size:16px; cursor:pointer; padding:0 6px; height:100%; display:flex; align-items:center; opacity:0.5; transition:opacity 0.15s; flex-shrink:0; }
+.mtb-new:hover { opacity:1; }
+.mtb-sep { width:1px; height:16px; background:var(--border); margin:0 4px; flex-shrink:0; }
+.mtb-spacer { flex:1; min-width:0; }
+.mtb-filename { flex:0 1 200px; min-width:80px; background:transparent; border:none; border-bottom:1px solid rgba(120,134,165,0.25); color:#D8DCEA; font-size:13px; font-weight:700; font-family:Arial; padding:2px 6px; outline:none; letter-spacing:-0.2px; margin:0 4px; }
+.mtb-filename::placeholder { color:#5A6A88; font-weight:400; }
+.mtb-filename:hover { border-bottom-color:rgba(120,134,165,0.5); }
+.mtb-filename:focus { border-bottom-color:#7886A5; background:rgba(120,134,165,0.06); }
+.mtb-presets { display:flex; align-items:center; gap:1px; flex-shrink:0; }
+.mtb-presets button { padding:1px 7px; border-radius:3px; cursor:pointer; font-size:8px; font-family:Arial; font-weight:600; transition:opacity 0.15s; border:none; }
+.mtb-presets button:hover { opacity:0.8; }
+.mtb-presets button.active { font-weight:700; box-shadow:0 1px 4px rgba(0,0,0,0.4); }
+.mtb-project { display:flex; align-items:center; gap:2px; flex-shrink:1; min-width:0; overflow:hidden; }
+.mtb-saves { display:flex; align-items:center; gap:2px; flex-shrink:0; margin-right:4px; }
+.mtb-save-btn { font-size:9px; font-family:Arial; padding:2px 8px; border-radius:3px; cursor:pointer; border:1px solid rgba(120,134,165,0.35); background:rgba(120,134,165,0.12); color:#9BA8C4; white-space:nowrap; transition:all 0.15s; font-weight:500; }
+.mtb-save-btn:hover { background:rgba(120,134,165,0.25); color:#B8C4D8; border-color:rgba(120,134,165,0.55); }
+.mtb-exports { display:flex; align-items:center; gap:2px; flex-shrink:0; padding-right:2px; }
+.mtb-exports .export-btn { font-size:9px; padding:2px 8px; margin-left:0; border-radius:3px; }
+
+/* ─── New Tab Page ─── */
+.ntp { flex:1; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; background:var(--bg); padding:48px 24px 24px; }
+.ntp-inner { max-width:640px; width:100%; }
+.ntp-modes { display:flex; gap:16px; justify-content:center; margin-bottom:36px; }
+.ntp-mode { display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; padding:16px 20px; border-radius:12px; transition:background 0.15s, transform 0.15s; user-select:none; }
+.ntp-mode:hover { background:rgba(255,255,255,0.06); transform:translateY(-2px); }
+.ntp-mode:active { transform:scale(0.96); }
+.ntp-mode-icon { width:56px; height:56px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:var(--ntp-clr,#999); transition:border-color 0.15s, background 0.15s; }
+.ntp-mode:hover .ntp-mode-icon { border-color:var(--ntp-clr,#999); background:color-mix(in srgb, var(--ntp-clr,#999) 10%, transparent); }
+.ntp-mode span { font-size:12px; color:var(--text2); font-family:Arial; font-weight:500; }
+.ntp-recents-label { font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:12px; padding-left:4px; font-family:Arial; }
+.ntp-recents { display:flex; flex-direction:column; gap:2px; }
+.ntp-recent { display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:8px; cursor:pointer; transition:background 0.12s; user-select:none; }
+.ntp-recent:hover { background:rgba(255,255,255,0.05); }
+.ntp-recent-icon { width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:14px; }
+.ntp-recent-icon.type-doc { background:rgba(107,142,123,0.15); color:#6B8E7B; }
+.ntp-recent-icon.type-slide { background:rgba(120,134,165,0.15); color:#7886A5; }
+.ntp-recent-icon.type-sheet { background:rgba(160,128,96,0.15); color:#A08060; }
+.ntp-recent-info { flex:1; min-width:0; }
+.ntp-recent-title { font-size:13px; color:var(--text); font-family:Arial; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ntp-recent-meta { font-size:11px; color:var(--text2); font-family:Arial; margin-top:1px; }
+

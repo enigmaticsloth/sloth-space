@@ -1,0 +1,276 @@
+/* ═══════════════════════════════════════════ */
+/* MOBILE RWD                                 */
+/* ═══════════════════════════════════════════ */
+
+/* Tablet: stack everything vertically */
+@media(max-width:900px){
+  .main-layout { flex-direction:column; }
+  .content-col { flex:1; }
+  .middle { flex-direction:column; }
+  .chat-panel { width:100%; flex:0 0 auto; min-height:120px; border-left:none; border-top:1px solid var(--border); margin:0; border-radius:0; }
+  .slide-panel { padding:4px 4px 4px; flex:0 0 auto; }
+  .topbar .logo { font-size:22px; }
+  .topbar .tagline { display:none; }
+  .topbar-ws-btn { display:none; }
+  .preset-pills { display:none; }
+  .deck-actions { gap:3px; }
+  .deck-action-btn { padding:3px 7px; font-size:9px; }
+  /* Landing page tablet: stack left sidebar on top */
+  .landing-overlay { flex-direction:column; }
+  .landing-left { width:100%; flex-shrink:0; max-height:40vh; padding:16px 20px; border-right:none; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .landing-right { flex-direction:column; align-items:center; }
+  .mp-chat-panel { width:100%; max-width:400px; height:260px; }
+  /* Mode picker tablet */
+  .mode-cards { gap:14px; }
+  .mode-card { max-width:240px; }
+  .mode-card-demo { height:130px; }
+}
+
+/* ═══════════════════════════════════════════════════ */
+/* PHONE: App-style adaptive layout (SwiftUI-like)    */
+/* Layout from top to bottom:                         */
+/*   Topbar → Slide (top-aligned) → Page dots →       */
+/*   Chat messages (scrollable flex) → Toolbar →       */
+/*   Input area (tall, expandable)                    */
+/* ═══════════════════════════════════════════════════ */
+@media(max-width:600px){
+  /* --- Global: fill viewport, no scroll on body --- */
+  body { overflow:hidden; }
+
+  /* --- Topbar: compact, extra padding for safe area --- */
+  .topbar { padding:8px 10px; gap:6px; min-height:44px; }
+  .topbar .logo { font-size:18px; }
+  .topbar .tagline { display:none; }
+  .preset-pills { display:none; }
+  .export-btn { display:none; }
+  .auth-bar { margin-left:auto; }
+  .auth-account-btn { padding:4px 8px 4px 6px; gap:6px; }
+  .auth-avatar { width:28px; height:28px; font-size:11px; }
+  .auth-name { font-size:11px; }
+  .auth-login-btn { padding:6px 10px; min-height:32px; font-size:11px; }
+  .product-bar { display:none !important; }
+
+  /* --- Main layout: vertical on mobile --- */
+  .main-layout { flex-direction:column; }
+  .content-col { flex:0 0 auto; min-height:0; }
+  .chat-panel { margin:0 !important; border-radius:0 !important; }
+
+  /* --- Middle: vertical column, no horizontal overflow --- */
+  .middle {
+    flex-direction:column;
+    flex:1 1 0; min-height:0;
+    overflow:hidden;
+    overflow-x:hidden !important; /* absolutely no horizontal scroll */
+    width:100% !important; max-width:100vw !important;
+  }
+
+  /* --- Slide panel: top-aligned, FIXED height so it never compresses/expands --- */
+  .slide-panel {
+    flex:0 0 36vh; /* fixed height = 36% viewport, never grows or shrinks */
+    width:100%;
+    align-items:center;
+    justify-content:flex-start; /* TOP-ALIGNED */
+    padding:2px 4px 0;
+    overflow:hidden; /* clip, don't let content push layout */
+    min-height:120px; /* minimum on tiny screens */
+  }
+  /* Doc/workspace canvas: now in .middle directly (not inside slide-panel) */
+  body.mode-doc .doc-canvas,
+  body.mode-workspace .workspace-canvas {
+    flex:1 1 0 !important; min-height:0;
+    overflow-y:auto !important; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y !important;
+    padding:16px 8px;
+    scrollbar-width:none; /* Firefox */
+  }
+  body.mode-sheet .sheet-canvas {
+    flex:1 1 0 !important; min-height:0;
+    overflow:auto !important;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x pan-y !important;
+    padding:0;
+    scrollbar-width:none;
+  }
+  body.mode-doc .doc-canvas::-webkit-scrollbar,
+  body.mode-workspace .workspace-canvas::-webkit-scrollbar,
+  body.mode-sheet .sheet-canvas::-webkit-scrollbar { display:none; /* Chrome/Safari */ }
+  /* Drag handle: always visible on mobile (no hover), and allow touch drag */
+  body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; }
+  .deck-name-bar { padding:2px 8px 0; gap:4px; }
+  .deck-name-input { font-size:12px; }
+  .deck-actions { display:none; }
+
+  /* Slide frame: contained within panel, never overflows */
+  .slide-frame {
+    border-radius:6px;
+    flex-shrink:0;
+    max-width:100%;
+    overflow:hidden;
+  }
+
+  /* --- Page dots: small circles, active = filled --- */
+  .slide-bar { gap:4px; margin-top:4px; padding-bottom:2px; flex-shrink:0; }
+  .slide-nav { gap:4px; flex-wrap:nowrap; }
+  .slide-nav button {
+    width:8px; height:8px; border-radius:50%;
+    font-size:0; color:transparent; padding:0;
+    border:none; background:#333;
+    transition:background 0.2s;
+  }
+  .slide-nav button.active { background:#7886A5; }
+  .slide-nav button:hover { background:#555; }
+  .slide-info { font-size:8px; }
+
+  /* --- Chat panel: fills remaining vertical space, width locked to 100% --- */
+  .chat-panel {
+    width:100% !important;
+    max-width:100vw !important;
+    flex:1 1 0 !important; min-height:40px;
+    flex-shrink:1 !important;
+    border-left:none !important;
+    margin:0 !important; border-radius:0 !important;
+    border:none !important; border-top:1px solid var(--chat-border) !important;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    transition:flex 0.25s ease, min-height 0.25s ease;
+    box-shadow:none !important;
+  }
+  .chat-panel.collapsed {
+    flex:0 0 auto !important; min-height:0 !important;
+  }
+  .chat-panel.collapsed .chat-messages { display:none; }
+  .chat-panel.collapsed .chat-tab-bar { display:none; }
+  .chat-tab { max-width:60px; font-size:9px; padding:3px 4px; }
+  .chat-tab-bar { min-height:24px; }
+  .chat-toggle-icon { display:inline-block; margin-left:auto; font-size:8px; transition:transform 0.2s; }
+  .chat-panel.collapsed .chat-toggle-icon { transform:rotate(180deg); }
+  .chat-header {
+    padding:4px 12px; font-size:9px;
+    border-bottom:1px solid var(--chat-border);
+    cursor:pointer; user-select:none;
+    flex-shrink:0;
+  }
+  .chat-messages {
+    flex:1 1 0; min-height:0;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+    padding:6px 10px; gap:4px;
+  }
+  .msg { font-size:11px; padding:5px 8px; max-width:92%; }
+
+  /* --- Bottom panel: toolbar + tall input, extra padding for home bar --- */
+  .bottom-panel { flex-shrink:0; padding:0 0 env(safe-area-inset-bottom,0px); }
+  .bottom-panel-inner { border-radius:0 !important; border:none !important; border-top:1px solid var(--prompt-border) !important; box-shadow:none !important; }
+
+  /* --- Toolbar: visible, compact horizontal scroll --- */
+  .toolbar {
+    display:flex !important;
+    overflow-x:auto; -webkit-overflow-scrolling:touch;
+    gap:0; padding:0 4px;
+  }
+  .tool-btn { padding:4px 10px; font-size:10px; white-space:nowrap; }
+  .font-size-indicator { font-size:9px; min-width:28px; padding:2px 4px; }
+  .undo-redo-btn { padding:4px 8px; font-size:12px; }
+
+  /* --- Selection bar --- */
+  .selection-bar { padding:2px 8px; font-size:9px; }
+
+  /* --- Input area: tall (roughly 2/5 of screen height) --- */
+  .input-area {
+    padding:4px 8px 6px; gap:6px;
+    align-items:stretch;
+    flex-shrink:0;
+  }
+  .input-area textarea {
+    height:22vh; min-height:60px; max-height:30vh;
+    font-size:16px; padding:10px 44px 10px 12px;
+    border-radius:12px;
+    line-height:1.5;
+    resize:none;
+    transition:height 0.2s ease;
+  }
+  /* Collapsed state: single-line bar */
+  .input-area.collapsed textarea {
+    height:40px; min-height:40px;
+    border-radius:20px;
+    padding:8px 40px 8px 14px;
+  }
+  .input-toggle {
+    display:flex; /* keep toggle visible on mobile for expand/collapse */
+    top:2px; right:44px;
+    width:20px; height:14px; font-size:9px;
+  }
+  .send-btn {
+    width:30px; height:30px; border-radius:8px;
+  }
+
+  /* --- Image staging: compact on mobile --- */
+  .img-staging { padding:2px 8px 0; gap:4px; }
+  .img-thumb { width:36px; height:36px; }
+  .img-staging-label { font-size:9px; }
+  .img-attach-btn { width:30px; height:30px; font-size:16px; }
+
+  /* --- Nav toggle: bigger tap target on mobile --- */
+  .file-nav-toggle { font-size:22px; padding:6px 10px; min-width:44px; min-height:44px; display:flex; align-items:center; justify-content:center; }
+
+  /* --- Overlay panels: full-width --- */
+  .file-nav { width:85vw; max-width:320px; }
+  .settings-panel { width:92vw; padding:20px 18px; }
+  /* Landing page phone */
+  .landing-overlay { flex-direction:column; }
+  .landing-left { width:100%; padding:16px; border-right:none; border-bottom:1px solid rgba(255,255,255,0.06); max-height:none; overflow-y:visible; }
+  .ll-logo { font-size:22px; }
+  .landing-right { flex-direction:column; padding:16px; }
+  .landing-modes { width:100%; }
+  .ws-modal { width:95%; }
+
+  /* --- Onboarding: compact --- */
+  .chat-chip { padding:7px 10px; font-size:10px; }
+  .chat-onboarding-title { font-size:11px; }
+  .chat-onboarding { padding:12px 10px; gap:8px; }
+
+  /* --- Contextual AI menu: bottom sheet on mobile --- */
+  .ctx-ai-menu { position:fixed !important; left:0 !important; right:0 !important; bottom:0 !important; top:auto !important; max-width:100% !important; width:100% !important; border-radius:14px 14px 0 0 !important; max-height:60vh; overflow-y:auto; animation:ctx-slide-up 0.2s ease !important; }
+  @keyframes ctx-slide-up { from{transform:translateY(100%);} to{transform:translateY(0);} }
+  .text-sel-tooltip button { font-size:13px; padding:8px 14px; }
+  /* Landing + mode cards phone */
+  .mp-chat-panel { display:none; }
+  .mp-mobile-prompt { display:flex; align-items:flex-end; gap:8px; position:fixed; bottom:0; left:0; right:0; padding:12px 16px; background:rgba(18,18,18,0.95); border-top:1px solid rgba(255,255,255,0.08); z-index:600; backdrop-filter:blur(12px); }
+  .mp-mobile-prompt textarea { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:#e0e0e0; font-size:14px; font-family:Arial; padding:10px 12px; resize:none; outline:none; max-height:80px; line-height:1.4; }
+  .mp-mobile-prompt textarea::placeholder { color:#666; }
+  .mp-mobile-prompt textarea:focus { border-color:rgba(168,153,196,0.4); }
+  .mode-cards { flex-direction:column; align-items:center; gap:12px; overflow-y:auto; max-height:calc(100vh - 160px); padding-bottom:12px; }
+  .mode-card { max-width:100%; width:100%; flex-direction:row; display:flex; border-radius:12px; }
+  .mode-card-demo { height:auto; width:110px; min-height:100px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:12px 0 0 12px; }
+  .mode-card-info { padding:14px 14px; flex:1; text-align:left; }
+  .mode-card-icon { margin:0 0 6px; width:32px; height:32px; }
+  .mode-card-name { font-size:14px; }
+  .mode-card-desc { font-size:10px; }
+  .mode-card-badge { top:6px; right:auto; left:6px; font-size:8px; }
+  .mc-slide-preview { width:70%; max-width:80px; padding:8px; }
+  .mc-doc-preview { width:50%; max-width:60px; padding:8px 6px; }
+  .mc-doc-preview .mc-dimg { height:16px; }
+  .mc-sheet-preview { width:75%; max-width:85px; }
+  .mc-sheet-cell { padding:3px 4px; font-size:6px; }
+  /* Workspace card on phone: same horizontal strip as others */
+  .mode-card-wide { flex-direction:row; margin:0 auto; max-width:100% !important; }
+  .mode-card-wide .mode-card-demo { width:100px; min-height:70px; border-radius:12px 0 0 12px; }
+  .mode-card-wide .mode-card-info { flex-direction:column; align-items:flex-start; gap:4px; padding:10px 12px; }
+  .mode-card-wide .mode-card-icon { width:28px; height:28px; }
+  .mc-ws-preview { max-width:85px; height:60px; }
+  .mc-ws-sidebar { width:14px; padding:5px 0; gap:4px; }
+  .mc-ws-dot { width:4px; height:4px; }
+  .mc-ws-thumb { width:12px; height:9px; }
+  .mc-ws-name { height:3px; } .mc-ws-date { height:2px; }
+  .mp-back { margin-top:16px; padding:6px 14px; font-size:11px; }
+  .mode-badge { padding:2px 7px; font-size:10px; gap:3px; }
+}
+
+/* Very small phones */
+@media(max-width:380px){
+  .topbar .logo { font-size:16px; }
+  .export-btn { display:none; }
+  .deck-action-btn.primary { font-size:8px; padding:2px 6px; }
+  .input-area textarea { height:20vh; min-height:60px; }
+}
+

@@ -684,9 +684,12 @@ export function setAuthUser(user){
     const cfg=S.llmConfig||{provider:'groq'};
     const providerDef=(LLM_DEFAULTS||{})[cfg.provider]||{label:'AI',color:'#8B9E8B',desc:''};
     bar.innerHTML=`
-      <span class="auth-name">${name}</span>
       <div class="user-menu-wrap">
-        <div class="auth-avatar" onclick="toggleUserMenu(event)" title="Account menu">${initial}</div>
+        <div class="auth-account-btn" onclick="toggleUserMenu(event)" title="Account menu">
+          <div class="auth-avatar">${initial}</div>
+          <span class="auth-name">${name}</span>
+          <svg class="auth-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
         <div class="user-menu" id="userMenu">
           <div class="um-header">
             <div class="um-name">${name}</div>

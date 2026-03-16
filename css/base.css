@@ -1,0 +1,10 @@
+:root {
+  --bg: #0e0e0e; --surface: #161616; --surface2: #1e1e1e; --border: #2a2a2a;
+  --text: #e0e0e0; --text2: #555; --input-bg: #121212;
+  /* Monet accent surfaces */
+  --chat-bg: #161A24; --chat-border: #252A38; --chat-surface: #1C2030;
+  --prompt-bg: #1A1816; --prompt-border: #2A2620; --prompt-surface: #201E1A;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:Arial,sans-serif; height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
