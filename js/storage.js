@@ -797,15 +797,21 @@ export function setAuthUser(user){
         if(window.saveConfig) window.saveConfig();
       }
       if(window.isConfigured&&window.isConfigured()){
-        const savedMode=sessionStorage.getItem('sloth_mode');
-        const pickerActive=sessionStorage.getItem('sloth_on_picker')==='1'||!document.getElementById('landingOverlay')?.classList.contains('hidden');
-        if(pickerActive){
-          // User was on the landing page — don't auto-enter any mode
-        } else if(savedMode&&savedMode!=='slide'){
-          if(window.hideLanding) window.hideLanding();
-          sessionStorage.setItem('sloth_active','1');
-        } else if(savedMode==='slide'||!savedMode){
-          if(window.enterSlides) window.enterSlides();
+        // Only enter a mode if the tab system hasn't already restored state.
+        // getSession() resolves async AFTER checkWelcomeScreen() loads saved tabs,
+        // so calling enterSlides() here would CREATE a duplicate tab on every refresh.
+        const tabsAlreadyLoaded=S.modeTabs&&S.modeTabs.length>0;
+        if(!tabsAlreadyLoaded){
+          const savedMode=sessionStorage.getItem('sloth_mode');
+          const pickerActive=sessionStorage.getItem('sloth_on_picker')==='1'||!document.getElementById('landingOverlay')?.classList.contains('hidden');
+          if(pickerActive){
+            // User was on the landing page — don't auto-enter any mode
+          } else if(savedMode&&savedMode!=='slide'){
+            if(window.hideLanding) window.hideLanding();
+            sessionStorage.setItem('sloth_active','1');
+          } else if(savedMode==='slide'||!savedMode){
+            if(window.enterSlides) window.enterSlides();
+          }
         }
         if(window.addMessage) window.addMessage('☁️ Settings synced from cloud.','system');
       }
