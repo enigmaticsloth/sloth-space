@@ -393,14 +393,15 @@ export function exportDocPDF(){
       default: html+='<p>'+text+'</p>';
     }
   }
+  html+='<script>window.onload=function(){window.print();}<\/script>';
   html+='</body></html>';
-  const blob=new Blob([html],{type:'text/html'});
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
   if(w){
-    window.addMessage('Document opened in new tab. Use your browser\'s Print (Ctrl+P) → Save as PDF.','system');
+    window.addMessage('✓ Document opened for PDF export. Use Print → Save as PDF.','system');
   } else {
-    window.addMessage('Pop-up blocked. Please allow pop-ups for this site.','system');
+    window.addMessage('Pop-up blocked! Please allow pop-ups for this site and try again.','system');
   }
 }
 

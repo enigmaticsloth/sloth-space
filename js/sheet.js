@@ -2099,6 +2099,70 @@ export function sheetToCSV(sheetData) {
 // XLSX EXPORT (OOXML via JSZip)
 // ═══════════════════════════════════════════
 
+export function exportSheetPDF(){
+  const sh=S.sheet.current;
+  if(!sh||!sh.columns||!sh.rows||!sh.rows.length){
+    window.addMessage('No sheet data to export.','system');
+    return;
+  }
+  const cols=sh.columns;
+  const rows=sh.rows;
+  const title=sh.title||'Sheet';
+  function _escH(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // Build header
+  let thead='<tr>';
+  cols.forEach(c=>{ thead+=`<th>${_escH(c.name||c.id)}</th>`; });
+  thead+='</tr>';
+
+  // Build rows
+  let tbody='';
+  rows.forEach(r=>{
+    tbody+='<tr>';
+    cols.forEach(c=>{
+      let raw=r.cells?.[c.id]??'';
+      let display=raw;
+      if(typeof raw==='string'&&raw.startsWith('=')){
+        try{ display=shEvalFormula(raw,sh); }catch{ display='#ERR'; }
+      }
+      const isNum=typeof display==='number'||(typeof display==='string'&&display!==''&&!isNaN(Number(display)));
+      tbody+=`<td${isNum?' class="num"':''}>${_escH(String(display))}</td>`;
+    });
+    tbody+='</tr>';
+  });
+
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${_escH(title)} — PDF Export</title>
+<style>
+@page{size:landscape;margin:15mm;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:Arial,sans-serif;font-size:11px;color:#222;padding:20px;}
+h1{font-size:18px;margin-bottom:12px;color:#333;}
+table{width:100%;border-collapse:collapse;page-break-inside:auto;}
+tr{page-break-inside:avoid;}
+th{background:#f0f0f0;font-weight:700;text-align:left;padding:6px 10px;border:1px solid #ccc;white-space:nowrap;}
+td{padding:5px 10px;border:1px solid #ddd;vertical-align:top;}
+td.num{text-align:right;font-variant-numeric:tabular-nums;}
+tr:nth-child(even) td{background:#fafafa;}
+.meta{font-size:10px;color:#888;margin-bottom:8px;}
+</style>
+</head><body>
+<h1>${_escH(title)}</h1>
+<div class="meta">${cols.length} columns · ${rows.length} rows · Exported from Sloth Space</div>
+<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  if(w){
+    window.addMessage('✓ Sheet opened for PDF export. Use Print → Save as PDF.','system');
+  } else {
+    window.addMessage('Pop-up blocked! Please allow pop-ups for this site and try again.','system');
+  }
+}
+
 function _escXml(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 export function shExportXlsx(){

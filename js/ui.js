@@ -1465,7 +1465,8 @@ function updateTopbarForMode(mode){
 function modeExportPDF(){
   if(S.currentMode==='slide') window.exportSlidePDF();
   else if(S.currentMode==='doc') window.exportDocPDF();
-  else window.addMessage('PDF export not available for this mode yet.','system');
+  else if(S.currentMode==='sheet') window.exportSheetPDF();
+  else window.addMessage('PDF export not available for this mode.','system');
 }
 
 function modeExportDocx(){

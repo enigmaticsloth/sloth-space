@@ -1150,8 +1150,51 @@ export function isInlineEditing(){
 // ═══════════════════════════════════════════
 
 export function exportSlidePDF(){
-  window.addMessage('Slide PDF export coming soon! Use Export .pptx for now.','system');
+  if(!S.currentDeck||!S.currentDeck.slides||!S.currentDeck.slides.length){
+    window.addMessage('No slides to export.','system');
+    return;
+  }
+  const p=PRESETS[S.currentPreset]||PRESETS['clean-white'];
+  const slides=S.currentDeck.slides;
+  const W=p.slide.width, H=p.slide.height;
+
+  // Render each slide as HTML
+  const slidePages=slides.map((s,i)=>{
+    const inner=renderSlide(s,i,p,slides.length);
+    // Each slide is a print page
+    return `<div class="slide-page">${inner}</div>`;
+  }).join('\n');
+
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${_esc(S.currentDeck.title||'Slides')} — PDF Export</title>
+<style>
+@page{size:${W}px ${H}px;margin:0;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{margin:0;padding:0;background:#fff;}
+.slide-page{width:${W}px;height:${H}px;overflow:hidden;page-break-after:always;position:relative;}
+.slide-page:last-child{page-break-after:auto;}
+@media screen{
+  body{background:#888;display:flex;flex-direction:column;align-items:center;gap:20px;padding:20px;}
+  .slide-page{box-shadow:0 4px 20px rgba(0,0,0,0.3);border-radius:4px;flex-shrink:0;}
 }
+/* region text styling inherited from renderSlide inline styles */
+</style>
+</head><body>
+${slidePages}
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  if(w){
+    window.addMessage('✓ Slides opened for PDF export. Use Print → Save as PDF (set margins to None for best results).','system');
+  } else {
+    window.addMessage('Pop-up blocked! Please allow pop-ups for this site and try again.','system');
+  }
+}
+
+function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ═══════════════════════════════════════════
 // SLIDE NAVIGATION & PRESETS
