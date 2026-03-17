@@ -299,9 +299,10 @@ INTENTS:
   EXCEPTION: If the user asks to CREATE/MAKE/WRITE a document or file (e.g. "make a document explaining project X", "write a report about project Y content"), this is ALWAYS "generate" NOT "describe".
 
 "about" — user is asking ABOUT Sloth (the AI) or Sloth Space THE APP itself: who are you, what is it, features, how to use it, a specific mode or feature. Also triggers on: "introduce yourself", "who are you", "what's your name".
-  Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace|generation|context_injection|conversion|ui_ops"}
+  Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace|generation|context_injection|conversion|ui_ops|creator"}
   topic guide:
     "general" — asking about Sloth or Sloth Space overall: "who are you", "what is Sloth Space", "what is this app", "tell me about it"
+    "creator" — asking about who made/built Sloth Space, who is EnigmaticSloth, the developer, the author: "who made this", "who built this", "who is EnigmaticSloth", "who's the developer"
     "slides" — asking about slide/presentation mode: "how do I use slide mode", "how do slides work"
     "doc" — asking about document mode: "what is document mode", "how does doc mode work"
     "sheet" — asking about sheet/data mode: "how do I use sheets", "how do sheets work"
@@ -475,7 +476,7 @@ INTENTS:
 "deck_edit" — batch edit ALL slides or restructure entire doc. {"intent":"deck_edit"}
 "sheet_fill" — AI fills/computes cell values in sheet mode. {"intent":"sheet_fill","instruction":"...","targetCol":"col"}
 "describe" — ask about current content: summarize, analyze, explain. {"intent":"describe"}
-"about" — ask about Sloth Space the app or Sloth the AI. {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
+"about" — ask about Sloth Space the app or Sloth the AI or its creator. {"intent":"about","topic":"general|slides|doc|sheet|workspace|creator"}
 "generate" — create NEW content or regenerate. Any topic, any mode. {"intent":"generate","target":"doc"|"slide"|"sheet","project":"projectName"}
   target: "slide" for presentations, "doc" for documents/reports, "sheet" for spreadsheets. Omit if same as current mode.
   project: if user mentions linking/filing/categorizing to a project, ALWAYS include the project name. System auto-creates if needed.
@@ -649,14 +650,22 @@ I can control the entire Sloth Space interface through natural language — no b
 **Styling (Slides):** "background to dark blue", "title font bigger", "use Monet theme", "make heading red"
 **Settings:** "open settings"
 
-All of these work in any language — just describe what you want to do and I'll handle it.`
+All of these work in any language — just describe what you want to do and I'll handle it.`,
+
+  creator:`🦥 **Who made Sloth Space?**
+
+Sloth Space was created by **EnigmaticSloth** — a mysterious PhD student whose research spans biomechanics, stem cells, biomedical engineering, and AI-driven design.
+
+The entire app was built in 4 days as a solo project, from scratch, with zero frameworks and zero build tools. Just vanilla JS, a love for clean architecture, and a lot of LLM-powered automation.
+
+GitHub: [@enigmaticsloth](https://github.com/enigmaticsloth)`
 };
 
 // Translation prompt for about texts
 const ABOUT_TRANSLATE_PROMPT=`You are a translator. Translate the following product introduction text to the target language.
 
 CRITICAL — DO NOT translate these terms (keep them exactly as-is in English):
-Sloth, Sloth Space, Slides, Doc, Sheet, Workspace, Project, AI Context Injection, AI Fill, PPTX, PowerPoint, CSV, AI, Undo, Redo, Monet, Seurat
+Sloth, Sloth Space, EnigmaticSloth, Slides, Doc, Sheet, Workspace, Project, AI Context Injection, AI Fill, PPTX, PowerPoint, CSV, AI, Undo, Redo, Monet, Seurat
 
 Keep ALL formatting exactly as-is: keep **, •, 🦥, 📊, 📝, 📈, 📁, 🧠, ✨, 🔄, 🎛️, emojis, markdown bold markers, numbered lists, line breaks.
 Only translate the regular text content. Output ONLY the translated text, nothing else.`;
