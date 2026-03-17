@@ -860,9 +860,11 @@ function rc(content,role,p,region,colorOv,fontSizeOv){
     const hBg=p.colors.table_header_bg,hT=colorOv||p.colors.table_header_text,alt=p.colors.table_row_alt,bc=p.colors.border,tc=txtColor;
     const tf=fs*0.9;
     let h=`<table style="width:100%;border-collapse:collapse;font-family:Arial;font-size:${tf}px;"><thead><tr>`;
-    content.headers.forEach(x=>{h+=`<th style="background:${hBg};color:${hT};padding:12px 16px;text-align:left;font-weight:700;font-size:${tf*0.9}px;border-bottom:2px solid ${bc};">${x}</th>`;});
+    const hdrs=Array.isArray(content.headers)?content.headers:[];
+    hdrs.forEach(x=>{h+=`<th style="background:${hBg};color:${hT};padding:12px 16px;text-align:left;font-weight:700;font-size:${tf*0.9}px;border-bottom:2px solid ${bc};">${x}</th>`;});
     h+='</tr></thead><tbody>';
-    content.rows.forEach((r,i)=>{h+=`<tr style="background:${i%2===1?alt:'transparent'};">`;const cells=Array.isArray(r)?r:(typeof r==='object'&&r?Object.values(r):[String(r)]);cells.forEach((c,j)=>{h+=`<td style="padding:10px 16px;border-bottom:1px solid ${bc};color:${tc};font-weight:${j===0?500:400};">${c}</td>`;});h+='</tr>';});
+    const rows=Array.isArray(content.rows)?content.rows:[];
+    rows.forEach((r,i)=>{h+=`<tr style="background:${i%2===1?alt:'transparent'};">`;const cells=Array.isArray(r)?r:(typeof r==='object'&&r?Object.values(r):[String(r)]);cells.forEach((c,j)=>{h+=`<td style="padding:10px 16px;border-bottom:1px solid ${bc};color:${tc};font-weight:${j===0?500:400};">${c}</td>`;});h+='</tr>';});
     return h+'</tbody></table>';
   }
 
@@ -880,6 +882,10 @@ function rc(content,role,p,region,colorOv,fontSizeOv){
 }
 
 export function renderSlide(slide,idx,p,total){
+  try{ return _renderSlideInner(slide,idx,p,total); }
+  catch(e){ console.warn('[renderSlide] Error on slide',idx,e); return `<div style="padding:40px;color:#e8913a;font-family:Arial;font-size:14px;">⚠ Slide ${idx+1} has corrupt data.<br><span style="font-size:11px;color:#888;">${e.message}</span></div>`; }
+}
+function _renderSlideInner(slide,idx,p,total){
   const L=LAYOUTS[slide.layout];
   if(!L)return `<div style="padding:40px;color:red;">Unknown layout: ${slide.layout}</div>`;
   const W=p.slide.width,H=p.slide.height,m=p.spacing.margin;
