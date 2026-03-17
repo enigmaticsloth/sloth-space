@@ -55,7 +55,12 @@
 
 /* ═══ Demo showcase — mini Sloth UI with animated cursor ═══ */
 .ll-demo { flex:1; display:flex; flex-direction:column; margin-top:16px; min-height:0; }
-.ll-demo-label { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; font-weight:600; }
+.ll-demo-label { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; font-weight:600; }
+.ll-demo-desc { font-size:11px; color:#9BA8C4; margin-bottom:8px; min-height:16px; transition:opacity 0.2s; }
+.ll-demo-stage { display:flex; align-items:stretch; gap:6px; flex:1; min-height:0; }
+.ll-demo-stage .mu { flex:1; min-width:0; }
+.ll-demo-arrow { background:none; border:1px solid rgba(120,134,165,0.15); color:#555; width:22px; border-radius:6px; cursor:pointer; font-size:18px; font-family:Arial; display:flex; align-items:center; justify-content:center; transition:all 0.15s; flex-shrink:0; padding:0; line-height:1; }
+.ll-demo-arrow:hover { color:#9BA8C4; border-color:rgba(120,134,165,0.4); background:rgba(120,134,165,0.08); }
 
 /* Mini app frame */
 .mu { position:relative; flex:1; min-height:120px; background:#0e1018; border:1px solid rgba(120,134,165,0.18); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
@@ -179,10 +184,11 @@
 .mu-status .ds-spin { display:inline-block; width:9px; height:9px; border:1.5px solid rgba(120,134,165,0.3); border-top-color:#7886A5; border-radius:50%; animation:ds-spin 0.7s linear infinite; vertical-align:middle; margin-right:4px; }
 @keyframes ds-spin { to{transform:rotate(360deg)} }
 
-/* Pagination dots */
-.ll-demo-dots { display:flex; justify-content:center; gap:6px; padding:8px 0 4px; }
-.ll-demo-dots span { width:6px; height:6px; border-radius:50%; background:#333; transition:background 0.3s; cursor:pointer; }
-.ll-demo-dots span.active { background:#7886A5; }
+/* Navigation dots */
+.ll-demo-nav { display:flex; justify-content:center; gap:8px; padding:8px 0 4px; }
+.ll-demo-dot { width:8px; height:8px; border-radius:50%; background:#333; border:1.5px solid transparent; transition:all 0.2s; cursor:pointer; padding:0; }
+.ll-demo-dot:hover { background:#555; border-color:rgba(120,134,165,0.3); }
+.ll-demo-dot.active { background:#7886A5; border-color:rgba(120,134,165,0.6); box-shadow:0 0 6px rgba(120,134,165,0.3); }
 
 .ll-footer { margin-top:auto; padding-top:12px; text-align:center; }
 .ll-tos { font-size:12px; color:#777; cursor:pointer; text-align:center; }

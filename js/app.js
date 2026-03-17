@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c25';
-import * as slide from './slide.js?v=20260317c25';
-import * as doc from './doc.js?v=20260317c25';
-import * as workspace from './workspace.js?v=20260317c25';
-import * as ai from './ai.js?v=20260317c25';
-import * as ui from './ui.js?v=20260317c25';
-import * as storage from './storage.js?v=20260317c25';
-import * as keys from './keys.js?v=20260317c25';
-import * as sheet from './sheet.js?v=20260317c25';
-import * as bench from './bench.js?v=20260317c25';
+import { S } from './state.js?v=20260317c26';
+import * as slide from './slide.js?v=20260317c26';
+import * as doc from './doc.js?v=20260317c26';
+import * as workspace from './workspace.js?v=20260317c26';
+import * as ai from './ai.js?v=20260317c26';
+import * as ui from './ui.js?v=20260317c26';
+import * as storage from './storage.js?v=20260317c26';
+import * as keys from './keys.js?v=20260317c26';
+import * as sheet from './sheet.js?v=20260317c26';
+import * as bench from './bench.js?v=20260317c26';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -333,10 +333,10 @@ try{ ui.renderApp(); }catch(e){ console.warn('[app.js] renderApp failed on init:
 
 // ─── Left sidebar demo — mini Sloth UI with animated cursor ───
 (function(){
-  let sceneIdx=0, _running=false;
+  let sceneIdx=0, _running=false, _abortScene=false;
   const $ = id => document.getElementById(id);
   const wait = ms => new Promise(r=>setTimeout(r,ms));
-  function alive(){ return !!$('llDemo'); }
+  function alive(){ return !!$('llDemo') && !_abortScene; }
 
   /* ── Cursor helpers ── */
   function showCursor(){ const c=$('muCursor'); if(c) c.classList.add('show'); }
@@ -927,14 +927,162 @@ try{ ui.renderApp(); }catch(e){ console.warn('[app.js] renderApp failed on init:
       </div>`);
   }
 
-  /* ── Scene loop ── */
-  const SCENES=[sceneSlides, sceneContext, sceneSheet, sceneDoc, sceneConvert];
+  /* ════════════════════════════════════════════════════
+     Scene 6 — Bench: drag files for AI context
+     ════════════════════════════════════════════════════ */
+  async function sceneBench(){
+    setMode('Slide');
+    setTab('Untitled');
+    showCursor();
 
-  function updateDots(){
-    const d=$('llDemoDots');
-    if(!d) return;
-    d.innerHTML=SCENES.map((_,i)=>`<span class="${i===sceneIdx%SCENES.length?'active':''}"></span>`).join('');
+    // Show bench panel with files being dragged in
+    const c=$('muCanvas'); if(!c) return;
+    const wrap=document.createElement('div');
+    wrap.style.cssText='width:100%;display:flex;flex-direction:column;gap:3px;padding:3px;';
+
+    // Bench header
+    const hdr=document.createElement('div');
+    hdr.style.cssText='font-size:6px;color:#7886A5;font-weight:700;letter-spacing:0.3px;margin-bottom:2px;display:flex;align-items:center;gap:3px;';
+    hdr.innerHTML='<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#7886A5" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> BENCH — Reference Files';
+    wrap.appendChild(hdr);
+
+    // File items to animate in
+    const benchFiles=[
+      {icon:'PDF',color:'#e47474',name:'annual-report.pdf',meta:'2.4 MB · 32 pages'},
+      {icon:'DOC',color:'#7886A5',name:'strategy-notes.docx',meta:'180 KB · 12 sections'},
+      {icon:'CSV',color:'#5A9E5A',name:'sales-data-q4.csv',meta:'45 KB · 1,200 rows'},
+    ];
+    const fileEls=[];
+    benchFiles.forEach(f=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:4px;padding:3px 4px;border-radius:3px;border:1px dashed rgba(255,255,255,0.08);opacity:0;transform:translateY(4px);transition:all 0.3s ease;';
+      row.innerHTML=`<div style="width:16px;height:16px;border-radius:3px;background:${f.color};font-size:4px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;">${f.icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:6px;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</div>
+          <div style="font-size:5px;color:#666;">${f.meta}</div>
+        </div>
+        <span class="fcheck" style="font-size:7px;color:#5A9E5A;opacity:0;transition:opacity 0.3s;">✓</span>`;
+      wrap.appendChild(row);
+      fileEls.push(row);
+    });
+    c.appendChild(wrap);
+
+    // Animate files dropping in
+    for(let i=0;i<fileEls.length;i++){
+      if(!alive()||_abortScene) return;
+      await wait(300);
+      fileEls[i].style.opacity='1';
+      fileEls[i].style.transform='translateY(0)';
+      fileEls[i].style.borderColor='rgba(120,134,165,0.25)';
+      setStatus(`<span class="ds-spin"></span> Extracting text from ${benchFiles[i].name}...`);
+      await wait(400);
+      fileEls[i].querySelector('.fcheck').style.opacity='1';
+    }
+    if(_abortScene) return;
+    await wait(300);
+
+    // Now type prompt referencing bench files
+    setStatus('<span class="ds-ok">✓ 3 files ready</span>');
+    await typeInPrompt('Create deck from these files');
+    if(_abortScene) return;
+    await clickSend('AI Reading Context');
+    setStatus('<span class="ds-spin"></span> Building slides from bench context...');
+
+    // Show mini slides appearing
+    const slideWrap=document.createElement('div');
+    slideWrap.className='mu-slides';
+    slideWrap.style.marginTop='4px';
+    const slideData=[['t','a','b'],['t','b','a','c'],['t','c gold','a'],['t','a','b','c']];
+    slideData.forEach(bars=>{
+      const s=document.createElement('div');
+      s.className='mu-slide';
+      bars.forEach(b=>{ const bar=document.createElement('div'); bar.className='sb '+b; s.appendChild(bar); });
+      slideWrap.appendChild(s);
+    });
+    c.appendChild(slideWrap);
+
+    const cards=slideWrap.querySelectorAll('.mu-slide');
+    for(let i=0;i<cards.length;i++){
+      if(!alive()||_abortScene) return;
+      await wait(200);
+      cards[i].classList.add('show');
+      setStatus(`<span class="ds-spin"></span> Slide ${i+1} of 4 (from bench data)`);
+    }
+    if(_abortScene) return;
+    await wait(400);
+    setStatus('<span class="ds-ok">✓ Deck generated from 3 reference files</span>');
+    hideCursor();
+
+    await showFileLink({color:'#7886A5',label:'SL',name:'annual-review.sloth',meta:'4 slides · from bench context · just now',badge:'SLIDE'});
+    if(_abortScene) return;
+
+    await showResult(`
+      <div class="demo-result-card">
+        <div class="demo-rc-header">
+          <div class="demo-rc-icon" style="background:rgba(120,134,165,0.2);color:#B8C4D8;">◈</div>
+          <div><div class="demo-rc-title">Bench → Slides</div>
+          <div class="demo-rc-subtitle">3 files · 4 slides · real data</div></div>
+        </div>
+        <div class="demo-rc-body">
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#e47474"></span><span class="demo-rc-text">PDF: 32 pages extracted</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#7886A5"></span><span class="demo-rc-text">DOCX: strategy points used</span></div>
+          <div class="demo-rc-row"><span class="demo-rc-dot" style="background:#5A9E5A"></span><span class="demo-rc-text">CSV: real numbers in charts</span></div>
+          <div class="demo-rc-divider"></div>
+          <div class="demo-rc-stat"><span class="demo-rc-stat-label">Zero hallucination</span><span class="demo-rc-stat-val">100% your data</span></div>
+        </div>
+      </div>`);
   }
+
+  /* ── Scene registry ── */
+  const SCENES=[sceneSlides, sceneContext, sceneSheet, sceneDoc, sceneConvert, sceneBench];
+  const SCENE_DESCS=[
+    'AI generates a full slide deck from one prompt',
+    'AI scans all project files and builds a summary',
+    'AI creates spreadsheets with formulas and data',
+    'AI writes structured documents in seconds',
+    'Convert any file between Slide, Doc, and Sheet',
+    'Drag reference files to Bench — AI uses your real data',
+  ];
+
+  function updateNav(){
+    const nav=$('llDemoNav');
+    if(!nav) return;
+    const si=sceneIdx%SCENES.length;
+    nav.innerHTML=SCENES.map((_,i)=>
+      `<button class="ll-demo-dot${i===si?' active':''}" onclick="window._demoJump(${i})" title="${SCENE_DESCS[i]}"></button>`
+    ).join('');
+    const desc=$('llDemoDesc');
+    if(desc) desc.textContent=SCENE_DESCS[si];
+  }
+
+  function resetUI(){
+    clearCanvas();
+    clearPrompt();
+    lightSend(false);
+    hideCursor();
+    aiActive(false);
+    setStatus('');
+    const cur=$('muCursor');
+    if(cur){ cur.style.left='80%'; cur.style.top='70%'; }
+  }
+
+  /* ── Navigation: jump to scene ── */
+  window._demoJump=function(idx){
+    _abortScene=true;
+    sceneIdx=idx;
+    // Small delay to let current scene's await notice the abort
+    setTimeout(()=>{
+      _abortScene=false;
+      _running=false;
+      resetUI();
+      updateNav();
+      loop();
+    },50);
+  };
+  window._demoGo=function(delta){
+    const next=(sceneIdx+delta+SCENES.length)%SCENES.length;
+    window._demoJump(next);
+  };
 
   async function loop(){
     if(_running) return;
@@ -945,21 +1093,14 @@ try{ ui.renderApp(); }catch(e){ console.warn('[app.js] renderApp failed on init:
         await wait(2000);
         continue;
       }
-      updateDots();
-      // Reset UI
-      clearCanvas();
-      clearPrompt();
-      lightSend(false);
-      hideCursor();
-      aiActive(false);
-      setStatus('');
-      // Reset cursor position to bottom-right
-      const cur=$('muCursor');
-      if(cur){ cur.style.left='80%'; cur.style.top='70%'; }
+      _abortScene=false;
+      updateNav();
+      resetUI();
 
       const scene=SCENES[sceneIdx%SCENES.length];
       await scene();
-      sceneIdx++;
+      if(_abortScene){ continue; }
+      sceneIdx=(sceneIdx+1)%SCENES.length;
     }
     _running=false;
   }
