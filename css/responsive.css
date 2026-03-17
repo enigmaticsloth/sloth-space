@@ -220,33 +220,75 @@
   /* --- Overlay panels: full-width --- */
   .file-nav { width:85vw; max-width:320px; }
   .settings-panel { width:92vw; padding:20px 18px; }
-  /* Landing page phone — demo-first hero layout */
-  .landing-overlay { flex-direction:column; overflow-y:auto; }
-  .landing-left { width:100%; padding:20px 16px; border-right:none; border-bottom:none; max-height:none; overflow-y:visible; display:flex; flex-direction:column; align-items:center; }
-  .ll-logo { font-size:26px; order:1; }
-  .ll-tagline { order:2; margin-bottom:16px; }
-  /* Demo is the hero — order 3, prominent, fixed height */
-  .ll-demo { order:3; width:100%; flex:none; margin-top:8px; min-height:280px; }
-  .ll-demo-stage { min-height:220px; height:220px; }
-  .mu { min-height:200px; height:100%; }
-  .mu-status { font-size:10px; }
-  .ll-demo-label { font-size:9px; }
-  .ll-demo-desc { font-size:10px; }
-  /* Get Started button */
-  .ll-get-started { order:4; display:block; width:100%; margin-top:16px; }
-  /* Footer after Get Started */
-  .ll-footer { order:6; margin-top:12px; padding-top:8px; }
-  /* Hide config sections initially on mobile — revealed by Get Started */
-  .ll-section { order:10; display:none; }
-  .ll-section.mobile-show { display:block; width:100%; }
-  .ll-get-started-btn { width:100%; padding:14px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; font-family:Arial; transition:transform 0.15s; letter-spacing:0.3px; }
-  .ll-get-started-btn:active { transform:scale(0.98); }
-  .ll-skip { text-align:center; font-size:11px; color:#666; margin-top:8px; cursor:pointer; }
-  .ll-skip:hover { color:#9BA8C4; }
-  /* Hide landing-right on mobile (mode cards shown after Get Started) */
+  /* ═══ Mobile Landing Page — app-like layout ═══ */
+  .landing-overlay { flex-direction:column; overflow:hidden; }
+  /* Hide desktop left sidebar entirely on mobile */
+  .landing-left { display:none; }
+  /* Hide desktop landing-right — replaced by mobile layout */
   .landing-right { display:none; }
-  .landing-right.mobile-show { display:flex; flex-direction:column; padding:16px; width:100%; }
-  .landing-modes { width:100%; }
+  .mp-mobile-prompt { display:none; }
+
+  /* Mobile landing container — full screen vertical layout */
+  .mobile-landing { display:flex !important; flex-direction:column; width:100%; height:100%; overflow:hidden; }
+
+  /* Demo at top — compact hero */
+  .mobile-landing .ml-demo-wrap { flex-shrink:0; padding:8px 12px 4px; }
+  .mobile-landing .ml-demo-wrap .mu { min-height:140px; height:160px; border-radius:12px; }
+  .mobile-landing .ml-demo-wrap .ll-demo-stage { height:160px; min-height:140px; gap:4px; }
+  .mobile-landing .ml-demo-wrap .ll-demo-arrow { width:18px; height:24px; font-size:14px; border-radius:6px; }
+  .mobile-landing .ml-demo-wrap .ll-demo-nav { margin-top:4px; }
+  .mobile-landing .ml-demo-wrap .ll-demo-desc { font-size:10px; margin-bottom:4px; min-height:14px; }
+
+  /* 2x2 mode icon grid */
+  .ml-mode-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:8px 16px; flex-shrink:0; }
+  .ml-mode-item { display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; cursor:pointer; transition:all 0.15s; }
+  .ml-mode-item:active { transform:scale(0.96); background:rgba(255,255,255,0.08); }
+  .ml-mode-item .ml-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+  .ml-mode-item .ml-label { font-size:12px; color:#ccc; font-weight:600; font-family:Arial; }
+
+  /* Chat + prompt area — takes remaining 1/3 of screen */
+  .ml-chat-area { flex:1; display:flex; flex-direction:column; min-height:0; padding:4px 12px 8px; }
+  .ml-chat-box { flex:1; min-height:0; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
+  .ml-chat-box .ml-chat-header { display:flex; align-items:center; gap:6px; padding:8px 12px; font-size:11px; color:#888; font-family:Arial; cursor:pointer; flex-shrink:0; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .ml-chat-box .ml-chat-header svg { flex-shrink:0; }
+  .ml-chat-box .ml-chat-toggle { margin-left:auto; font-size:10px; color:#666; transition:transform 0.2s; }
+  .ml-chat-box.expanded .ml-chat-toggle { transform:rotate(180deg); }
+  .ml-chat-box .ml-chat-messages { flex:1; overflow-y:auto; padding:8px 12px; display:none; }
+  .ml-chat-box.expanded .ml-chat-messages { display:block; }
+  .ml-chat-box .ml-chat-welcome { text-align:center; padding:12px 0; }
+  .ml-chat-box .ml-chat-welcome .ml-sloth { font-size:28px; }
+  .ml-chat-box .ml-chat-welcome .ml-hint { font-size:11px; color:#888; margin-top:4px; line-height:1.4; }
+  .ml-chat-box .ml-chat-welcome .ml-chips { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:8px; }
+  .ml-chat-box .ml-chat-welcome .ml-chip { padding:6px 10px; font-size:10px; background:rgba(120,134,165,0.12); border:1px solid rgba(120,134,165,0.2); border-radius:8px; color:#9BA8C4; cursor:pointer; font-family:Arial; }
+  .ml-chat-box .ml-chat-welcome .ml-chip:active { background:rgba(120,134,165,0.25); }
+
+  /* Prompt input — always visible, 2 lines */
+  .ml-prompt-wrap { display:flex; gap:6px; padding:8px 0 0; flex-shrink:0; }
+  .ml-prompt-wrap textarea { flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:12px; color:#e0e0e0; font-size:13px; font-family:Arial; padding:10px 12px; resize:none; height:48px; line-height:1.4; }
+  .ml-prompt-wrap textarea:focus { outline:none; border-color:rgba(120,134,165,0.4); }
+  .ml-prompt-wrap textarea::placeholder { color:#555; }
+  .ml-prompt-wrap .ml-send { width:44px; height:48px; background:#7886A5; border:none; border-radius:12px; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; }
+  .ml-prompt-wrap .ml-send:active { background:#6775A0; }
+
+  /* Auth gate overlay — shown when not configured */
+  .ml-auth-gate { display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:700; background:rgba(0,0,0,0.85); backdrop-filter:blur(12px); align-items:center; justify-content:center; }
+  .ml-auth-gate.visible { display:flex; }
+  .ml-auth-gate-card { width:90%; max-width:340px; background:#1a1a1f; border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:28px 24px; display:flex; flex-direction:column; gap:16px; }
+  .ml-auth-gate-card .ml-gate-title { font-size:18px; font-weight:700; color:#e0e0e0; text-align:center; font-family:Arial; }
+  .ml-auth-gate-card .ml-gate-subtitle { font-size:12px; color:#888; text-align:center; font-family:Arial; line-height:1.4; }
+  .ml-auth-gate-card .ml-gate-github { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:12px; background:#24292e; color:#fff; border:1px solid #444; border-radius:12px; cursor:pointer; font-size:13px; font-family:Arial; font-weight:500; }
+  .ml-auth-gate-card .ml-gate-github:active { background:#2d3339; }
+  .ml-auth-gate-card .ml-gate-divider { display:flex; align-items:center; gap:8px; color:#555; font-size:10px; font-family:Arial; }
+  .ml-auth-gate-card .ml-gate-divider::before, .ml-auth-gate-card .ml-gate-divider::after { content:''; flex:1; height:1px; background:rgba(255,255,255,0.1); }
+  .ml-auth-gate-card .ml-gate-api-btn { width:100%; padding:12px; background:rgba(120,134,165,0.15); color:#9BA8C4; border:1px solid rgba(120,134,165,0.25); border-radius:12px; cursor:pointer; font-size:13px; font-family:Arial; font-weight:500; text-align:center; }
+  .ml-auth-gate-card .ml-gate-api-btn:active { background:rgba(120,134,165,0.25); }
+  .ml-auth-gate-card .ml-gate-skip { text-align:center; font-size:11px; color:#666; cursor:pointer; font-family:Arial; }
+
+  /* Footer — subtle at bottom of mobile landing */
+  .ml-footer { flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:12px; padding:4px 0 6px; }
+  .ml-footer span, .ml-footer a { font-size:9px; color:#555; font-family:Arial; text-decoration:none; }
+  .ml-footer a:hover { color:#888; }
+
   .ws-modal { width:95%; }
 
   /* --- Onboarding: compact --- */
@@ -263,22 +305,6 @@
   /* Slide drag handle: bigger on mobile for touch */
   .slide-drag-handle { width:34px; height:34px; top:-8px; left:-8px; border-radius:9px; }
   .slide-drag-handle svg { width:16px; height:16px; }
-  /* Landing + mode cards phone */
-  .mp-chat-panel { display:none; }
-  /* Mobile prompt: floating bottom bar inside landing overlay */
-  .mp-mobile-prompt { display:none; }
-  /* On mobile landing page, show Get Started instead of floating prompt */
-  .mode-cards { flex-direction:column; align-items:center; gap:12px; overflow-y:auto; max-height:calc(100vh - 160px); padding-bottom:12px; }
-  .mode-card { max-width:100%; width:100%; flex-direction:row; display:flex; border-radius:12px; }
-  .mode-card-demo { height:auto; width:110px; min-height:100px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:12px 0 0 12px; }
-  .mode-card-info { padding:14px 14px; flex:1; text-align:left; }
-  .mode-card-icon { margin:0 0 6px; width:32px; height:32px; }
-  .mode-card-name { font-size:14px; }
-  .mode-card-desc { font-size:10px; }
-  .mode-card-badge { top:6px; right:auto; left:6px; font-size:8px; }
-  .mc-slide-preview { width:70%; max-width:80px; padding:8px; }
-  .mc-doc-preview { width:50%; max-width:60px; padding:8px 6px; }
-  .mc-doc-preview .mc-dimg { height:16px; }
   .mc-sheet-preview { width:75%; max-width:85px; }
   .mc-sheet-cell { padding:3px 4px; font-size:6px; }
   /* Workspace card on phone: same horizontal strip as others */

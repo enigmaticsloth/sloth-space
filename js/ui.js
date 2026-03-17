@@ -302,15 +302,68 @@ function showLanding(){
   sessionStorage.setItem('sloth_on_picker','1');
   _initLandingProviderGrid();
   _prefillLandingFromConfig();
+  // Mobile: show mobile landing, clone demo into mobile frame
+  const isMobile=window.innerWidth<=600;
+  const ml=document.getElementById('mobileLanding');
+  if(isMobile && ml){
+    ml.style.display='flex';
+    _cloneDemoToMobile();
+  } else if(ml){
+    ml.style.display='none';
+  }
   // History API: push landing state (skip if triggered by popstate)
   if(!_isPopState && location.hash!=='#home'){
     history.pushState({mode:'home'},'','#home');
   }
 }
 
+/**
+ * Clone the desktop demo (muFrame) content into the mobile frame.
+ * On mobile, the demo scenes in app.js target `muFrame` (desktop).
+ * We use a MutationObserver to mirror content into muFrameMobile.
+ */
+function _cloneDemoToMobile(){
+  const src=document.getElementById('muFrame');
+  const dst=document.getElementById('muFrameMobile');
+  if(!src||!dst) return;
+  // Initial clone
+  dst.innerHTML=src.innerHTML;
+  // Mirror future updates
+  if(window._mlDemoObserver) window._mlDemoObserver.disconnect();
+  window._mlDemoObserver=new MutationObserver(()=>{
+    dst.innerHTML=src.innerHTML;
+  });
+  window._mlDemoObserver.observe(src, {childList:true, subtree:true, characterData:true, attributes:true});
+  // Also sync demo description and nav dots
+  const srcDesc=document.getElementById('llDemoDesc');
+  const dstDesc=document.getElementById('mlDemoDesc');
+  if(srcDesc&&dstDesc){
+    dstDesc.textContent=srcDesc.textContent;
+    if(window._mlDescObserver) window._mlDescObserver.disconnect();
+    window._mlDescObserver=new MutationObserver(()=>{
+      dstDesc.textContent=srcDesc.textContent;
+    });
+    window._mlDescObserver.observe(srcDesc, {childList:true, characterData:true, subtree:true});
+  }
+  const srcNav=document.getElementById('llDemoNav');
+  const dstNav=document.getElementById('mlDemoNav');
+  if(srcNav&&dstNav){
+    dstNav.innerHTML=srcNav.innerHTML;
+    if(window._mlNavObserver) window._mlNavObserver.disconnect();
+    window._mlNavObserver=new MutationObserver(()=>{
+      dstNav.innerHTML=srcNav.innerHTML;
+    });
+    window._mlNavObserver.observe(srcNav, {childList:true, subtree:true, characterData:true, attributes:true});
+  }
+}
+
 function hideLanding(){
   const overlay=document.getElementById('landingOverlay');
   if(overlay) overlay.classList.add('hidden');
+  // Clean up mobile demo observers
+  if(window._mlDemoObserver){ window._mlDemoObserver.disconnect(); window._mlDemoObserver=null; }
+  if(window._mlDescObserver){ window._mlDescObserver.disconnect(); window._mlDescObserver=null; }
+  if(window._mlNavObserver){ window._mlNavObserver.disconnect(); window._mlNavObserver=null; }
 }
 
 function _initLandingProviderGrid(){
@@ -2292,6 +2345,82 @@ function mpSendFromMobile() {
   mpSendPrompt(text);
 }
 
+// ═══════════════════════════════════════════
+// MOBILE LANDING — phone-only functions
+// ═══════════════════════════════════════════
+
+/**
+ * Mobile landing: pick a mode (doc/slide/sheet/workspace).
+ * Shows auth gate if not configured; otherwise enters the mode.
+ */
+function mlPickMode(mode){
+  if(!window.isConfigured || !window.isConfigured()){
+    mlShowAuthGate();
+    return;
+  }
+  hideLanding();
+  modeEnter(mode);
+}
+
+/**
+ * Toggle the mobile chat box expanded/collapsed.
+ */
+function mlToggleChat(){
+  const box=document.getElementById('mlChatBox');
+  if(box) box.classList.toggle('expanded');
+}
+
+/**
+ * Send a prompt from mobile landing (chip click or programmatic).
+ * Gates on API config; if not configured shows auth gate.
+ */
+function mlSendPrompt(text){
+  if(!text) return;
+  if(!window.isConfigured || !window.isConfigured()){
+    mlShowAuthGate();
+    return;
+  }
+  // Delegate to the existing mpSendPrompt which handles routing + mode entry
+  mpSendPrompt(text);
+}
+
+/**
+ * Send from the mobile landing textarea.
+ */
+function mlSendFromInput(){
+  const input=document.getElementById('mlChatInput');
+  if(!input) return;
+  const text=input.value.trim();
+  if(!text) return;
+  input.value='';
+  mlSendPrompt(text);
+}
+
+/**
+ * Show the API setup flow from mobile auth gate.
+ * Closes auth gate and opens the settings overlay (reuses desktop settings).
+ */
+function mlShowApiSetup(){
+  mlCloseAuthGate();
+  openSettings();
+}
+
+/**
+ * Show the mobile auth gate overlay.
+ */
+function mlShowAuthGate(){
+  const gate=document.getElementById('mlAuthGate');
+  if(gate) gate.classList.add('visible');
+}
+
+/**
+ * Close the mobile auth gate overlay.
+ */
+function mlCloseAuthGate(){
+  const gate=document.getElementById('mlAuthGate');
+  if(gate) gate.classList.remove('visible');
+}
+
 /**
  * Simulate a visual click effect on a DOM element.
  */
@@ -2564,6 +2693,7 @@ function mpSendPrompt(text) {
 function mpInitInputs() {
   mpInitInput('mpChatInput', mpSendFromInput);
   mpInitInput('mpMobileChatInput', mpSendFromMobile);
+  mpInitInput('mlChatInput', mlSendFromInput);
 }
 
 // Export all functions
@@ -2675,4 +2805,12 @@ export {
   // New tab page
   ntpPickMode,
   ntpOpenRecent,
+  // Mobile landing
+  mlPickMode,
+  mlToggleChat,
+  mlSendPrompt,
+  mlSendFromInput,
+  mlShowApiSetup,
+  mlShowAuthGate,
+  mlCloseAuthGate,
 };
