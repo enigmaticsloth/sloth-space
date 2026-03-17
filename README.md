@@ -40,20 +40,20 @@ The AI doesn't just create content — it operates the entire application. It sw
 - The LLM doesn't just generate content — it operates the entire application interface
 - 27 whitelisted UI functions: mode switching, workspace navigation, file/project CRUD, panels, search/sort
 - Multi-step executor — "create a project called Q2, write a budget report and put it in there" triggers create → switch mode → generate → link in one command
-- Monet-orange overlay indicator showing AI actions in real-time
+- Natural language intent routing — no hardcoded commands, works in any language
 - Fuzzy name-to-ID resolution for natural language references ("open that file", "delete the Q2 project")
+- Context memory — AI remembers recent actions to resolve pronouns and references
+- Monet-orange overlay indicator showing AI actions in real-time
 - Destructive actions require user confirmation; schema validation on all parameters
 
-**AI Capabilities**
-- Natural language intent routing — no hardcoded commands, works in any language
-- Content generation, editing, styling, and batch operations
-- Cross-file project context — AI reads all files in a project when generating
-- Context memory — AI remembers recent actions to resolve "that file", "open it"
+**AI Context Injection**
+- Cross-file project context — AI reads all files in a project when generating new content
 - Per-block AI actions — rewrite, expand, translate, simplify, change tone, suggest formula
+- Bench (context staging) — pin files, paste text, or drop images as extra context for generation
+- Cross-file references — mention a doc or sheet by name, AI pulls its data into the prompt
 
 **Workspace**
 - Project-based file organization
-- Cross-file references (mention a doc or sheet by name, AI uses its data)
 - Auto-linking generated content to source projects
 - Cloud sync via Supabase (GitHub OAuth)
 
