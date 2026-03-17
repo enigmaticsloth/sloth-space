@@ -429,7 +429,7 @@ INTENTS:
 PRIORITY RULES (follow in order):
 1. Undo words (undo/redo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (delete/remove) → "content_edit" with delete:true.
-3. **MULTI-STEP CHECK**: If the message asks for BOTH project/file management AND content creation (e.g. "create project X and write a doc about Y for it"), → "multi_step".
+3. **MULTI-STEP CHECK**: If the message asks to CREATE A NEW PROJECT AND also create content for it → "multi_step". But if the user just wants to create content and file/link it to an EXISTING project (歸在/歸類/放在/加入/put in/link to + existing project name), → "generate" (NOT multi_step). The system auto-links to the mentioned project.
 4. **APP MANAGEMENT OVERRIDE**: If the message asks to CREATE/DELETE/MANAGE a PROJECT, or OPEN/SWITCH/NAVIGATE to a mode/file/project, or LINK/UNLINK files → ALWAYS "ui_action". Keywords: project, open, switch, navigate, link, unlink, sort, search, settings. "create a project" / "open settings" / "switch to workspace" → ui_action, NOT generate.
 5. **CONTENT CREATION OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation (CONTENT, not a project) → ALWAYS "generate", even if the message ALSO asks about content.
 6. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
@@ -483,6 +483,7 @@ INTENTS:
 "chat" — ONLY pure greetings with no topic. If ANY topic exists → "generate" instead.
 
 PRIORITY: undo > delete(content_edit) > multi_step > ui_action(projects/navigation) > generate(content creation) > describe > about > style/image > chat.
+CRITICAL: "create/write content + put/file/link it in an existing project" → generate (NOT multi_step). The system auto-links to the project. Only use multi_step when CREATING a new project AND content together.
 When in doubt between chat and generate → always choose generate.
 Cross-mode conversion ("turn slides into doc") → generate with appropriate target.
 Bench files are reference data already injected as context. "use bench/PDF data to generate" → generate.
@@ -2385,12 +2386,39 @@ ${sourceContent}`;
 
     }else if(intent==='multi_step'){
       // ── MULTI-STEP: sequential execution of mixed intent types ──
-      statusDiv.remove();
       const steps = routerData.steps || [];
       const message = routerData.message || 'Executing multi-step operation...';
-      if(steps.length === 0){
+      const hasGenerate = steps.some(s => s.type === 'generate');
+      const userWantsContent = /建立|create|write|make|生成|產生|寫|做|draft|generate/i.test(text) && /文件|doc|簡報|slide|presentation|報告|report|article|文章|試算|sheet/i.test(text);
+
+      // Safety: if multi_step has no generate step but user clearly wants content, fall back to generate
+      if (!hasGenerate && userWantsContent) {
+        // Execute any ui_action steps first (e.g. creating a project)
+        if (steps.length > 0) {
+          statusDiv.remove();
+          await executeMultiStep(steps, message, text, wsContext, _resolvedProjectId);
+        }
+        // Then generate the content
+        const target = /簡報|slide|presentation|pitch|deck|ppt/i.test(text) ? 'slide' :
+                       /試算|sheet|spreadsheet|excel|csv/i.test(text) ? 'sheet' : 'doc';
+        if (target === 'slide') {
+          await _aiEnsureModeForGenerate('slide');
+          await doGenerate(statusDiv, wsContext);
+        } else if (target === 'sheet') {
+          // Sheet generation handled separately — fall through to generate intent
+          await _aiEnsureModeForGenerate('sheet');
+          statusDiv.textContent = 'Generating sheet...';
+        } else {
+          await _aiEnsureModeForGenerate('doc');
+          await doDocGenerate(statusDiv, text, wsContext);
+        }
+        _autoLinkToProject(_resolvedProjectId);
+        S.chatHistory.push({role:'assistant',content:`[Multi-step + generate: ${message}]`});
+      } else if(steps.length === 0){
+        statusDiv.remove();
         addMessage(message || 'No steps to perform.', 'ai');
       } else {
+        statusDiv.remove();
         await executeMultiStep(steps, message, text, wsContext, _resolvedProjectId);
         S.chatHistory.push({role:'assistant',content:`[Multi-step: ${message}]`});
       }
@@ -3527,7 +3555,18 @@ function resolveActionRefs(actions) {
       const name = a.args[0].toLowerCase();
       const tab = S.modeTabs.find(t => (t.title || '').toLowerCase().includes(name));
       if (tab) resolved.args[0] = tab.id;
-      else {
+      else if (a.fn === 'modeTabSwitch') {
+        // Fallback: if tab name matches a mode, use modeEnter instead
+        const modeNames = ['slide','doc','sheet','workspace'];
+        const matchedMode = modeNames.find(m => name.includes(m));
+        if (matchedMode) {
+          resolved.fn = 'modeEnter';
+          resolved.args = [matchedMode];
+        } else {
+          console.warn(`[AI UI] Tab not found: "${a.args[0]}"`);
+          return null;
+        }
+      } else {
         console.warn(`[AI UI] Tab not found: "${a.args[0]}"`);
         return null;
       }
