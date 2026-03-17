@@ -210,8 +210,10 @@ async function _extractPdfText(file) {
   }
 }
 
-// ── Size limits ──
-const _BENCH_IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8 MB limit for images
+// ── Limits ──
+const _BENCH_MAX_FILES = 5;
+const _BENCH_FILE_MAX_BYTES = 20 * 1024 * 1024; // 20 MB per file
+const _BENCH_IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8 MB for images
 
 // ── localStorage persistence ──
 const _BENCH_STORAGE_KEY = 'sloth_bench';
@@ -263,9 +265,26 @@ function _benchLoad() {
 // ── Core bench operations ──
 
 async function benchAddFile(file) {
+  // Enforce max file count
+  if (S.bench.length >= _BENCH_MAX_FILES) {
+    if (window.addMessage) {
+      window.addMessage(`Bench is full (max ${_BENCH_MAX_FILES} files). Remove a file before adding more.`, 'system');
+    }
+    return null;
+  }
+
+  // Enforce per-file size limit
+  if (file.size > _BENCH_FILE_MAX_BYTES) {
+    const maxMB = (_BENCH_FILE_MAX_BYTES / (1024 * 1024)).toFixed(0);
+    if (window.addMessage) {
+      window.addMessage(`"${file.name}" (${_sizeStr(file.size)}) exceeds the ${maxMB}MB file size limit.`, 'system');
+    }
+    return null;
+  }
+
   const type = _benchFileType(file.name);
 
-  // Enforce image size limit
+  // Enforce image size limit (stricter)
   if (type === 'image' && file.size > _BENCH_IMAGE_MAX_BYTES) {
     const maxMB = (_BENCH_IMAGE_MAX_BYTES / (1024 * 1024)).toFixed(0);
     if (window.addMessage) {
