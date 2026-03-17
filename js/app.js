@@ -58,7 +58,7 @@ ui.mpInitInputs();
 
 // 3. Auth + restore persisted data (AFTER mode is established)
 storage.initAuth();
-storage.autoLoad();
+try{ storage.autoLoad(); }catch(e){ console.warn('[app.js] autoLoad failed:',e); }
 
 // 4. Restore chat tabs
 ai.initChatTabs();
@@ -66,8 +66,8 @@ ai.initChatTabs();
 // 5. Check share link (may override loaded deck)
 storage.checkShareLink();
 
-// 6. Final render
-ui.renderApp();
+// 6. Final render (wrapped — uncaught error here kills the entire ES module)
+try{ ui.renderApp(); }catch(e){ console.warn('[app.js] renderApp failed on init:',e); }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── Typewriter placeholder animation ──
