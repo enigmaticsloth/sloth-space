@@ -129,31 +129,32 @@
   body.mode-doc .doc-canvas::-webkit-scrollbar,
   body.mode-workspace .workspace-canvas::-webkit-scrollbar,
   body.mode-sheet .sheet-canvas::-webkit-scrollbar { display:none; /* Chrome/Safari */ }
-  /* ── iOS native text selection: comprehensive enablement ── */
-  /* Doc page + all children: full native touch for long-press select.
-     Use -webkit-user-select:text (NOT auto) — 'auto' can inherit 'none'
-     from parent chain on some iOS versions, 'text' explicitly enables. */
+  /* ── iOS native text selection: enable select but suppress native toolbar ── */
+  /* Use -webkit-user-select:text for selection, but -webkit-touch-callout:none
+     to suppress the native iOS Copy/Paste/Look Up toolbar — we show our own
+     custom toolbar (sel-toolbar.js) with Copy/Cut/AI Edit instead. */
   body.mode-doc .doc-canvas #docPage,
   body.mode-doc .doc-canvas #docPage *,
   body.mode-doc .doc-canvas .doc-block,
   body.mode-doc .doc-canvas [contenteditable] {
     -webkit-user-select:text !important; user-select:text !important;
     touch-action:auto !important;
-    -webkit-touch-callout:default !important;
+    -webkit-touch-callout:none !important;
   }
   /* Ensure #docPage itself is selectable and not clipped */
   body.mode-doc #docPage {
     position:relative !important;
     -webkit-user-select:text !important; user-select:text !important;
+    -webkit-touch-callout:none !important;
   }
-  /* Slide inline editing: enable native text selection on canvas */
+  /* Slide inline editing: enable text selection but suppress native iOS toolbar */
   body.slide-inline-editing .slide-panel,
   body.slide-inline-editing #slideCanvas,
   body.slide-inline-editing #slideCanvas *,
   body.slide-inline-editing .slide-frame {
     touch-action:auto !important;
     -webkit-user-select:text !important; user-select:text !important;
-    -webkit-touch-callout:default !important;
+    -webkit-touch-callout:none !important;
   }
   /* Drag handle: always visible on mobile (no hover), and allow touch drag */
   body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; -webkit-touch-callout:none !important; }

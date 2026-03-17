@@ -165,19 +165,19 @@ export function handleRegionClick(slideIdx,regionId,role,label,event){
   if(sel&&sel.toString().trim().length>0) return;
   // If in move mode and we already have this region selected, ignore
   if(S.fcMoveMode&&S.selectedRegion&&S.selectedRegion.regionId===regionId) return;
-  // Single click → select region + enter inline edit directly (no AI menu popup)
-  if(role==='image'){
-    selectRegion(slideIdx,regionId,role,label,event);
-    return;
-  }
-  selectRegionQuiet(slideIdx,regionId,role,label);
-  enterInlineEdit(slideIdx,regionId);
+  // Single click → SELECT block (show selection bar + AI context menu)
+  // Double click → enters inline text editing (see handleRegionDblClick)
+  selectRegion(slideIdx,regionId,role,label,event);
   showSlideDragHandle(true);
 }
 
-export function handleRegionDblClick(slideIdx,regionId,role){
-  // Double-click: select word (browser default), no extra action needed
-  // since single-click already enters edit mode
+export function handleRegionDblClick(slideIdx,regionId,role,label){
+  // Double-click → enter inline text editing (images don't have inline edit)
+  if(role==='image') return;
+  if(isInlineEditing()) commitInlineEdit();
+  selectRegionQuiet(slideIdx,regionId,role,label);
+  enterInlineEdit(slideIdx,regionId);
+  showSlideDragHandle(true);
 }
 
 export function selectRegion(slideIdx,regionId,role,label,clickEvent){
@@ -186,8 +186,8 @@ export function selectRegion(slideIdx,regionId,role,label,clickEvent){
   document.getElementById('selectionTag').textContent=`Slide ${slideIdx+1} → ${label} (${regionId})`;
   window.renderApp();
   updateFontSizeIndicator();
-  // AI menu only for images (no inline edit for images)
-  if(clickEvent&&!S.fcDrag&&!S.fcJustDragged&&role==='image') showCtxAiMenu(slideIdx,regionId,role,label,clickEvent);
+  // Show AI context menu for all block types on single click
+  if(clickEvent&&!S.fcDrag&&!S.fcJustDragged) showCtxAiMenu(slideIdx,regionId,role,label,clickEvent);
 }
 
 /** Select region without re-render or AI menu (for inline edit entry) */
@@ -304,6 +304,12 @@ export function resetRegionBounds(slideIdx,regionId){
 export function initFreeformCanvas(){
   const canvas=document.getElementById('slideCanvas');
   if(!canvas)return;
+
+  // Suppress native iOS context menu on slide canvas (inline editing)
+  // so only our custom sel-toolbar shows
+  canvas.addEventListener('contextmenu',function(e){
+    if(S.currentMode==='slide'&&isInlineEditing()) e.preventDefault();
+  });
 
   // ── Helper: compute scale from rendered slide to data coordinates ──
   function getSlideScale(){
@@ -634,7 +640,7 @@ export function generateCtxSuggestions(role,regionId,content){
 
   // ════════ DIRECT ACTIONS (non-AI, at top) ════════
   if(!isImage){
-    suggestions.push({icon:'✏️',text:'Edit text directly',hint:'Or double-click',action:`__edit__${regionId}`});
+    suggestions.push({icon:'✏️',text:'Edit text directly',hint:'Double-click to edit',action:`__edit__${regionId}`});
   }
   suggestions.push({icon:'✥',text:'Move / reposition',hint:'Drag to new location',action:`__move__${regionId}`});
   // Reset position if customized
@@ -969,7 +975,7 @@ function _renderSlideInner(slide,idx,p,total){
     const isSel=S.selectedRegion&&S.selectedRegion.slideIdx===idx&&S.selectedRegion.regionId===r.id;
     const selClass=isSel?'region-box selected':'region-box';
     const roleLabel=r.role.charAt(0).toUpperCase()+r.role.slice(1);
-    html+=`<div class="${selClass}" data-region="${r.id}" data-slide="${idx}" onmouseup="event.stopPropagation();handleRegionClick(${idx},'${r.id}','${r.role}','${roleLabel}',event)" ondblclick="event.stopPropagation();handleRegionDblClick(${idx},'${r.id}','${r.role}')" style="position:absolute;left:${ax}px;top:${ay}px;width:${bw}px;height:${bh}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
+    html+=`<div class="${selClass}" data-region="${r.id}" data-slide="${idx}" onmouseup="event.stopPropagation();handleRegionClick(${idx},'${r.id}','${r.role}','${roleLabel}',event)" ondblclick="event.stopPropagation();handleRegionDblClick(${idx},'${r.id}','${r.role}','${roleLabel}')" style="position:absolute;left:${ax}px;top:${ay}px;width:${bw}px;height:${bh}px;display:flex;flex-direction:column;justify-content:${jc};text-align:${al.horizontal||'left'};overflow:hidden;${extra}">`;
     html+=rc(c,r.role,p,r,regionColor,regionFontSize);
     // Resize handles on selected region
     if(isSel){

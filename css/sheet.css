@@ -110,7 +110,7 @@
   z-index:1;
 }
 .sh-cell.error { color:#e55; font-style:italic; font-size:11px; }
-/* Fill handle — small blue square at bottom-right of selected cell */
+/* Fill handle — small blue square at bottom-right of selected cell (legacy, kept for compat) */
 .sh-fill-handle {
   position:absolute; bottom:-3px; right:-3px;
   width:7px; height:7px;
@@ -119,6 +119,21 @@
   border-radius:1px;
 }
 .sh-fill-handle:hover { background:#6B8FC5; transform:scale(1.3); }
+
+/* Corner drag handles — 4 dots on selected cell corners for range selection */
+.sh-corner-handle {
+  position:absolute;
+  width:7px; height:7px;
+  background:#4A6FA5; border:1px solid #222;
+  border-radius:50%;
+  cursor:crosshair; z-index:5;
+  transition:transform 0.1s, background 0.1s;
+}
+.sh-corner-handle:hover { background:#6B8FC5; transform:scale(1.5); }
+.sh-corner-tl { top:-4px; left:-4px; }
+.sh-corner-tr { top:-4px; right:-4px; }
+.sh-corner-bl { bottom:-4px; left:-4px; }
+.sh-corner-br { bottom:-4px; right:-4px; }
 .sh-cell.selected { position:relative; }
 .sh-grid { user-select:none; -webkit-user-select:none; }
 

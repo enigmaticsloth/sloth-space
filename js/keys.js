@@ -195,12 +195,15 @@ export function initKeys(){
     if(e.key==='Escape'){
       if(S.currentMode==='doc'){
         window.docHideImagePopup();
-        // If actively editing a contenteditable, blur it first
-        const ae=document.activeElement;
-        if(ae&&ae.isContentEditable){
-          ae.blur();
-          if(ae.classList.contains('doc-block')) ae.contentEditable='false';
-          if(S.docEditingBlockId) S.docEditingBlockId=null;
+        // If inline-editing, exit editing first (go back to block-selected state)
+        if(S.docInlineEditing){
+          window.docExitInlineEdit();
+          e.preventDefault();
+          return;
+        }
+        // If block is selected, clear selection
+        if(S.docSelectedBlockId){
+          window.docClearBlockSelection();
           e.preventDefault();
           return;
         }

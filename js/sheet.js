@@ -167,9 +167,12 @@ export function renderSheetMode() {
       const cellBg = row.cellStyles && row.cellStyles[col.id] && row.cellStyles[col.id].bg;
       const bgStyle = cellBg ? ` style="background:${cellBg}"` : '';
 
-      // Add fill handle to the selected cell (bottom-right corner drag square)
-      const fillHandle = (isSelected && !isEditing && !isInRange)
-        ? `<div class="sh-fill-handle" onmousedown="event.stopPropagation(); window.shFillHandleDown(event, '${row.id}', '${col.id}')"></div>`
+      // Add corner drag handles to the selected cell (4 corners for range selection)
+      const cornerHandles = (isSelected && !isEditing && !isInRange)
+        ? `<div class="sh-corner-handle sh-corner-tl" onmousedown="event.stopPropagation(); window.shCornerHandleDown(event, '${row.id}', '${col.id}', 'tl')" ontouchstart="event.stopPropagation(); window.shCornerHandleDown(event, '${row.id}', '${col.id}', 'tl')"></div>`
+        + `<div class="sh-corner-handle sh-corner-tr" onmousedown="event.stopPropagation(); window.shCornerHandleDown(event, '${row.id}', '${col.id}', 'tr')" ontouchstart="event.stopPropagation(); window.shCornerHandleDown(event, '${row.id}', '${col.id}', 'tr')"></div>`
+        + `<div class="sh-corner-handle sh-corner-bl" onmousedown="event.stopPropagation(); window.shCornerHandleDown(event, '${row.id}', '${col.id}', 'bl')" ontouchstart="event.stopPropagation(); window.shCornerHandleDown(event, '${row.id}', '${col.id}', 'bl')"></div>`
+        + `<div class="sh-corner-handle sh-corner-br" onmousedown="event.stopPropagation(); window.shCornerHandleDown(event, '${row.id}', '${col.id}', 'br')" ontouchstart="event.stopPropagation(); window.shCornerHandleDown(event, '${row.id}', '${col.id}', 'br')"></div>`
         : '';
       html += `<div class="${cls.join(' ')}" data-row-id="${row.id}" data-col-id="${col.id}"
         data-row-idx="${r}" data-col-idx="${c}"${bgStyle}
@@ -177,7 +180,7 @@ export function renderSheetMode() {
         onclick="window.shCellClick(event, '${row.id}', '${col.id}')"
         ondblclick="window.shCellDblClick(event, '${row.id}', '${col.id}')"
         oncontextmenu="event.preventDefault(); window.shCellCtx(event, '${row.id}', '${col.id}')"
-        >${escHtml(String(displayText))}${fillHandle}</div>`;
+        >${escHtml(String(displayText))}${cornerHandles}</div>`;
     }
     // Empty spacer for add-col column on each data row
     html += `<div class="sh-add-col-spacer"></div>`;
@@ -243,6 +246,8 @@ export function shCellClick(event, rowId, colId) {
     shSelectRange(S.sheet.selectedCell, { rowId, colId });
   } else {
     shSelectCell(rowId, colId);
+    // Show AI context menu on single-click selection (like slide/doc modes)
+    showSheetCtxAiMenu(rowId, colId, event);
   }
 }
 
@@ -468,6 +473,75 @@ function _reattachDragListeners() {
 
 let _fillState = null; // { srcRowId, srcColId, srcRowIdx, srcColIdx }
 
+// ═══════════════════════════════════════════
+// CORNER DRAG HANDLES — drag from any corner to select a range
+// ═══════════════════════════════════════════
+
+let _cornerDragState = null;
+
+export function shCornerHandleDown(event, rowId, colId, corner) {
+  event.preventDefault();
+  event.stopPropagation();
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const rIdx = sh.rows.findIndex(r => r.id === rowId);
+  const cIdx = sh.columns.findIndex(c => c.id === colId);
+  _cornerDragState = { anchorRowId: rowId, anchorColId: colId, anchorRowIdx: rIdx, anchorColIdx: cIdx, corner };
+
+  // Hide AI context menu during drag
+  window.hideCtxAiMenu?.();
+
+  document.addEventListener('mousemove', _onCornerDragMove);
+  document.addEventListener('mouseup', _onCornerDragEnd);
+  document.addEventListener('selectstart', _blockSelect);
+
+  // Also support touch
+  document.addEventListener('touchmove', _onCornerDragTouchMove, { passive: false });
+  document.addEventListener('touchend', _onCornerDragTouchEnd);
+}
+
+function _onCornerDragMove(e) {
+  if (!_cornerDragState) return;
+  const hit = _cellFromPoint(e.clientX, e.clientY);
+  if (!hit) return;
+  // Update range selection from anchor cell to current cell
+  S.sheet.selectedRange = {
+    start: { rowId: _cornerDragState.anchorRowId, colId: _cornerDragState.anchorColId },
+    end: hit
+  };
+  renderSheetMode();
+}
+
+function _onCornerDragTouchMove(e) {
+  if (!_cornerDragState) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const hit = _cellFromPoint(touch.clientX, touch.clientY);
+  if (!hit) return;
+  S.sheet.selectedRange = {
+    start: { rowId: _cornerDragState.anchorRowId, colId: _cornerDragState.anchorColId },
+    end: hit
+  };
+  renderSheetMode();
+}
+
+function _onCornerDragEnd(e) {
+  document.removeEventListener('mousemove', _onCornerDragMove);
+  document.removeEventListener('mouseup', _onCornerDragEnd);
+  document.removeEventListener('selectstart', _blockSelect);
+  document.removeEventListener('touchmove', _onCornerDragTouchMove);
+  document.removeEventListener('touchend', _onCornerDragTouchEnd);
+  if (_cornerDragState && S.sheet.selectedRange) {
+    // Keep the range selection visible
+    setTimeout(()=>{ if(window.showSheetRangeToolbar) window.showSheetRangeToolbar(); }, 0);
+  }
+  _cornerDragState = null;
+}
+
+function _onCornerDragTouchEnd(e) {
+  _onCornerDragEnd(e);
+}
+
 export function shFillHandleDown(event, rowId, colId) {
   event.preventDefault();
   const sh = S.sheet.current;
@@ -569,6 +643,96 @@ export function shSelectCell(rowId, colId) {
   S.sheet.selectedRange = null;
   if(window.hideTextSelTooltip) window.hideTextSelTooltip();
   renderSheetMode();
+}
+
+export function showSheetCtxAiMenu(rowId, colId, clickEvent) {
+  const sh = S.sheet.current;
+  if (!sh) return;
+  const row = sh.rows.find(r => r.id === rowId);
+  if (!row) return;
+  const col = sh.columns.find(c => c.id === colId);
+  if (!col) return;
+  const rawVal = row.cells[colId] || '';
+  const colName = col.name || '';
+  const rIdx = sh.rows.indexOf(row) + 1;
+  const cellRef = `${colName}${rIdx}`;
+
+  const suggestions = [];
+
+  // Direct actions
+  suggestions.push({icon:'✏️', text:'Edit cell', hint:'Double-click to type', action:`__sh_edit__${rowId}__${colId}`});
+  if (rawVal) {
+    suggestions.push({icon:'🗑️', text:'Clear cell', hint:'Remove content', action:`__sh_clear__${rowId}__${colId}`});
+  }
+
+  suggestions.push({type:'divider'});
+
+  // AI suggestions
+  if (rawVal && !rawVal.startsWith('=')) {
+    suggestions.push({icon:'✨', text:'Suggest formula', hint:'Auto-generate formula', action:`__sh_ai__formula__Suggest a formula for cell ${cellRef} based on context__${rowId}__${colId}`});
+    suggestions.push({icon:'🔄', text:'Reformat value', hint:'Clean up formatting', action:`__sh_ai__format__Reformat this cell value for consistency__${rowId}__${colId}`});
+  }
+  if (rawVal && rawVal.startsWith('=')) {
+    suggestions.push({icon:'💡', text:'Explain formula', hint:'What does this do?', action:`__sh_ai__explain__Explain what this formula does: ${rawVal}__${rowId}__${colId}`});
+    suggestions.push({icon:'🔧', text:'Fix / optimize', hint:'Improve formula', action:`__sh_ai__fix__Fix or optimize this formula: ${rawVal}__${rowId}__${colId}`});
+  }
+  suggestions.push({icon:'📊', text:'Fill column with AI', hint:'Auto-populate values', action:`__sh_ai__fill__Fill this column with appropriate values based on existing data__${rowId}__${colId}`});
+
+  const cellEl = document.querySelector(`.sh-cell[data-row-id="${rowId}"][data-col-id="${colId}"]`);
+  window.renderCtxMenuPopup({
+    title: `Cell ${cellRef}`,
+    suggestions,
+    execFn: 'execSheetCtxAction',
+    placeholder: 'Ask AI about this cell...',
+    customExecCode: `execSheetCtxCustom('${rowId}','${colId}')`,
+    clickEvent,
+    anchorEl: cellEl
+  });
+}
+
+export function execSheetCtxAction(action) {
+  window.hideCtxAiMenu();
+  if (action.startsWith('__sh_edit__')) {
+    const parts = action.replace('__sh_edit__','').split('__');
+    shStartEdit(parts[0], parts[1]);
+    return;
+  }
+  if (action.startsWith('__sh_clear__')) {
+    const parts = action.replace('__sh_clear__','').split('__');
+    shPushUndo();
+    shSetCellValue(parts[0], parts[1], '');
+    renderSheetMode();
+    return;
+  }
+  if (action.startsWith('__sh_ai__')) {
+    const rest = action.replace('__sh_ai__','');
+    const firstSep = rest.indexOf('__');
+    const type = rest.substring(0, firstSep);
+    const remaining = rest.substring(firstSep + 2);
+    const lastSep2 = remaining.lastIndexOf('__');
+    const lastSep1 = remaining.lastIndexOf('__', lastSep2 - 1);
+    const instruction = remaining.substring(0, lastSep1);
+    // Send to chat AI
+    const input = document.getElementById('chatInput');
+    if (input) {
+      input.value = instruction;
+      input.focus();
+    }
+    return;
+  }
+}
+
+export function execSheetCtxCustom(rowId, colId) {
+  const input = document.getElementById('ctxCustomInput');
+  if (!input) return;
+  const instruction = input.value.trim();
+  if (!instruction) return;
+  window.hideCtxAiMenu();
+  const chatInput = document.getElementById('chatInput');
+  if (chatInput) {
+    chatInput.value = instruction;
+    chatInput.focus();
+  }
 }
 
 export function shSelectRange(start, end) {
@@ -1889,6 +2053,8 @@ export function shColHeaderCtx(event, colId) {
   const isFirst = colIdx === 0;
   const isFrozen = sh.frozenCols > 0;
   _showHeaderMenu(event, [
+    { label: 'Select column', action: `window.shSelectEntireCol('${colId}')` },
+    { divider: true },
     { label: 'Copy column', action: `window.shCopyCol('${colId}')` },
     { label: 'Paste into column', action: `window.shPasteCol('${colId}')` },
     { divider: true },
@@ -1908,6 +2074,8 @@ export function shRowHeaderCtx(event, rowId) {
   const isFirst = rowIdx === 0;
   const isFrozen = sh.frozenRows > 1; // frozenRows default=1 means header only; >1 means first data row frozen
   _showHeaderMenu(event, [
+    { label: 'Select row', action: `window.shSelectEntireRow('${rowId}')` },
+    { divider: true },
     { label: 'Copy row', action: `window.shCopyRow('${rowId}')` },
     { label: 'Paste into row', action: `window.shPasteRow('${rowId}')` },
     { divider: true },
@@ -1918,6 +2086,38 @@ export function shRowHeaderCtx(event, rowId) {
     { label: isFrozen ? 'Unfreeze first row' : 'Freeze first row',
       action: `window.shToggleFreezeRow()`, disabled: !isFirst && !isFrozen },
   ]);
+}
+
+// ── Select entire column / row ──
+
+export function shSelectEntireCol(colId) {
+  const sh = S.sheet.current;
+  if (!sh || sh.rows.length === 0) return;
+  const firstRow = sh.rows[0];
+  const lastRow = sh.rows[sh.rows.length - 1];
+  S.sheet.selectedCell = { rowId: firstRow.id, colId };
+  S.sheet.selectedRange = {
+    start: { rowId: firstRow.id, colId },
+    end: { rowId: lastRow.id, colId }
+  };
+  S.sheet.editingCell = null;
+  renderSheetMode();
+  setTimeout(() => { if (window.showSheetRangeToolbar) window.showSheetRangeToolbar(); }, 0);
+}
+
+export function shSelectEntireRow(rowId) {
+  const sh = S.sheet.current;
+  if (!sh || sh.columns.length === 0) return;
+  const firstCol = sh.columns[0];
+  const lastCol = sh.columns[sh.columns.length - 1];
+  S.sheet.selectedCell = { rowId, colId: firstCol.id };
+  S.sheet.selectedRange = {
+    start: { rowId, colId: firstCol.id },
+    end: { rowId, colId: lastCol.id }
+  };
+  S.sheet.editingCell = null;
+  renderSheetMode();
+  setTimeout(() => { if (window.showSheetRangeToolbar) window.showSheetRangeToolbar(); }, 0);
 }
 
 // ── Insert row/col at position ──

@@ -154,6 +154,7 @@ export const S = {
   currentDoc: null,
   docSelectedBlockId: null,
   docEditingBlockId: null,
+  docInlineEditing: false,
   docSelectedCaptionBlockId: null,
   docCtxMenuBlockId: null,
   docLastClickedBlock: null,

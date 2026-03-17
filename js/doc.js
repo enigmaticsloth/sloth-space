@@ -35,29 +35,85 @@ export function docEditFromSelection(){
   input.selectionStart=input.selectionEnd=input.value.length;
 }
 
-// ── Doc block click → direct inline edit (text) or AI menu (image/table) ──
+// ── Doc block click → single-click selects block + AI menu, double-click edits ──
+let _docClickTimer=null;
+
 export function docBlockClickAction(blockId, e){
   // Don't interfere if user is selecting text
   const sel=window.getSelection();
   if(sel&&!sel.isCollapsed) return;
   if(e.target.closest('.doc-block-handle')) return;
-  // If already editing this block, don't re-trigger
-  if(S.docEditingBlockId===blockId) return;
+  if(e.target.closest('.doc-float-handle')) return;
+
+  // If currently inline-editing THIS block, allow normal cursor movement
+  if(S.docInlineEditing&&S.docEditingBlockId===blockId) return;
+
+  // If inline-editing a DIFFERENT block, exit editing first
+  if(S.docInlineEditing) docExitInlineEdit();
+
+  // Single click → SELECT block (show selection outline + AI context menu)
+  // Delay to allow double-click to cancel
+  clearTimeout(_docClickTimer);
+  _docClickTimer=setTimeout(()=>{
+    docSelectBlockVisual(blockId, e);
+  },200);
+}
+
+export function docBlockDblClickAction(blockId, e){
+  clearTimeout(_docClickTimer);
   const block=docGetBlock(blockId);
   if(!block) return;
   const isTextBlock=['paragraph','heading1','heading2','heading3','quote','code','bullet','numbered'].includes(block.type);
-  if(isTextBlock){
-    // Single click → enter contenteditable directly (no AI menu)
-    const el=document.querySelector(`[data-block-id="${blockId}"]`);
-    if(el){
-      S.docEditingBlockId=blockId;
-      el.contentEditable='true';
-      setTimeout(()=>el.focus(),0);
+  if(!isTextBlock) return; // Images/tables/dividers don't have inline edit
+  docEnterInlineEdit(blockId, e);
+}
+
+function docSelectBlockVisual(blockId, event){
+  // Clear previous selection
+  docClearBlockSelection();
+  S.docSelectedBlockId=blockId;
+  const blockEl=document.querySelector(`[data-block-id="${blockId}"]`);
+  if(blockEl) blockEl.classList.add('doc-block-selected');
+  // Show AI context menu
+  showDocCtxAiMenu(blockId, event);
+  docUpdateToolbarState();
+}
+
+export function docClearBlockSelection(){
+  document.querySelectorAll('.doc-block-selected').forEach(el=>el.classList.remove('doc-block-selected'));
+  S.docSelectedBlockId=null;
+  window.hideCtxAiMenu?.();
+}
+
+export function docEnterInlineEdit(blockId, event){
+  docClearBlockSelection();
+  S.docInlineEditing=true;
+  S.docEditingBlockId=blockId;
+  const page=document.getElementById('docPage');
+  if(!page) return;
+  page.contentEditable='true';
+  // Place cursor at click/double-click position
+  if(event){
+    const range=document.caretRangeFromPoint?.(event.clientX, event.clientY);
+    if(range){
+      const sel=window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
     }
   } else {
-    // Non-text blocks (image, table, divider) → show AI context menu
-    showDocCtxAiMenu(blockId, e);
+    const blockEl=document.querySelector(`[data-block-id="${blockId}"]`);
+    if(blockEl) blockEl.focus();
   }
+  docFocusBlock(blockId);
+}
+
+export function docExitInlineEdit(){
+  if(!S.docInlineEditing) return;
+  docFlushEditing();
+  S.docInlineEditing=false;
+  S.docEditingBlockId=null;
+  const page=document.getElementById('docPage');
+  if(page) page.contentEditable='false';
 }
 
 // ── Doc context AI menu (reuses ctxAiMenu popup, like slide mode) ──
@@ -132,12 +188,7 @@ export function execDocCtxAction(action){
   // Direct actions
   if(action.startsWith('__doc_edit__')){
     const bid=action.replace('__doc_edit__','');
-    const el=document.querySelector(`[data-block-id="${bid}"]`);
-    if(el){
-      S.docEditingBlockId=bid;
-      el.contentEditable='true';
-      setTimeout(()=>el.focus(),0);
-    }
+    docEnterInlineEdit(bid, null);
     return;
   }
   if(action.startsWith('__doc_delete__')){
@@ -1138,14 +1189,21 @@ export async function docCtxCustomAI(){
   await docCtxAI('custom', instruction);
 }
 
-// Right-click to open context menu on doc blocks
+// Right-click / long-press to open context menu on doc blocks
+// On iOS: preventDefault suppresses the native Copy/Paste/Look Up toolbar
+// so only our custom sel-toolbar appears
 document.addEventListener('contextmenu',function(e){
   if(S.currentMode!=='doc') return;
+  // Freeflow mode: target is inside #docPage
+  const docPage=e.target.closest('#docPage');
   const blockEl=e.target.closest('.doc-block');
-  if(!blockEl) return;
+  if(!docPage&&!blockEl) return;
   e.preventDefault();
-  const blockId=blockEl.dataset.blockId;
-  if(blockId) docShowContextMenu(blockId, e.clientX, e.clientY);
+  if(blockEl){
+    const bid=blockEl.dataset.blockId;
+    if(bid) docShowContextMenu(bid, e.clientX, e.clientY);
+  }
+  // For freeflow #docPage, just suppress native menu — our sel-toolbar handles it
 });
 
 
@@ -1395,11 +1453,13 @@ export function renderDocMode(){
   if(inUl) html+='</ul>';
   if(inOl) html+='</ol>';
 
+  const isEditing=S.docInlineEditing===true;
   canvas.innerHTML=`
-    <div class="doc-page" id="docPage" contenteditable="true"
+    <div class="doc-page" id="docPage" contenteditable="${isEditing?'true':'false'}"
       oninput="docFreeflowInput()"
       onkeydown="docFreeflowKeydown(event)"
       onclick="docFreeflowClick(event)"
+      ondblclick="docFreeflowDblClick(event)"
       ondragover="docDragOver(event)" ondrop="docDrop(event)" ondragleave="docDragLeave(event)">
       ${html}
     </div>`;
@@ -1582,15 +1642,38 @@ export function docFreeflowKeydown(event){
 }
 
 export function docFreeflowClick(event){
-  // Handle clicks on media blocks (non-editable islands)
   const target=event.target;
-  if(target.closest('[contenteditable="false"][data-block-id]')){
-    // Media block clicked — show context menu
-    const mediaBlock=target.closest('[data-block-id]');
-    if(mediaBlock&&mediaBlock.dataset.blockId){
-      showDocCtxAiMenu(mediaBlock.dataset.blockId, event);
-    }
+  // Don't interfere with float handle / block handle clicks
+  if(target.closest('.doc-float-handle')||target.closest('.doc-block-handle')) return;
+
+  // Find the block element
+  const blockEl=target.closest('[data-block-id]');
+
+  if(!blockEl){
+    // Click on blank area → clear selection / exit editing
+    if(S.docInlineEditing) docExitInlineEdit();
+    docClearBlockSelection();
+    return;
   }
+
+  const blockId=blockEl.dataset.blockId;
+  if(!blockId) return;
+
+  // Delegate to unified handler
+  docBlockClickAction(blockId, event);
+}
+
+export function docFreeflowDblClick(event){
+  clearTimeout(_docClickTimer);
+  const target=event.target;
+  if(target.closest('.doc-float-handle')||target.closest('.doc-block-handle')) return;
+
+  const blockEl=target.closest('[data-block-id]');
+  if(!blockEl) return;
+  const blockId=blockEl.dataset.blockId;
+  if(!blockId) return;
+
+  docBlockDblClickAction(blockId, event);
 }
 
 // ── Stub functions for backward compatibility with old code ──

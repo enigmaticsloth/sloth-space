@@ -8,9 +8,9 @@
  * For commercial, closed-source licensing exceptions, contact the author.
  */
 /* ─── Doc Canvas ─── */
-.doc-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; touch-action:auto; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+.doc-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; touch-action:auto; -webkit-user-select:text; user-select:text; -webkit-touch-callout:none; }
 .doc-page { max-width:720px; margin:0 auto; min-height:60vh; padding-bottom:40vh; overflow:hidden; }
-#docPage { outline:none; padding:0; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+#docPage { outline:none; padding:0; -webkit-user-select:text; user-select:text; -webkit-touch-callout:none; }
 #docPage:focus-within { outline:none; }
 .doc-empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:50vh; text-align:center; }
 
@@ -21,15 +21,34 @@
   transition:border-color 0.15s, background 0.15s; cursor:text; min-height:28px;
 }
 
-/* Freeflow focus/hover states */
-#docPage h1:focus, #docPage h2:focus, #docPage h3:focus, #docPage p:focus,
-#docPage blockquote:focus, #docPage pre:focus, #docPage ul:focus, #docPage ol:focus, #docPage li:focus {
+/* Block selected state (single-click selection, before editing) */
+#docPage .doc-block-selected {
+  border-color:rgba(74,111,165,0.7) !important;
+  background:rgba(74,111,165,0.08) !important;
+  box-shadow:0 0 0 1px rgba(74,111,165,0.3);
+}
+
+/* Freeflow focus/hover states (only during inline editing) */
+#docPage[contenteditable="true"] h1:focus, #docPage[contenteditable="true"] h2:focus,
+#docPage[contenteditable="true"] h3:focus, #docPage[contenteditable="true"] p:focus,
+#docPage[contenteditable="true"] blockquote:focus, #docPage[contenteditable="true"] pre:focus,
+#docPage[contenteditable="true"] ul:focus, #docPage[contenteditable="true"] ol:focus,
+#docPage[contenteditable="true"] li:focus {
   border-color:rgba(120,134,165,0.5); background:rgba(120,134,165,0.04);
 }
 
+/* Hover states — show subtle border to indicate clickable blocks */
 #docPage h1:hover, #docPage h2:hover, #docPage h3:hover, #docPage p:hover,
 #docPage blockquote:hover, #docPage pre:hover, #docPage ul:hover, #docPage ol:hover, #docPage li:hover {
   border-color:rgba(120,134,165,0.15);
+}
+/* Cursor: pointer when not editing (blocks are selectable), text when editing */
+#docPage[contenteditable="false"] h1, #docPage[contenteditable="false"] h2,
+#docPage[contenteditable="false"] h3, #docPage[contenteditable="false"] p,
+#docPage[contenteditable="false"] blockquote, #docPage[contenteditable="false"] pre,
+#docPage[contenteditable="false"] ul, #docPage[contenteditable="false"] ol,
+#docPage[contenteditable="false"] li {
+  cursor:default;
 }
 
 /* Heading styles */
