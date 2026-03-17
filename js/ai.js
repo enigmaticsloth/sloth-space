@@ -339,7 +339,7 @@ INTENTS:
   - openWorkspaceItem(fileNameOrIndex) — open a file (can use file name, will be resolved)
   - wsNewFile(type) — create empty file: 'slide', 'doc', 'sheet'
   - wsCreateProject(name, description) — create a new project
-  - wsLinkFile(fileNameOrId, projectNameOrId) — link file to project (can use names)
+  - wsLinkFile(fileNameOrId, projectNameOrId) — link file to project (can use names). Use "current" as fileNameOrId to link the file the user is currently viewing.
   - wsUnlinkFile(fileId, projectId) — unlink file from project
   - wsSetActiveProject(projectNameOrId) — set project as AI context
   - wsClearActiveProject() — clear active project context
@@ -357,6 +357,8 @@ INTENTS:
   - "create a project called Q2 Planning" → {"intent":"ui_action","actions":[{"fn":"wsCreateProject","args":["Q2 Planning",""]}],"message":"Created project Q2 Planning"}
   - "go to projects tab" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["workspace"]},{"fn":"wsSetView","args":["projects"]}],"message":"Switching to Projects"}
   - "put the budget file into Q2 project" → {"intent":"ui_action","actions":[{"fn":"wsLinkFile","args":["budget","Q2 Planning"]}],"message":"Linked budget to Q2 Planning"}
+  - "歸類到sloth space專案" / "link this to project X" / "put this in project X" → {"intent":"ui_action","actions":[{"fn":"wsLinkFile","args":["current","sloth space"]}],"message":"Linked to Sloth Space project"}
+  IMPORTANT: "歸類/歸在/放在/加入 + 專案/project" = wsLinkFile, NOT wsOpenProject. Use "current" as file arg to link the currently viewed file.
   - "open settings" → {"intent":"ui_action","actions":[{"fn":"openSettings","args":[]}],"message":"Opening settings"}
   - "switch to doc mode" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["doc"]}],"message":"Switching to Doc mode"}
 
@@ -478,7 +480,8 @@ INTENTS:
   Confirmations (yes/ok/sure/go) after AI suggests → generate.
 "ui_action" — navigate, switch modes, open files, manage projects, save.
   {"intent":"ui_action","actions":[{"fn":"name","args":[...]}],"message":"..."}
-  Functions: modeEnter(mode), openWorkspaceItem(name), wsCreateProject(name,desc), wsOpenProject(name), wsLinkFile(file,project), wsDeleteFile(id), wsDeleteProject(id), openSettings(), modeTabSwitch(tabId), modeTabClose(tabId), modeTabNew()+ntpPickMode(mode), modeSave(), modeSaveCloud(), modeNew(), benchRemove(id), benchClear(), applyPreset(name), wsSetView(view), wsSetSearch(q), wsSetSort(by)
+  Functions: modeEnter(mode), openWorkspaceItem(name), wsCreateProject(name,desc), wsOpenProject(name), wsLinkFile(fileOrCurrent,project) — use "current" for currently viewed file, wsDeleteFile(id), wsDeleteProject(id), openSettings(), modeTabSwitch(tabId), modeTabClose(tabId), modeTabNew()+ntpPickMode(mode), modeSave(), modeSaveCloud(), modeNew(), benchRemove(id), benchClear(), applyPreset(name), wsSetView(view), wsSetSearch(q), wsSetSort(by)
+  CRITICAL: "歸類/歸在/放在/加入/link to + 專案/project" → wsLinkFile("current","projectName"), NOT wsOpenProject.
 "multi_step" — BOTH ui_action AND content creation in one request. {"intent":"multi_step","steps":[...]}
 "chat" — ONLY pure greetings with no topic. If ANY topic exists → "generate" instead.
 
@@ -3527,7 +3530,24 @@ function resolveActionRefs(actions) {
 
     // wsLinkFile: resolve file name → fileId, project name → projectId
     if (a.fn === 'wsLinkFile') {
-      if (typeof a.args[0] === 'string' && !a.args[0].startsWith('ws_') && !a.args[0].startsWith('doc_')) {
+      // "current" = the file the user is currently viewing
+      if (typeof a.args[0] === 'string' && a.args[0].toLowerCase() === 'current') {
+        const curFileId = S._wsCurrentFileId;
+        if (curFileId) {
+          resolved.args[0] = curFileId;
+        } else {
+          // Current file not in workspace yet — use _autoLinkToProject fallback
+          // Find the project first, then call _autoLinkToProject
+          if (typeof a.args[1] === 'string') {
+            const pName = a.args[1].toLowerCase();
+            const p = projects.find(p => (p.name || '').toLowerCase().includes(pName));
+            if (p) {
+              _autoLinkToProject(p.id);
+              return null; // handled — skip normal execution
+            }
+          }
+        }
+      } else if (typeof a.args[0] === 'string' && !a.args[0].startsWith('ws_') && !a.args[0].startsWith('doc_')) {
         const name = a.args[0].toLowerCase();
         const f = files.find(f => (f.title || '').toLowerCase().includes(name));
         if (f) resolved.args[0] = f.id;
@@ -3536,6 +3556,11 @@ function resolveActionRefs(actions) {
         const name = a.args[1].toLowerCase();
         const p = projects.find(p => (p.name || '').toLowerCase().includes(name));
         if (p) resolved.args[1] = p.id;
+      }
+      // Final fallback: if file arg is still unresolved string, try current file
+      if (typeof resolved.args[0] === 'string' && !resolved.args[0].startsWith('ws_') && !resolved.args[0].startsWith('doc_')) {
+        const curId = S._wsCurrentFileId;
+        if (curId) resolved.args[0] = curId;
       }
     }
 
