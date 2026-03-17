@@ -18,16 +18,6 @@
 import { S } from './state.js';
 
 // ═══════════════════════════════════════════════════════════════════
-// INPUT TOGGLE (expand/collapse)
-// ═══════════════════════════════════════════════════════════════════
-export function toggleInputSize(){
-  const area=document.getElementById('inputArea');
-  const btn=document.getElementById('inputToggle');
-  S.inputCollapsed=!S.inputCollapsed;
-  area.classList.toggle('collapsed',S.inputCollapsed);
-  btn.innerHTML=S.inputCollapsed?'&#9660;':'&#9650;'; // ▼ or ▲
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // IMAGE STAGING
 // ═══════════════════════════════════════════════════════════════════

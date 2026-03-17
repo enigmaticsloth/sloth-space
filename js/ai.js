@@ -2766,6 +2766,7 @@ async function _autoLinkToProject(projectId){
       _updateAIActionOverlay(`AI ▸ Linked to ${proj?proj.name:'project'} ✓`);
       setTimeout(_hideAIActionOverlay, 1200);
     }
+    _aiHideCursor();
   }
 }
 
