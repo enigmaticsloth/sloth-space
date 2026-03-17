@@ -255,6 +255,14 @@ export function wsDeleteFile(id) {
   syncWorkspaceToCloud();
 }
 
+/** Confirm + delete a single file (for per-file delete button) */
+export function wsConfirmDeleteFile(id, title) {
+  if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+  wsDeleteFile(id);
+  renderWorkspaceMode();
+  window.addMessage(`✓ Deleted "${title}"`, 'system');
+}
+
 /**
  * Update a workspace file with partial updates.
  */
@@ -1141,6 +1149,7 @@ function renderFileCard(item) {
     </div>
     <div class="ws-file-actions">
       <button class="ws-link-btn${fileProjects.length > 0 ? ' has-links' : ''}" onclick="event.stopPropagation();wsShowLinkPicker('${item.id}')" title="${fileProjects.length > 0 ? 'Linked to ' + fileProjects.length + ' project(s) — click to manage' : 'Link to project'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+      <button class="ws-file-del-btn" onclick="event.stopPropagation();wsConfirmDeleteFile('${item.id}','${escapeHtml(item.title||'Untitled').replace(/'/g,'\\&#39;')}')" title="Delete file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
     </div>
   </div>`;
 }
@@ -1684,9 +1693,9 @@ function renderSearchAndSort() {
       <button class="ws-sort-btn${sortBy==='date'?' active':''}" onclick="wsSetSort('date')">Date ${sortBy==='date'?arrow:''}</button>
       <button class="ws-sort-btn${sortBy==='name'?' active':''}" onclick="wsSetSort('name')">Name ${sortBy==='name'?arrow:''}</button>
       <button class="ws-sort-btn${sortBy==='type'?' active':''}" onclick="wsSetSort('type')">Type ${sortBy==='type'?arrow:''}</button>
-      ${!S.wsSelectMode ? `<button class="ws-sort-btn ws-select-files-btn" onclick="wsEnterSelectMode()">
+      ${!S.wsSelectMode ? `<button class="ws-select-btn-monet" onclick="wsEnterSelectMode()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Select
-      </button>` : `<button class="ws-sort-btn ws-select-files-btn active" onclick="wsExitSelectMode()">
+      </button>` : `<button class="ws-select-btn-monet active" onclick="wsExitSelectMode()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel
       </button>`}
     </div>
