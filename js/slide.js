@@ -537,7 +537,7 @@ export { showTextSelTooltip, hideTextSelTooltip, updateSelTooltipForMode,
          selToolbarShowAI, selToolbarBack, selToolbarCut, selToolbarPaste,
          selToolbarAiAction, selToolbarAskAI,
          showSheetRangeToolbar, shRangeCopy, shRangePaste, shRangeDelete
-       } from './sel-toolbar.js?v=20260317c28';
+       } from './sel-toolbar.js?v=20260317c29';
 
 export function editFromSelection(){
   hideTextSelTooltip();
@@ -1383,17 +1383,5 @@ export function initToolbar(){
 
 // ═══════════════════════════════════════════
 // EVENT LISTENERS
+// (selectionchange + mousedown for tooltip now in sel-toolbar.js)
 // ═══════════════════════════════════════════
-
-// Listen for text selection changes
-document.addEventListener('selectionchange',function(){
-  clearTimeout(S.textSelTimeout);
-  S.textSelTimeout=setTimeout(showTextSelTooltip,300);
-});
-
-// Hide tooltip on scroll or click outside
-document.addEventListener('mousedown',function(e){
-  if(e.target.closest('.text-sel-tooltip'))return;
-  // Small delay so selectionchange fires first
-  setTimeout(hideTextSelTooltip,50);
-});

@@ -3,7 +3,7 @@
 // Used by slide, doc, and sheet modes
 // ═══════════════════════════════════════════
 
-import { S } from './state.js?v=20260317c28';
+import { S } from './state.js?v=20260317c29';
 
 // ── Position helper ──
 function _positionTooltip(rect){
@@ -33,7 +33,8 @@ export function showTextSelTooltip(){
 
   const anchor=sel.anchorNode;
   const regionEl=anchor?.parentElement?.closest?.('.region-box')||anchor?.closest?.('.region-box');
-  const docBlockEl=anchor?.parentElement?.closest?.('.doc-block')||anchor?.closest?.('.doc-block');
+  // Doc blocks are semantic elements (h1/p/blockquote) inside .doc-page with [data-block-id]
+  const docBlockEl=anchor?.parentElement?.closest?.('.doc-page [data-block-id]')||anchor?.parentElement?.closest?.('.doc-page');
   const shCellEl=anchor?.parentElement?.closest?.('.sh-cell')||anchor?.closest?.('.sh-cell');
 
   if(!regionEl&&!docBlockEl&&!shCellEl) return hideTextSelTooltip();
@@ -62,20 +63,22 @@ function _buildToolbarMain(mode){
   if(!tooltip) return;
   tooltip.className='text-sel-tooltip';
 
+  // All buttons use onmousedown="event.preventDefault()" to preserve text selection
+  const md='onmousedown="event.preventDefault()"';
   if(mode==='sheet'){
     // Sheet: no AI Edit
     tooltip.innerHTML=
-      `<button onclick="selToolbarCut()">Cut</button>`+
-      `<button onclick="copySelectionToClipboard()">Copy</button>`+
-      `<button onclick="selToolbarPaste()">Paste</button>`;
+      `<button ${md} onclick="selToolbarCut()">Cut</button>`+
+      `<button ${md} onclick="copySelectionToClipboard()">Copy</button>`+
+      `<button ${md} onclick="selToolbarPaste()">Paste</button>`;
   } else {
     // Slide / Doc: Cut | Copy | Paste | AI Edit ▸
     tooltip.innerHTML=
-      `<button onclick="selToolbarCut()">Cut</button>`+
-      `<button onclick="copySelectionToClipboard()">Copy</button>`+
-      `<button onclick="selToolbarPaste()">Paste</button>`+
+      `<button ${md} onclick="selToolbarCut()">Cut</button>`+
+      `<button ${md} onclick="copySelectionToClipboard()">Copy</button>`+
+      `<button ${md} onclick="selToolbarPaste()">Paste</button>`+
       `<span class="sel-divider"></span>`+
-      `<button class="sel-ai-btn" onclick="selToolbarShowAI(event)">AI Edit ▸</button>`;
+      `<button class="sel-ai-btn" ${md} onclick="selToolbarShowAI(event)">AI Edit ▸</button>`;
   }
 }
 
@@ -87,16 +90,21 @@ export function updateSelTooltipForMode(isDoc){
 // ── AI sub-menu (slide/doc only) ──
 
 export function selToolbarShowAI(e){
-  if(e) e.stopPropagation();
+  if(e){ e.stopPropagation(); e.preventDefault(); }
   const tooltip=document.getElementById('textSelTooltip');
   if(!tooltip) return;
   tooltip.className='text-sel-tooltip ai-mode';
   tooltip.innerHTML=
-    `<button onclick="selToolbarAiAction('expand')">Write More</button>`+
-    `<button onclick="selToolbarAiAction('shorten')">Write Less</button>`+
+    `<button onmousedown="event.preventDefault()" onclick="selToolbarAiAction('expand')">Write More</button>`+
+    `<button onmousedown="event.preventDefault()" onclick="selToolbarAiAction('shorten')">Write Less</button>`+
     `<span class="sel-divider"></span>`+
-    `<button class="sel-ai-ask" onclick="selToolbarAskAI()">Ask AI</button>`+
-    `<button class="sel-back-btn" onclick="selToolbarBack()">◂</button>`;
+    `<button class="sel-ai-ask" onmousedown="event.preventDefault()" onclick="selToolbarAskAI()">Ask AI</button>`+
+    `<button class="sel-back-btn" onmousedown="event.preventDefault()" onclick="selToolbarBack()">◂</button>`;
+  // Reposition since width may change
+  const sel=window.getSelection();
+  if(sel&&sel.rangeCount>0){
+    _positionTooltip(sel.getRangeAt(0).getBoundingClientRect());
+  }
 }
 
 export function selToolbarBack(){
@@ -186,11 +194,12 @@ export function showSheetRangeToolbar(){
   const tooltip=document.getElementById('textSelTooltip');
   if(!tooltip) return;
   tooltip.className='text-sel-tooltip';
+  const md='onmousedown="event.preventDefault()"';
   tooltip.innerHTML=
-    `<button onclick="shRangeCopy()">Copy</button>`+
-    `<button onclick="shRangePaste()">Paste</button>`+
+    `<button ${md} onclick="shRangeCopy()">Copy</button>`+
+    `<button ${md} onclick="shRangePaste()">Paste</button>`+
     `<span class="sel-divider"></span>`+
-    `<button onclick="shRangeDelete()">Delete</button>`;
+    `<button ${md} onclick="shRangeDelete()">Delete</button>`;
   tooltip.style.display='flex';
 
   // Position above the selection range
@@ -300,6 +309,10 @@ document.addEventListener('selectionchange',function(){
 });
 
 document.addEventListener('mousedown',function(e){
-  if(e.target.closest('.text-sel-tooltip')) return;
+  // Clicking inside the tooltip should NOT collapse the text selection
+  if(e.target.closest('.text-sel-tooltip')){
+    e.preventDefault(); // preserve text selection when clicking toolbar buttons
+    return;
+  }
   setTimeout(hideTextSelTooltip,50);
 });

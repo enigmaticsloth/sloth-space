@@ -388,7 +388,14 @@ export function initKeys(){
       if(S.currentMode==='sheet'&&S.sheet.current){
         try{ localStorage.setItem('sloth_current_sheet',JSON.stringify(S.sheet.current)); }catch(e){}
       }
+      // Save mode tabs snapshot on visibility hidden (more reliable on mobile)
+      if(window._saveModeTabs) window._saveModeTabs();
     }
+  });
+
+  // pagehide is more reliable than beforeunload on mobile Safari
+  window.addEventListener('pagehide',function(){
+    if(window._saveModeTabs) window._saveModeTabs();
   });
 
   // ── Block browser back/forward — remap to in-app navigation ──
