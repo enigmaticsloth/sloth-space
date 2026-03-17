@@ -1,4 +1,5 @@
 import { S, PRESETS, LAYOUTS, STORAGE_KEY, STORAGE_HISTORY_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, CLOUD_BUCKET, WS_STORAGE_KEY, LLM_DEFAULTS, CLOUD_PROVIDERS, CONFIG_KEY } from './state.js';
+import { rs, SC } from './slide.js';
 
 // ═══════════════════════════════════════════
 // CLOUD AUTO-SYNC
@@ -408,9 +409,9 @@ function _doExportPPTX(){
       const isBold=rOv.bold!==undefined?rOv.bold:(ov.bold||false);
       const isItalic=rOv.italic!==undefined?rOv.italic:(ov.italic||false);
 
-      const s=window.rs(r.role,p);
+      const s=rs(r.role,p);
       const sk=r.fontSize||'body';
-      const fontSize=toPt(p.typography.scale[window.SC[sk]]||16);
+      const fontSize=toPt(p.typography.scale[SC[sk]]||16);
       const txtColor=regionColor||s.color;
       const fontFace=regionFont||s.ff||'Arial';
       const al=r.align||{};

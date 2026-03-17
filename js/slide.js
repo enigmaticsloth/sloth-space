@@ -818,7 +818,7 @@ export function updateFontSizeIndicator(){
 // SLIDE RENDERER
 // ═══════════════════════════════════════════
 
-const SC = {title:0,h1:1,h2:2,body:3,caption:4,small:5};
+export const SC = {title:0,h1:1,h2:2,body:3,caption:4,small:5};
 
 export function rs(role,p){
   const h=p.typography.heading,b=p.typography.body;

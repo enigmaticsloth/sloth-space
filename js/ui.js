@@ -1569,32 +1569,36 @@ function checkWelcomeScreen() {
     // Otherwise fall through — tab restore will handle it
   }
 
-  // Restore sessionStorage from localStorage backup (survives tab close)
+  // Restore sessionStorage from localStorage backup (survives tab close / OAuth redirect)
   // Must happen here BEFORE the check, since autoLoad runs after this
   if(hasConfig && !sessionStorage.getItem('sloth_active')){
     const lastMode=localStorage.getItem('sloth_last_mode');
-    // Only restore last mode if user was NOT on the mode picker when they refreshed
-    // (showModePicker sets a flag in sessionStorage to indicate the user was browsing the picker)
     const wasOnPicker=sessionStorage.getItem('sloth_on_picker')==='1';
     if(lastMode && !wasOnPicker){
       sessionStorage.setItem('sloth_mode',lastMode);
       sessionStorage.setItem('sloth_active','1');
     }
-    // NOTE: Do NOT clear sloth_on_picker here — autoLoad() and setAuthUser() run AFTER this
-    // and need to see the flag. It gets cleared when user enters a mode (modeEnter).
+    // Also: if we have saved tabs but no lastMode, still mark active
+    // (e.g., after OAuth redirect where sessionStorage was cleared)
+    else if(!wasOnPicker && localStorage.getItem(_MODE_TABS_KEY)){
+      sessionStorage.setItem('sloth_active','1');
+    }
   }
-  // Only skip welcome if user was actively working (refresh or restored), not fresh setup
-  if (hasConfig && window.isConfigured() && sessionStorage.getItem('sloth_active')) {
-    // Try to restore saved mode tabs first (full tab state)
+
+  // Try to restore saved tabs (survives refresh AND OAuth redirects via localStorage)
+  if (hasConfig && window.isConfigured()) {
+    // First priority: restore saved tab state from localStorage
     const hadTabs=_loadModeTabs();
     if(hadTabs){
       const activeTab=S.modeTabs.find(t=>t.id===S.activeTabId);
       const restoreMode=activeTab?activeTab.mode:'slide';
       history.replaceState({mode:restoreMode},'','#'+restoreMode);
+      sessionStorage.setItem('sloth_active','1');
+      sessionStorage.setItem('sloth_mode',restoreMode);
       _isPopState=true;
       try{ _restoreActiveTab(); }finally{ _isPopState=false; }
-    } else {
-      // Fallback: restore single mode (legacy behavior)
+    } else if(sessionStorage.getItem('sloth_active')) {
+      // Fallback: restore single mode (legacy behavior, no saved tabs)
       const savedMode=sessionStorage.getItem('sloth_mode')||'slide';
       history.replaceState({mode:savedMode},'','#'+savedMode);
       _isPopState=true;
@@ -1602,11 +1606,14 @@ function checkWelcomeScreen() {
         if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
         else { pickMode(savedMode); }
       }finally{ _isPopState=false; }
+    } else {
+      // No saved tabs, no active session — show landing
+      history.replaceState({mode:'home'},'','#home');
+      showLanding();
     }
   }
-  // Otherwise show landing page (always — it IS the homepage now)
+  // Not configured — show landing page
   else {
-    // Set initial history state for landing
     history.replaceState({mode:'home'},'','#home');
     showLanding();
   }
