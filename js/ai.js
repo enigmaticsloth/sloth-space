@@ -1568,6 +1568,30 @@ async function sendMessage(){
     }
   }
 
+  // 2b) Fallback: if no project matched by name but user explicitly mentions a project keyword,
+  //     try to extract the project name from patterns like "歸在X專案" / "put in X project"
+  if(!_resolvedProjectId && window.wsListProjects){
+    const projectKwMatch=text.match(/(?:歸在|放在|加入|歸到|放到|加到|link(?:ed)?\s*to|(?:put|add|file)\s*(?:in|to|under))\s*(.+?)(?:專案|project|$)/i);
+    if(projectKwMatch){
+      const extractedName=projectKwMatch[1].trim();
+      if(extractedName){
+        const allProjects=window.wsListProjects();
+        // Try to match extracted name against existing projects
+        const match=allProjects.find(p=>p.name&&p.name.toLowerCase()===extractedName.toLowerCase());
+        if(match){
+          _resolvedProjectId=match.id;
+        }else{
+          // Fuzzy match: extracted name is substring of project name or vice versa
+          const fuzzy=allProjects.find(p=>p.name&&(
+            p.name.toLowerCase().includes(extractedName.toLowerCase())||
+            extractedName.toLowerCase().includes(p.name.toLowerCase())
+          ));
+          if(fuzzy) _resolvedProjectId=fuzzy.id;
+        }
+      }
+    }
+  }
+
   // 3) Current file's project (auto-detect from the file being viewed)
   if(!wsContext){
     const currentFileId=window.wsGetCurrentFileId ? window.wsGetCurrentFileId() : null;
@@ -2367,7 +2391,7 @@ ${sourceContent}`;
       if(steps.length === 0){
         addMessage(message || 'No steps to perform.', 'ai');
       } else {
-        await executeMultiStep(steps, message, text, wsContext);
+        await executeMultiStep(steps, message, text, wsContext, _resolvedProjectId);
         S.chatHistory.push({role:'assistant',content:`[Multi-step: ${message}]`});
       }
 
@@ -2396,7 +2420,7 @@ ${sourceContent}`;
 }
 
 // ── Multi-step executor: sequentially runs mixed ui_action / generate / link steps ──
-async function executeMultiStep(steps, message, userText, wsContext) {
+async function executeMultiStep(steps, message, userText, wsContext, resolvedProjectId) {
   _showAIActionOverlay(`AI ▸ ${message}`);
   addMessage(`✦ ${message}`, 'system');
   _aiEnsureCursor();
@@ -2474,8 +2498,11 @@ async function executeMultiStep(steps, message, userText, wsContext) {
           await doDocGenerate(tempStatus, topic, wsContext);
         }
         tempStatus.remove();
+        // Auto-link: prefer newly created project, then resolved project from user text
         if (lastCreatedProjectId) {
           _autoLinkToProject(lastCreatedProjectId);
+        } else if (resolvedProjectId) {
+          _autoLinkToProject(resolvedProjectId);
         }
 
       } else if (step.type === 'link_last') {
@@ -2486,6 +2513,8 @@ async function executeMultiStep(steps, message, userText, wsContext) {
           const p = projects.find(p => (p.name || '').toLowerCase().includes(projectName.toLowerCase()));
           if (p) projectId = p.id;
         }
+        // Fallback: use resolved project from user text
+        if (!projectId && resolvedProjectId) projectId = resolvedProjectId;
         if (projectId) {
           _autoLinkToProject(projectId);
         }
@@ -2559,6 +2588,16 @@ function _autoLinkToProject(projectId){
       const existing=files.findIndex(f=>f.id===entry.id);
       if(existing>=0) files[existing]=entry;
       else files.push(entry);
+      fileId=entry.id;
+    } else if(S.currentMode==='sheet' && S.sheet && S.sheet.current){
+      const entry={
+        id: 'ws_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),
+        type:'sheet',
+        title: S.sheet.current.title||'Untitled Sheet',
+        created: now, updated: now,
+        content: S.sheet.current
+      };
+      files.push(entry);
       fileId=entry.id;
     }
     if(fileId){
