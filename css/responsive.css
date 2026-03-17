@@ -91,8 +91,17 @@
     overflow:hidden; /* clip, don't let content push layout */
     min-height:120px; /* minimum on tiny screens */
   }
-  /* Doc/workspace canvas: now in .middle directly (not inside slide-panel) */
-  body.mode-doc .doc-canvas,
+  /* Doc canvas: full native touch (text selection, scroll, etc.) */
+  body.mode-doc .doc-canvas {
+    flex:1 1 0 !important; min-height:0;
+    overflow-y:auto !important; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    touch-action:auto !important;
+    -webkit-user-select:auto !important; user-select:auto !important;
+    padding:16px 8px;
+    scrollbar-width:none; /* Firefox */
+  }
+  /* Workspace canvas: vertical scroll only */
   body.mode-workspace .workspace-canvas {
     flex:1 1 0 !important; min-height:0;
     overflow-y:auto !important; overflow-x:hidden;
@@ -112,6 +121,12 @@
   body.mode-doc .doc-canvas::-webkit-scrollbar,
   body.mode-workspace .workspace-canvas::-webkit-scrollbar,
   body.mode-sheet .sheet-canvas::-webkit-scrollbar { display:none; /* Chrome/Safari */ }
+  /* Ensure doc blocks allow native text selection on iOS */
+  body.mode-doc .doc-canvas .doc-block,
+  body.mode-doc .doc-canvas [contenteditable] {
+    -webkit-user-select:auto !important; user-select:auto !important;
+    touch-action:auto !important;
+  }
   /* Drag handle: always visible on mobile (no hover), and allow touch drag */
   body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }

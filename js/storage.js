@@ -252,26 +252,32 @@ function _sanitizeDeckContent(deck){
 
 export function autoLoad(){
   try{
-    // Restore slide deck
-    const saved=localStorage.getItem(STORAGE_KEY);
-    if(saved){
-      const data=JSON.parse(saved);
-      if(data.deck&&data.deck.slides){
-        S.currentDeck=_sanitizeDeckContent(data.deck);
-        S.currentPreset=data.preset||'clean-white';
-        S.currentSlide=Math.min(data.slide||0,data.deck.slides.length-1);
-        window.addMessage(`✓ Restored: "${S.currentDeck.title||'Untitled'}" (${S.currentDeck.slides.length} slides)`,'system');
-      }
-    }
-    // Restore current doc (if user was in doc mode)
-    const savedDoc=localStorage.getItem('sloth_current_doc');
-    if(savedDoc){
-      try{
-        const parsed=JSON.parse(savedDoc);
-        if(parsed&&parsed.blocks&&parsed.blocks.length){
-          S.currentDoc=parsed;
+    // If tab system already restored state, skip legacy deck/doc restoration
+    // (tab snapshots are the source of truth; legacy keys are a fallback only)
+    const tabsRestored=S.modeTabs&&S.modeTabs.length>0;
+
+    // Restore slide deck (only if tab system didn't already handle it)
+    if(!tabsRestored){
+      const saved=localStorage.getItem(STORAGE_KEY);
+      if(saved){
+        const data=JSON.parse(saved);
+        if(data.deck&&data.deck.slides){
+          S.currentDeck=_sanitizeDeckContent(data.deck);
+          S.currentPreset=data.preset||'clean-white';
+          S.currentSlide=Math.min(data.slide||0,data.deck.slides.length-1);
+          window.addMessage(`✓ Restored: "${S.currentDeck.title||'Untitled'}" (${S.currentDeck.slides.length} slides)`,'system');
         }
-      }catch(e){}
+      }
+      // Restore current doc (only if tab system didn't handle it)
+      const savedDoc=localStorage.getItem('sloth_current_doc');
+      if(savedDoc){
+        try{
+          const parsed=JSON.parse(savedDoc);
+          if(parsed&&parsed.blocks&&parsed.blocks.length){
+            S.currentDoc=parsed;
+          }
+        }catch(e){}
+      }
     }
     // Restore last mode to localStorage (backup for sessionStorage)
     // BUT only if user isn't on the mode picker (showModePicker clears session state)
