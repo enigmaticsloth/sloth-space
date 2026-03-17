@@ -1057,8 +1057,9 @@ export function enterInlineEdit(slideIdx,regionId){
   const regionEl=document.querySelector(`.region-box[data-region="${regionId}"][data-slide="${slideIdx}"]`);
   if(!regionEl)return;
 
-  // Add editing class for visual feedback
+  // Add editing class for visual feedback + enable touch text selection
   regionEl.classList.add('inline-editing');
+  document.body.classList.add('slide-inline-editing');
 
   if(typeof content==='string'){
     // Simple text: make the inner div contenteditable
@@ -1178,6 +1179,7 @@ export function commitInlineEdit(){
   }
 
   if(regionEl) regionEl.classList.remove('inline-editing');
+  document.body.classList.remove('slide-inline-editing');
   S.inlineEdit=null;
   window.autoSave();
   window.renderApp();

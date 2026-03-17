@@ -25,7 +25,10 @@
 .deck-action-btn.primary { background:#7886A5; color:#fff; border-color:#7886A5; font-weight:600; }
 .deck-action-btn.primary:hover { background:#6775A0; }
 .slide-frame { box-shadow:0 2px 16px rgba(0,0,0,0.5); border-radius:2px; overflow:hidden; flex-shrink:0; position:relative; touch-action:none; }
-.slide-panel, .slide-panel *, .slide-frame *, #slideCanvas, #slideCanvas * { touch-action:none; /* lock ALL elements inside slide — no zoom/scroll/resize */ }
+/* Slide panel: lock touch on structural elements only */
+.slide-panel { touch-action:none; }
+.slide-bar, .slide-nav, .slide-info, .deck-name-bar { touch-action:manipulation; }
+#slideCanvas { touch-action:none; }
 /* ── Re-enable native touch for text-editable areas (unified) ── */
 /* Doc: full native touch (long-press select, scroll, etc.) */
 .doc-canvas, .doc-canvas * { touch-action:auto !important; -webkit-user-select:auto !important; user-select:auto !important; }
@@ -33,9 +36,9 @@
 .workspace-canvas, .workspace-canvas * { touch-action:pan-y !important; }
 /* Sheet: two-axis scroll */
 .sheet-canvas, .sheet-canvas * { touch-action:pan-x pan-y !important; }
-/* Slide inline editing: contenteditable inside slide canvas gets native touch */
-#slideCanvas .region-box.inline-editing, #slideCanvas .region-box.inline-editing *,
-#slideCanvas [contenteditable="true"], #slideCanvas [contenteditable="true"] * {
+/* Slide inline editing: entire canvas switches to auto when editing */
+body.slide-inline-editing #slideCanvas,
+body.slide-inline-editing #slideCanvas * {
   touch-action:auto !important; -webkit-user-select:text !important; user-select:text !important;
 }
 /* Slide transition animations (swipe/navigate) */

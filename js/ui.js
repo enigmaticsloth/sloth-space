@@ -832,9 +832,9 @@ function _loadModeTabs(){
       if(!t.mode || t.mode==='newtab') return false;
       // Skip tabs with no actual content (blank files)
       if(!t.snapshot) return false;
-      if(t.mode==='slide' && !t.snapshot.deck) return false;
-      if(t.mode==='doc' && !t.snapshot.doc) return false;
-      if(t.mode==='sheet' && !t.snapshot.sheet) return false;
+      if(t.mode==='slide' && (!t.snapshot.deck || !t.snapshot.deck.slides || t.snapshot.deck.slides.length===0)) return false;
+      if(t.mode==='doc' && (!t.snapshot.doc || !t.snapshot.doc.blocks || t.snapshot.doc.blocks.length===0)) return false;
+      if(t.mode==='sheet' && (!t.snapshot.sheet || !t.snapshot.sheet.rows || t.snapshot.sheet.rows.length===0)) return false;
       return true;
     });
     if(validTabs.length===0) return false;
