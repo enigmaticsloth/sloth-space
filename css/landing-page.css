@@ -1,3 +1,12 @@
+/**
+ * Sloth Space - AI-Native Agentic Workspace
+ * Copyright (c) 2026 EnigmaticSloth
+ *
+ * This source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+ * You may use, distribute and modify this code under the terms of the AGPL-3.0 license.
+ *
+ * For commercial, closed-source licensing exceptions, contact the author.
+ */
 /* ─── Landing Page (unified homepage) ─── */
 .landing-overlay { position:fixed; top:0; left:0; width:100%; height:100%; z-index:600; display:flex;
   background:linear-gradient(135deg, #0e0e0e 0%, #2a1f3a 15%, #2a4060 30%, #4a2a50 50%, #2a4a3a 70%, #3a2a40 85%, #0e0e0e 100%);

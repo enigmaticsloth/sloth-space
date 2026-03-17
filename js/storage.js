@@ -1,3 +1,16 @@
+/**
+ * Sloth Space - AI-Native Agentic Workspace
+ * Copyright (c) 2026 EnigmaticSloth
+ *
+ * This source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+ * You may use, distribute and modify this code under the terms of the AGPL-3.0 license.
+ *
+ * ⚠️ WARNING TO COMMERCIAL/SAAS ENTITIES:
+ * Under AGPL-3.0, if you modify this program and allow users to interact with it
+ * over a network (SaaS), you MUST fully open-source your entire backend infrastructure.
+ *
+ * For commercial, closed-source licensing exceptions, contact the author.
+ */
 import { S, PRESETS, LAYOUTS, STORAGE_KEY, STORAGE_HISTORY_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, CLOUD_BUCKET, WS_STORAGE_KEY, LLM_DEFAULTS, CLOUD_PROVIDERS, CONFIG_KEY } from './state.js';
 import { rs, SC } from './slide.js';
 
@@ -921,9 +934,11 @@ export async function loadFromCloud(filename){
       window.addMessage(`✓ Loaded from cloud: "${S.currentDeck.title||'Untitled'}"`,'system');
       autoSave();
       window.closeFileNav();
-      // Switch to slide mode if not already there
-      if(S.currentMode!=='slide') window.modeEnter('slide');
-      else window.renderApp();
+      // Switch to slide mode if not already there (use modeEnterWithData to preserve loaded data)
+      if(S.currentMode!=='slide'){
+        if(window.modeEnterWithData) window.modeEnterWithData('slide');
+        else window.modeEnter('slide');
+      } else window.renderApp();
     }
   }catch(e){window.addMessage('Cloud load error: '+e.message,'system');}
 }

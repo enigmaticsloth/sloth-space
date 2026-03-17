@@ -1,3 +1,16 @@
+/**
+ * Sloth Space - AI-Native Agentic Workspace
+ * Copyright (c) 2026 EnigmaticSloth
+ *
+ * This source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+ * You may use, distribute and modify this code under the terms of the AGPL-3.0 license.
+ *
+ * ⚠️ WARNING TO COMMERCIAL/SAAS ENTITIES:
+ * Under AGPL-3.0, if you modify this program and allow users to interact with it
+ * over a network (SaaS), you MUST fully open-source your entire backend infrastructure.
+ *
+ * For commercial, closed-source licensing exceptions, contact the author.
+ */
 import { S, DOC_MAX_UNDO, DOC_BLOCK_TYPES, DOC_DRAG_DEAD_ZONE, DOC_DRAG_HYSTERESIS } from './state.js';
 
 // ═══════════════════════════════════════════

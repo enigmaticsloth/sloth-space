@@ -1,3 +1,12 @@
+/**
+ * Sloth Space - AI-Native Agentic Workspace
+ * Copyright (c) 2026 EnigmaticSloth
+ *
+ * This source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+ * You may use, distribute and modify this code under the terms of the AGPL-3.0 license.
+ *
+ * For commercial, closed-source licensing exceptions, contact the author.
+ */
 /* ─── Contextual AI Menu (appears on region click) ─── */
 .ctx-ai-menu { position:absolute; z-index:200; background:#1a1a1a; border:1px solid #333; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,0.6); min-width:220px; max-width:300px; overflow:hidden; animation:ctx-fade-in 0.15s ease; pointer-events:auto; }
 @keyframes ctx-fade-in { from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:translateY(0);} }

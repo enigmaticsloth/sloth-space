@@ -1,3 +1,16 @@
+/**
+ * Sloth Space - AI-Native Agentic Workspace
+ * Copyright (c) 2026 EnigmaticSloth
+ *
+ * This source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+ * You may use, distribute and modify this code under the terms of the AGPL-3.0 license.
+ *
+ * ⚠️ WARNING TO COMMERCIAL/SAAS ENTITIES:
+ * Under AGPL-3.0, if you modify this program and allow users to interact with it
+ * over a network (SaaS), you MUST fully open-source your entire backend infrastructure.
+ *
+ * For commercial, closed-source licensing exceptions, contact the author.
+ */
 // ═══════════════════════════════════════════════════════════════════════════════
 // app.js — Main Entry Point
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -5,17 +18,17 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c31';
-import * as slide from './slide.js?v=20260317c31';
-import * as doc from './doc.js?v=20260317c31';
-import * as workspace from './workspace.js?v=20260317c31';
-import * as ai from './ai.js?v=20260317c31';
-import * as ui from './ui.js?v=20260317c31';
-import * as storage from './storage.js?v=20260317c31';
-import * as keys from './keys.js?v=20260317c31';
-import * as sheet from './sheet.js?v=20260317c31';
-import * as bench from './bench.js?v=20260317c31';
-import * as selToolbar from './sel-toolbar.js?v=20260317c31';
+import { S } from './state.js?v=20260317c33';
+import * as slide from './slide.js?v=20260317c33';
+import * as doc from './doc.js?v=20260317c33';
+import * as workspace from './workspace.js?v=20260317c33';
+import * as ai from './ai.js?v=20260317c33';
+import * as ui from './ui.js?v=20260317c33';
+import * as storage from './storage.js?v=20260317c33';
+import * as keys from './keys.js?v=20260317c33';
+import * as sheet from './sheet.js?v=20260317c33';
+import * as bench from './bench.js?v=20260317c33';
+import * as selToolbar from './sel-toolbar.js?v=20260317c33';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work

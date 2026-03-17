@@ -1,3 +1,16 @@
+/**
+ * Sloth Space - AI-Native Agentic Workspace
+ * Copyright (c) 2026 EnigmaticSloth
+ *
+ * This source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+ * You may use, distribute and modify this code under the terms of the AGPL-3.0 license.
+ *
+ * ⚠️ WARNING TO COMMERCIAL/SAAS ENTITIES:
+ * Under AGPL-3.0, if you modify this program and allow users to interact with it
+ * over a network (SaaS), you MUST fully open-source your entire backend infrastructure.
+ *
+ * For commercial, closed-source licensing exceptions, contact the author.
+ */
 // ═══════════════════════════════════════════
 // WORKSPACE MODULE
 // ═══════════════════════════════════════════
@@ -1830,7 +1843,12 @@ export function openWorkspaceItem(index) {
     else if (targetMode === 'slide') window.renderApp();
     else if (targetMode === 'sheet') window.renderSheetMode();
   } else {
-    window.modeEnter(targetMode);
+    // Use modeEnterWithData (fresh=false) so data loaded by wsItemLoaders is NOT overwritten
+    if (window.modeEnterWithData) {
+      window.modeEnterWithData(targetMode, item.id);
+    } else {
+      window.modeEnter(targetMode);
+    }
   }
 }
 

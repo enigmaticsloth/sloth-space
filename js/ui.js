@@ -1,3 +1,16 @@
+/**
+ * Sloth Space - AI-Native Agentic Workspace
+ * Copyright (c) 2026 EnigmaticSloth
+ *
+ * This source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+ * You may use, distribute and modify this code under the terms of the AGPL-3.0 license.
+ *
+ * ⚠️ WARNING TO COMMERCIAL/SAAS ENTITIES:
+ * Under AGPL-3.0, if you modify this program and allow users to interact with it
+ * over a network (SaaS), you MUST fully open-source your entire backend infrastructure.
+ *
+ * For commercial, closed-source licensing exceptions, contact the author.
+ */
 import { S, PRESETS, LAYOUTS, LLM_DEFAULTS, CLOUD_PROVIDERS, FONTS } from './state.js';
 
 // ═══════════════════════════════════════════
@@ -820,8 +833,9 @@ function _findTabByFileId(wsFileId){
   if(!wsFileId) return null;
   // Snapshot current tab first so wsFileId is up to date
   const curTab=S.modeTabs.find(t=>t.id===S.activeTabId);
-  if(curTab && curTab.mode!=='newtab' && !curTab.wsFileId) curTab.wsFileId=S._wsCurrentFileId||null;
-  return S.modeTabs.find(t=>t.wsFileId===wsFileId);
+  if(curTab && curTab.mode!=='newtab' && curTab.mode!=='workspace' && !curTab.wsFileId) curTab.wsFileId=S._wsCurrentFileId||null;
+  // Never match workspace tabs — they browse files but don't own them
+  return S.modeTabs.find(t=>t.wsFileId===wsFileId && t.mode!=='workspace');
 }
 
 function _findTabByMode(mode){
@@ -1275,6 +1289,22 @@ function modeEnter(mode){
   S.activeTabId=id;
   _renderTabBar();
   _modeEnterInternal(mode, true);
+  _saveModeTabs();
+}
+
+/**
+ * Enter a mode with data already loaded (e.g. from workspace).
+ * Creates a new tab but uses fresh=false so _modeEnterInternal
+ * does NOT overwrite the already-loaded S.currentDoc / S.currentDeck / S.sheet.current.
+ */
+function modeEnterWithData(mode, wsFileId){
+  if(S.activeTabId) _snapshotCurrentTab();
+  const id=_nextTabId();
+  const tab={id, mode, title:mode.charAt(0).toUpperCase()+mode.slice(1), snapshot:null, wsFileId:wsFileId||null};
+  S.modeTabs.push(tab);
+  S.activeTabId=id;
+  _renderTabBar();
+  _modeEnterInternal(mode, false);
   _saveModeTabs();
 }
 
@@ -2147,7 +2177,7 @@ function loadFileFromNav(id){
         window.autoSave();
         closeFileNav();
         // Switch to slide mode if not already there
-        if(S.currentMode!=='slide') modeEnter('slide');
+        if(S.currentMode!=='slide') modeEnterWithData('slide');
         else renderApp();
       }
     }catch(e){window.addMessage('Failed to load: '+e.message,'system');}
@@ -2570,6 +2600,7 @@ export {
   modeSaveCurrent,
   modeShowUI,
   modeEnter,
+  modeEnterWithData,
   pickMode,
   updateModeBadge,
   toggleModeSwitchMenu,
