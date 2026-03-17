@@ -1606,7 +1606,10 @@ ${ABOUT_TEXTS.sheet}
   // ── Inject Bench context if any files are staged ──
   if (window.benchGetContext) {
     const benchCtx = window.benchGetContext();
-    if (benchCtx) wsContext += benchCtx;
+    if (benchCtx) {
+      wsContext += benchCtx;
+      console.log('[AI] Bench context injected, length:', benchCtx.length, 'preview:', benchCtx.substring(0,300));
+    }
   }
 
   // Block user interaction during AI operations
