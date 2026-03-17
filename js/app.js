@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c11';
-import * as slide from './slide.js?v=20260317c11';
-import * as doc from './doc.js?v=20260317c11';
-import * as workspace from './workspace.js?v=20260317c11';
-import * as ai from './ai.js?v=20260317c11';
-import * as ui from './ui.js?v=20260317c11';
-import * as storage from './storage.js?v=20260317c11';
-import * as keys from './keys.js?v=20260317c11';
-import * as sheet from './sheet.js?v=20260317c11';
-import * as bench from './bench.js?v=20260317c11';
+import { S } from './state.js?v=20260317c12';
+import * as slide from './slide.js?v=20260317c12';
+import * as doc from './doc.js?v=20260317c12';
+import * as workspace from './workspace.js?v=20260317c12';
+import * as ai from './ai.js?v=20260317c12';
+import * as ui from './ui.js?v=20260317c12';
+import * as storage from './storage.js?v=20260317c12';
+import * as keys from './keys.js?v=20260317c12';
+import * as sheet from './sheet.js?v=20260317c12';
+import * as bench from './bench.js?v=20260317c12';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -51,22 +51,26 @@ keys.initKeys();
 // 1b. Init bench (context staging area)
 bench.initBench();
 
-// 2. Check welcome screen / enter saved mode (calls loadConfig internally)
+// 2. Auth FIRST — must run before checkWelcomeScreen, because showLanding()
+//    calls history.pushState('#home') which strips ?code= from the URL.
+//    Supabase needs to read ?code= to complete the OAuth callback.
+storage.initAuth();
+
+// 3. Check welcome screen / enter saved mode (calls loadConfig internally)
 ui.checkWelcomeScreen();
 ui.initOllamaGuide();
 ui.mpInitInputs();
 
-// 3. Auth + restore persisted data (AFTER mode is established)
-storage.initAuth();
+// 4. Restore persisted data
 try{ storage.autoLoad(); }catch(e){ console.warn('[app.js] autoLoad failed:',e); }
 
-// 4. Restore chat tabs
+// 5. Restore chat tabs
 ai.initChatTabs();
 
-// 5. Check share link (may override loaded deck)
+// 6. Check share link (may override loaded deck)
 storage.checkShareLink();
 
-// 6. Final render (wrapped — uncaught error here kills the entire ES module)
+// 7. Final render (wrapped — uncaught error here kills the entire ES module)
 try{ ui.renderApp(); }catch(e){ console.warn('[app.js] renderApp failed on init:',e); }
 
 // ═══════════════════════════════════════════════════════════════════════════════
