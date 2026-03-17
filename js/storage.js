@@ -104,7 +104,7 @@ export async function cloudAutoLoad(){
       const text = await blob.text();
       const parsed = JSON.parse(text);
       if(parsed.deck&&parsed.deck.slides){
-        S.currentDeck = parsed.deck;
+        S.currentDeck = _sanitizeDeckContent(parsed.deck);
         S.currentPreset = parsed.preset || 'clean-white';
         S.currentSlide = Math.min(parsed.slide||0, parsed.deck.slides.length-1);
         // Also save locally so next refresh is fast
@@ -217,6 +217,25 @@ export function saveCurrentMode(){
   try{ localStorage.setItem('sloth_last_mode', S.currentMode); }catch(e){}
 }
 
+// Sanitize slide table/list content to prevent r.forEach crashes
+function _sanitizeDeckContent(deck){
+  if(!deck||!deck.slides) return deck;
+  for(const s of deck.slides){
+    if(!s.content||typeof s.content!=='object') continue;
+    for(const[k,v]of Object.entries(s.content)){
+      if(v&&typeof v==='object'&&v.type==='table'){
+        if(!Array.isArray(v.headers)) v.headers=v.headers?Object.values(v.headers):[];
+        if(!Array.isArray(v.rows)) v.rows=v.rows?[Object.values(v.rows)]:[];
+        v.rows=v.rows.map(r=>Array.isArray(r)?r:(typeof r==='object'&&r?Object.values(r):[String(r)]));
+      }
+      if(v&&typeof v==='object'&&v.type==='list'){
+        if(!Array.isArray(v.items)) v.items=v.items?[String(v.items)]:[];
+      }
+    }
+  }
+  return deck;
+}
+
 export function autoLoad(){
   try{
     // Restore slide deck
@@ -224,7 +243,7 @@ export function autoLoad(){
     if(saved){
       const data=JSON.parse(saved);
       if(data.deck&&data.deck.slides){
-        S.currentDeck=data.deck;
+        S.currentDeck=_sanitizeDeckContent(data.deck);
         S.currentPreset=data.preset||'clean-white';
         S.currentSlide=Math.min(data.slide||0,data.deck.slides.length-1);
         window.addMessage(`✓ Restored: "${S.currentDeck.title||'Untitled'}" (${S.currentDeck.slides.length} slides)`,'system');
@@ -878,7 +897,7 @@ export async function loadFromCloud(filename){
     const text=await data.text();
     const parsed=JSON.parse(text);
     if(parsed.deck){
-      S.currentDeck=parsed.deck;
+      S.currentDeck=_sanitizeDeckContent(parsed.deck);
       S.currentPreset=parsed.preset||'clean-white';
       S.currentSlide=0;
       S.chatHistory=parsed.chat||[];
@@ -998,7 +1017,7 @@ export function checkShareLink(){
     return r.json();
   }).then(parsed=>{
     if(parsed.deck){
-      S.currentDeck=parsed.deck;
+      S.currentDeck=_sanitizeDeckContent(parsed.deck);
       S.currentPreset=parsed.preset||'clean-white';
       S.currentSlide=0;
       S.chatHistory=[];

@@ -1067,6 +1067,20 @@ function validateDeck(deck){
     if(!VALID_LAYOUTS.includes(s.layout))return `Slide ${i+1} has invalid layout: ${s.layout}`;
     if(!s.content||typeof s.content!=='object')return `Slide ${i+1} has no content`;
   }
+  // Sanitize table content — LLM sometimes returns rows as objects instead of arrays
+  for(const s of deck.slides){
+    for(const[k,v]of Object.entries(s.content)){
+      if(v&&typeof v==='object'&&v.type==='table'){
+        if(!Array.isArray(v.headers)) v.headers=v.headers?Object.values(v.headers):[];
+        if(!Array.isArray(v.rows)) v.rows=v.rows?[Object.values(v.rows)]:[];
+        v.rows=v.rows.map(r=>Array.isArray(r)?r:(typeof r==='object'&&r?Object.values(r):[String(r)]));
+      }
+      // Also sanitize list content
+      if(v&&typeof v==='object'&&v.type==='list'){
+        if(!Array.isArray(v.items)) v.items=v.items?[String(v.items)]:[];
+      }
+    }
+  }
   // ensure required fields
   if(!deck.sloth_version)deck.sloth_version='0.1.0';
   if(!deck.type)deck.type='slides';
