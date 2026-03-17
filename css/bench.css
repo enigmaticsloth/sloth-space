@@ -56,6 +56,7 @@ body.mode-workspace .bench-wrapper { display:none; }
 .chat-chip { background:var(--chat-surface); border:1px solid var(--chat-border); color:#7B8BA0; padding:9px 12px; border-radius:8px; cursor:pointer; font-size:11px; font-family:Arial; text-align:left; line-height:1.4; transition:all 0.15s; }
 .chat-chip:hover { color:#B8C4D8; border-color:#3A4258; background:rgba(120,134,165,0.1); }
 .chat-chip .chip-icon { margin-right:6px; }
+.ai-action-btns { display:flex; flex-direction:column; gap:6px; margin-top:2px; }
 
 /* Popups */
 .popup { display:none; position:absolute; bottom:30px; left:0; background:#1a1a1a; border:1px solid var(--border); border-radius:5px; padding:10px; z-index:100; box-shadow:0 6px 20px rgba(0,0,0,0.6); }

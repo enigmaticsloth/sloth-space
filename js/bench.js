@@ -307,8 +307,14 @@ async function benchAddFile(file) {
 
   // For images, create data URL thumbnail (resized to save space)
   let dataUrl = null;
+  let slideDataUrl = null;
+  let origW = 0, origH = 0;
   if (type === 'image') {
-    dataUrl = await _createThumbnail(file);
+    const thumbResult = await _createThumbnail(file);
+    dataUrl = thumbResult.thumb;
+    slideDataUrl = thumbResult.slideDataUrl;
+    origW = thumbResult.origW;
+    origH = thumbResult.origH;
   }
 
   const item = {
@@ -317,6 +323,8 @@ async function benchAddFile(file) {
     type,
     size: file.size,
     dataUrl,
+    slideDataUrl,  // higher-res for slide insertion (memory only, not persisted)
+    origW, origH,  // original dimensions
     extractedText,
     addedAt: new Date().toISOString()
   };
@@ -328,13 +336,27 @@ async function benchAddFile(file) {
 }
 
 // Create a resized thumbnail dataUrl to keep localStorage small
+// Also creates a slide-suitable higher-res version (in memory only)
 async function _createThumbnail(file) {
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        // Resize to max 200px for thumbnail
+        // Slide-quality version (max 1000px) — kept in memory for insertion
+        const slideMax = 1000;
+        let sw = img.width, sh = img.height;
+        if (sw > slideMax || sh > slideMax) {
+          const ratio = Math.min(slideMax / sw, slideMax / sh);
+          sw = Math.round(sw * ratio);
+          sh = Math.round(sh * ratio);
+        }
+        const slideCanvas = document.createElement('canvas');
+        slideCanvas.width = sw; slideCanvas.height = sh;
+        slideCanvas.getContext('2d').drawImage(img, 0, 0, sw, sh);
+        const slideDataUrl = slideCanvas.toDataURL('image/jpeg', 0.85);
+
+        // Thumbnail (200px) — for bench card display and localStorage
         const maxDim = 200;
         let w = img.width, h = img.height;
         if (w > maxDim || h > maxDim) {
@@ -344,11 +366,15 @@ async function _createThumbnail(file) {
         }
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve({
+          thumb: canvas.toDataURL('image/jpeg', 0.7),
+          slideDataUrl,
+          origW: img.width,
+          origH: img.height
+        });
       };
-      img.onerror = () => resolve(reader.result); // fallback to full dataUrl
+      img.onerror = () => resolve({ thumb: reader.result, slideDataUrl: reader.result, origW: 400, origH: 400 });
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
@@ -399,6 +425,11 @@ function benchGetContext() {
 function benchGetSummary() {
   if (S.bench.length === 0) return '';
   return S.bench.map(b => `"${b.name}" (${b.type})`).join(', ');
+}
+
+/** Return the first image on the bench (for auto-insertion into slides) */
+function benchGetFirstImage() {
+  return S.bench.find(b => b.type === 'image' && (b.slideDataUrl || b.dataUrl)) || null;
 }
 
 // ── Render ──
@@ -524,6 +555,7 @@ export {
   benchImportToWs,
   benchGetContext,
   benchGetSummary,
+  benchGetFirstImage,
   renderBench,
   benchTriggerFileInput,
   benchHandleFileInput,

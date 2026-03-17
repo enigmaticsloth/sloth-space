@@ -1974,12 +1974,12 @@ ${ABOUT_TEXTS.sheet}
           const isZh=/[\u4e00-\u9fff]/.test(text);
           const followUp=addMessage('','system');
           followUp.innerHTML=isZh
-            ? '需要產生檔案嗎？ <span class="ai-action-btn" data-gen="doc">📄 文件</span> <span class="ai-action-btn" data-gen="slide">📊 投影片</span> <span class="ai-action-btn" data-gen="sheet">📋 試算表</span>'
-            : 'Generate a file? <span class="ai-action-btn" data-gen="doc">📄 Doc</span> <span class="ai-action-btn" data-gen="slide">📊 Slides</span> <span class="ai-action-btn" data-gen="sheet">📋 Sheet</span>';
+            ? '<div style="margin-bottom:6px">需要產生檔案嗎？</div><div class="ai-action-btns"><span class="ai-action-btn" data-gen="doc">📄 文件</span><span class="ai-action-btn" data-gen="slide">📊 投影片</span><span class="ai-action-btn" data-gen="sheet">📋 試算表</span></div>'
+            : '<div style="margin-bottom:6px">Generate a file?</div><div class="ai-action-btns"><span class="ai-action-btn" data-gen="doc">📄 Doc</span><span class="ai-action-btn" data-gen="slide">📊 Slides</span><span class="ai-action-btn" data-gen="sheet">📋 Sheet</span></div>';
           followUp.querySelectorAll('.ai-action-btn').forEach(btn=>{
-            btn.style.cssText='cursor:pointer;padding:4px 12px;border-radius:6px;background:#f0f0f0;margin:0 4px;display:inline-block;font-size:0.9em;transition:background 0.2s';
-            btn.onmouseenter=()=>btn.style.background='#e0e0e0';
-            btn.onmouseleave=()=>btn.style.background='#f0f0f0';
+            btn.style.cssText='cursor:pointer;padding:8px 14px;border-radius:8px;background:var(--chat-surface,#f0f0f0);border:1px solid var(--chat-border,#e0e0e0);display:block;width:100%;font-size:0.9em;transition:all 0.15s;text-align:left';
+            btn.onmouseenter=()=>{btn.style.background='rgba(120,134,165,0.1)';btn.style.borderColor='#3A4258';};
+            btn.onmouseleave=()=>{btn.style.background='var(--chat-surface,#f0f0f0)';btn.style.borderColor='var(--chat-border,#e0e0e0)';};
             btn.onclick=()=>{
               followUp.remove();
               const target=btn.dataset.gen;
@@ -2025,8 +2025,27 @@ ${ABOUT_TEXTS.sheet}
         statusDiv.remove();
         addMessage(raw,'ai');
       }else if(imgAction.action==='place'){
-        statusDiv.remove();
-        addMessage('⚠ No image attached. Use the + button to attach an image first.','system');
+        // No staged image — check bench for images
+        const benchImg=window.benchGetFirstImage ? window.benchGetFirstImage() : null;
+        if(benchImg){
+          const targetSlide=(imgAction.slide||S.currentSlide+1)-1;
+          const position=imgAction.position||'auto';
+          const fakeImg={
+            dataUrl: benchImg.slideDataUrl||benchImg.dataUrl,
+            name: benchImg.name,
+            width: benchImg.origW||400,
+            height: benchImg.origH||400
+          };
+          const msg=placeImageOnSlide([fakeImg],targetSlide,position);
+          statusDiv.remove();
+          if(msg) addMessage(msg,'ai');
+          S.chatHistory.push({role:'assistant',content:msg||'[placed bench image]'});
+          window.renderApp();
+          window.autoSave();
+        }else{
+          statusDiv.remove();
+          addMessage('⚠ No image attached. Use the + button to attach an image, or drop an image onto the Bench first.','system');
+        }
       }else{
         // Manipulation: scale, move, fit, remove
         const msg=applyImageAction(imgAction);
