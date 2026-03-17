@@ -1170,6 +1170,19 @@ function _modeEnterInternal(mode, fresh){
       // New tab = blank deck — clear current state so renderApp creates fresh
       S.currentDeck=null;
       S.currentSlide=0;
+    } else if(!S.currentDeck){
+      // Tab restore had null snapshot — try localStorage fallback (same pattern as doc/sheet)
+      try{
+        const saved=localStorage.getItem('sloth_space_deck');
+        if(saved){
+          const parsed=JSON.parse(saved);
+          if(parsed&&parsed.deck&&parsed.deck.slides){
+            S.currentDeck=parsed.deck;
+            S.currentPreset=parsed.preset||'clean-white';
+            S.currentSlide=Math.min(parsed.slide||0, parsed.deck.slides.length-1);
+          }
+        }
+      }catch(e){}
     }
     updateModeNameBar('slide');
     renderApp();
