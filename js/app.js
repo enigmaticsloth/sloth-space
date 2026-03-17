@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c8';
-import * as slide from './slide.js?v=20260317c8';
-import * as doc from './doc.js?v=20260317c8';
-import * as workspace from './workspace.js?v=20260317c8';
-import * as ai from './ai.js?v=20260317c8';
-import * as ui from './ui.js?v=20260317c8';
-import * as storage from './storage.js?v=20260317c8';
-import * as keys from './keys.js?v=20260317c8';
-import * as sheet from './sheet.js?v=20260317c8';
-import * as bench from './bench.js?v=20260317c8';
+import { S } from './state.js?v=20260317c9';
+import * as slide from './slide.js?v=20260317c9';
+import * as doc from './doc.js?v=20260317c9';
+import * as workspace from './workspace.js?v=20260317c9';
+import * as ai from './ai.js?v=20260317c9';
+import * as ui from './ui.js?v=20260317c9';
+import * as storage from './storage.js?v=20260317c9';
+import * as keys from './keys.js?v=20260317c9';
+import * as sheet from './sheet.js?v=20260317c9';
+import * as bench from './bench.js?v=20260317c9';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -362,12 +362,12 @@ ui.renderApp();
     const frame=$('muFrame');
     if(!cur||!frame) return;
     const rip=document.createElement('div');
-    rip.className='mu-click';
+    rip.className='mu-click'+(_aiOn?' ai':'');
     rip.style.left=cur.style.left;
     rip.style.top=cur.style.top;
     frame.appendChild(rip);
     requestAnimationFrame(()=>rip.classList.add('pop'));
-    setTimeout(()=>rip.remove(),500);
+    setTimeout(()=>rip.remove(),600);
   }
 
   async function clickEl(targetEl){
@@ -384,6 +384,7 @@ ui.renderApp();
     const bar=$('muAiBar');
     const badge=$('muAiBadge');
     const status=$('muStatus');
+    const cur=$('muCursor');
     if(frame){ if(on) frame.classList.add('ai-active'); else frame.classList.remove('ai-active'); }
     if(bar){ if(on) bar.classList.add('active'); else bar.classList.remove('active'); }
     if(badge){
@@ -391,6 +392,7 @@ ui.renderApp();
       else badge.classList.remove('show');
     }
     if(status){ if(on) status.classList.add('ai'); else status.classList.remove('ai'); }
+    if(cur){ if(on) cur.classList.add('ai'); else cur.classList.remove('ai'); }
   }
 
   /* ── UI helpers ── */
