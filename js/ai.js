@@ -2808,18 +2808,25 @@ async function doGenerate(statusDiv,wsContext){
   }
   // Only send last 6 messages to generation model to avoid token overflow
   const genHistory=S.chatHistory.slice(-6);
-  const raw=await callLLM(GEN_PROMPT+editContext+wsExtra,genHistory,{json:true,max_tokens:8192});
-  S.chatHistory.push({role:'assistant',content:raw});
-
-  const deck=extractJSON(raw);
-  if(!deck){
-    console.error('Generation failed — raw LLM response:',raw.substring(0,500));
-    throw new Error('LLM returned invalid JSON. Please try again.');
-  }
-  const err=validateDeck(deck);
-  if(err){
-    console.error('Deck validation failed:',err,'deck:',JSON.stringify(deck).substring(0,500));
-    throw new Error(`Invalid deck: ${err}`);
+  const maxAttempts=2;
+  let deck=null;
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+    const raw=await callLLM(GEN_PROMPT+editContext+wsExtra,genHistory,{json:true,max_tokens:8192});
+    if(attempt===maxAttempts) S.chatHistory.push({role:'assistant',content:raw});
+    const parsed=extractJSON(raw);
+    if(!parsed){
+      console.warn(`[Slide gen] Attempt ${attempt}/${maxAttempts} — invalid JSON:`,raw.substring(0,300));
+      if(attempt<maxAttempts){ statusDiv.textContent='Retrying generation...'; continue; }
+      throw new Error('LLM returned invalid JSON after retry. Please try again.');
+    }
+    const err=validateDeck(parsed);
+    if(err){
+      console.warn(`[Slide gen] Attempt ${attempt}/${maxAttempts} — validation failed:`,err);
+      if(attempt<maxAttempts){ statusDiv.textContent='Retrying generation...'; continue; }
+      throw new Error(`Invalid deck after retry: ${err}`);
+    }
+    deck=parsed;
+    break;
   }
 
   // Apply template style bank: override content but keep the color scheme
@@ -2916,20 +2923,27 @@ async function doDocGenerate(statusDiv,userText,wsContext){
 
   const wsExtra=wsContext||'';
   const genHistory=S.chatHistory.slice(-6);
-  const raw=await callLLM(DOC_GEN_PROMPT+editContext+wsExtra,genHistory,{json:true,max_tokens:8192});
-  S.chatHistory.push({role:'assistant',content:raw});
-
-  let docData;
-  try{
-    docData=JSON.parse(raw);
-  }catch(e){
-    const extracted=extractJSON(raw);
-    if(extracted) docData=extracted;
-    else throw new Error('AI returned invalid JSON for doc generation');
-  }
-
-  if(!docData.blocks||!Array.isArray(docData.blocks)){
-    throw new Error('AI response missing blocks array');
+  const maxAttempts=2;
+  let docData=null;
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+    const raw=await callLLM(DOC_GEN_PROMPT+editContext+wsExtra,genHistory,{json:true,max_tokens:8192});
+    if(attempt===maxAttempts) S.chatHistory.push({role:'assistant',content:raw});
+    let parsed=null;
+    try{ parsed=JSON.parse(raw); }catch(e){
+      parsed=extractJSON(raw);
+    }
+    if(!parsed){
+      console.warn(`[Doc gen] Attempt ${attempt}/${maxAttempts} — invalid JSON:`,raw.substring(0,300));
+      if(attempt<maxAttempts){ statusDiv.textContent='Retrying generation...'; continue; }
+      throw new Error('AI returned invalid JSON after retry.');
+    }
+    if(!parsed.blocks||!Array.isArray(parsed.blocks)){
+      console.warn(`[Doc gen] Attempt ${attempt}/${maxAttempts} — missing blocks array`);
+      if(attempt<maxAttempts){ statusDiv.textContent='Retrying generation...'; continue; }
+      throw new Error('AI response missing blocks array after retry.');
+    }
+    docData=parsed;
+    break;
   }
 
   // Convert to proper block schema
