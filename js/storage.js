@@ -361,14 +361,9 @@ export function exportPPTX(){
 }
 function _doExportPPTX(){
   const p=PRESETS[S.currentPreset];
-  // PptxGenJS CDN may export as .default, as a class, or as an object with a class inside
-  console.log('[PPTX] window.PptxGenJS type:', typeof window.PptxGenJS, window.PptxGenJS);
-  let PptxCtor=null;
-  if(typeof window.PptxGenJS==='function') PptxCtor=window.PptxGenJS;
-  else if(window.PptxGenJS?.default && typeof window.PptxGenJS.default==='function') PptxCtor=window.PptxGenJS.default;
-  else if(typeof window.pptxgen==='function') PptxCtor=window.pptxgen;
-  else if(window.pptxgen?.default && typeof window.pptxgen.default==='function') PptxCtor=window.pptxgen.default;
-  if(!PptxCtor){ window.addMessage('PptxGenJS library not loaded. Check console for details.','system'); console.error('[PPTX] Cannot find constructor. window.PptxGenJS=',window.PptxGenJS,'window.pptxgen=',window.pptxgen); return; }
+  // PptxGenJS CDN: v3.x exposes window.PptxGenJS as constructor
+  const PptxCtor=window.PptxGenJS||(window.PptxGenJS?.default)||(window.pptxgen)||(window.pptxgen?.default);
+  if(!PptxCtor){ window.addMessage('PptxGenJS library failed to load. Try refreshing the page.','system'); return; }
   const pptx=new PptxCtor();
   pptx.layout='LAYOUT_WIDE'; // 13.33 x 7.5 inches = 1280x720 at 96dpi
   pptx.title=S.currentDeck.title||'Untitled';
