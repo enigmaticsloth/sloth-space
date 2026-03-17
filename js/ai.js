@@ -1575,7 +1575,7 @@ async function sendMessage(){
   // 2b) Fallback: if no project matched by name but user explicitly mentions a project keyword,
   //     try to extract the project name from patterns like "歸在X專案" / "put in X project"
   if(!_resolvedProjectId && window.wsListProjects){
-    const projectKwMatch=text.match(/(?:歸在|放在|加入|歸到|放到|加到|link(?:ed)?\s*to|(?:put|add|file)\s*(?:in|to|under))\s*(.+?)(?:專案|project|$)/i);
+    const projectKwMatch=text.match(/(?:歸在|歸到|放在|放到|加入|加到|link(?:ed)?\s*to|(?:put|add|file)\s*(?:in|to|under))\s*(.+?)(?:專案|project|$)/i);
     if(projectKwMatch){
       const extractedName=projectKwMatch[1].trim();
       if(extractedName){
@@ -1590,7 +1590,15 @@ async function sendMessage(){
             p.name.toLowerCase().includes(extractedName.toLowerCase())||
             extractedName.toLowerCase().includes(p.name.toLowerCase())
           ));
-          if(fuzzy) _resolvedProjectId=fuzzy.id;
+          if(fuzzy){
+            _resolvedProjectId=fuzzy.id;
+          }else if(window.wsCreateProject){
+            // Project doesn't exist — auto-create it
+            const newProj=window.wsCreateProject(extractedName);
+            _resolvedProjectId=newProj.id;
+            addMessage(`📁 Created new project "${extractedName}"`,'system');
+            if(window.renderWorkspace) window.renderWorkspace();
+          }
         }
       }
     }
@@ -3537,10 +3545,16 @@ function resolveActionRefs(actions) {
           resolved.args[0] = curFileId;
         } else {
           // Current file not in workspace yet — use _autoLinkToProject fallback
-          // Find the project first, then call _autoLinkToProject
+          // Find the project first (or create it), then call _autoLinkToProject
           if (typeof a.args[1] === 'string') {
             const pName = a.args[1].toLowerCase();
-            const p = projects.find(p => (p.name || '').toLowerCase().includes(pName));
+            let p = projects.find(p => (p.name || '').toLowerCase().includes(pName));
+            if (!p && window.wsCreateProject) {
+              // Project doesn't exist — auto-create it
+              p = window.wsCreateProject(a.args[1]);
+              addMessage(`📁 Created new project "${a.args[1]}"`,'system');
+              if(window.renderWorkspace) window.renderWorkspace();
+            }
             if (p) {
               _autoLinkToProject(p.id);
               return null; // handled — skip normal execution
@@ -3554,7 +3568,13 @@ function resolveActionRefs(actions) {
       }
       if (typeof a.args[1] === 'string' && !a.args[1].startsWith('proj_')) {
         const name = a.args[1].toLowerCase();
-        const p = projects.find(p => (p.name || '').toLowerCase().includes(name));
+        let p = projects.find(p => (p.name || '').toLowerCase().includes(name));
+        if (!p && window.wsCreateProject) {
+          // Project doesn't exist — auto-create it
+          p = window.wsCreateProject(a.args[1]);
+          addMessage(`📁 Created new project "${a.args[1]}"`,'system');
+          if(window.renderWorkspace) window.renderWorkspace();
+        }
         if (p) resolved.args[1] = p.id;
       }
       // Final fallback: if file arg is still unresolved string, try current file
