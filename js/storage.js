@@ -357,6 +357,9 @@ export function exportJSON(){
 // ═══════════════════════════════════════════
 export function exportPPTX(){
   if(!S.currentDeck){window.addMessage('Nothing to export yet.','system');return;}
+  try{ _doExportPPTX(); }catch(e){ console.error('exportPPTX error:',e); window.addMessage('Export error: '+e.message,'system'); }
+}
+function _doExportPPTX(){
   const p=PRESETS[S.currentPreset];
   const pptx=new window.PptxGenJS();
   pptx.layout='LAYOUT_WIDE'; // 13.33 x 7.5 inches = 1280x720 at 96dpi
@@ -442,22 +445,23 @@ export function exportPPTX(){
       if(typeof c==='object'&&c.type==='table'){
         // Table rendering
         const rows=[];
-        // Header row
-        if(c.headers){
-          rows.push(c.headers.map(h=>({
-            text:h,
+        // Header row (guard: ensure array)
+        const hdrs=Array.isArray(c.headers)?c.headers:(c.headers?Object.values(c.headers):[]);
+        if(hdrs.length){
+          rows.push(hdrs.map(h=>({
+            text:String(h||''),
             options:{bold:true,fontSize:fontSize*0.85,color:hx(p.colors.table_header_text),fill:{color:hx(p.colors.table_header_bg)},fontFace}
           })));
         }
-        // Data rows
-        if(c.rows){
-          c.rows.forEach((row,ri)=>{
-            rows.push(row.map((cell,ci)=>({
-              text:String(cell),
-              options:{fontSize:fontSize*0.85,color:hx(txtColor),fill:{color:ri%2===1?hx(p.colors.table_row_alt):'FFFFFF'},fontFace,bold:ci===0}
-            })));
-          });
-        }
+        // Data rows (guard: ensure array of arrays)
+        const dataRows=Array.isArray(c.rows)?c.rows:(c.rows?[Object.values(c.rows)]:[]);
+        dataRows.forEach((row,ri)=>{
+          const cells=Array.isArray(row)?row:(row&&typeof row==='object'?Object.values(row):[String(row||'')]);
+          rows.push(cells.map((cell,ci)=>({
+            text:String(cell||''),
+            options:{fontSize:fontSize*0.85,color:hx(txtColor),fill:{color:ri%2===1?hx(p.colors.table_row_alt):'FFFFFF'},fontFace,bold:ci===0}
+          })));
+        });
         if(rows.length>0){
           sl.addTable(rows,{
             x,y,w,h,
@@ -470,8 +474,9 @@ export function exportPPTX(){
       }
 
       if(typeof c==='object'&&c.type==='list'){
-        // List as bullet points
-        const textRows=c.items.map(item=>({
+        // List as bullet points (guard: ensure array)
+        const items=Array.isArray(c.items)?c.items:(c.items?[String(c.items)]:[]);
+        const textRows=items.map(item=>({
           text:item,
           options:{
             fontSize,color:hx(txtColor),fontFace,
