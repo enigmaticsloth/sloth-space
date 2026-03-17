@@ -5,16 +5,16 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c9';
-import * as slide from './slide.js?v=20260317c9';
-import * as doc from './doc.js?v=20260317c9';
-import * as workspace from './workspace.js?v=20260317c9';
-import * as ai from './ai.js?v=20260317c9';
-import * as ui from './ui.js?v=20260317c9';
-import * as storage from './storage.js?v=20260317c9';
-import * as keys from './keys.js?v=20260317c9';
-import * as sheet from './sheet.js?v=20260317c9';
-import * as bench from './bench.js?v=20260317c9';
+import { S } from './state.js?v=20260317c10';
+import * as slide from './slide.js?v=20260317c10';
+import * as doc from './doc.js?v=20260317c10';
+import * as workspace from './workspace.js?v=20260317c10';
+import * as ai from './ai.js?v=20260317c10';
+import * as ui from './ui.js?v=20260317c10';
+import * as storage from './storage.js?v=20260317c10';
+import * as keys from './keys.js?v=20260317c10';
+import * as sheet from './sheet.js?v=20260317c10';
+import * as bench from './bench.js?v=20260317c10';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -392,7 +392,12 @@ ui.renderApp();
       else badge.classList.remove('show');
     }
     if(status){ if(on) status.classList.add('ai'); else status.classList.remove('ai'); }
-    if(cur){ if(on) cur.classList.add('ai'); else cur.classList.remove('ai'); }
+    if(cur){
+      if(on) cur.classList.add('ai'); else cur.classList.remove('ai');
+      // Directly set SVG path fill/stroke (CSS can't always override inline SVG attributes)
+      const p=cur.querySelector('path');
+      if(p){ p.setAttribute('fill',on?'#E8913A':'#fff'); p.setAttribute('stroke',on?'#A0600A':'#000'); }
+    }
   }
 
   /* ── UI helpers ── */
