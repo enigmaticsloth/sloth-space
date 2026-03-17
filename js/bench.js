@@ -205,8 +205,20 @@ function _benchLoad() {
     if (!raw) return;
     const data = JSON.parse(raw);
     if (data.items && Array.isArray(data.items)) {
+      // Purge stale PDF entries that were cached before PDF extraction was implemented
+      let purged = false;
+      data.items.forEach(b => {
+        if (b.type === 'pdf' && b.extractedText && /PDF text extraction pending|PDF\.js library not loaded/.test(b.extractedText)) {
+          b.extractedText = `[PDF: ${b.name} — cached without text extraction. Please remove and re-add this file to extract text.]`;
+          purged = true;
+        }
+      });
       S.bench = data.items;
       S._benchIdCounter = data.idCounter || data.items.length;
+      if (purged) {
+        _benchSave(); // Update cache with warning text
+        console.warn('[Bench] Found stale PDF entries from before text extraction was enabled. Please re-add PDF files.');
+      }
     }
   } catch (e) {
     console.warn('[Bench] localStorage load failed:', e.message);
