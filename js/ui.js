@@ -656,6 +656,17 @@ function modeShowUI(mode){
   const docCanvas=document.getElementById('docCanvas');
   const wsCanvas=document.getElementById('workspaceCanvas');
 
+  // iOS: relax viewport in doc mode to allow native text selection.
+  // maximum-scale=1.0 + user-scalable=no can block iOS long-press cursor placement.
+  const vp=document.querySelector('meta[name="viewport"]');
+  if(vp && window.innerWidth<=600){
+    if(mode==='doc'){
+      vp.setAttribute('content','width=device-width, initial-scale=1.0, viewport-fit=cover');
+    } else {
+      vp.setAttribute('content','width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+    }
+  }
+
   // Hide new tab page
   _hideNewTabPage();
 
@@ -809,11 +820,14 @@ function _saveModeTabs(){
   try{
     // Snapshot current tab before saving
     if(S.activeTabId) _snapshotCurrentTab();
+    // Strip undo/redo stacks from saved data — they're large (each entry = full deck/doc copy)
+    // and can cause localStorage quota overflow, silently losing ALL tab data on next refresh.
     const data={
-      tabs: S.modeTabs.map(t=>({
-        id:t.id, mode:t.mode, title:t.title, wsFileId:t.wsFileId||null,
-        snapshot: t.snapshot ? JSON.parse(JSON.stringify(t.snapshot)) : null
-      })),
+      tabs: S.modeTabs.map(t=>{
+        const snap=t.snapshot ? JSON.parse(JSON.stringify(t.snapshot)) : null;
+        if(snap){ delete snap.undoStack; delete snap.redoStack; }
+        return { id:t.id, mode:t.mode, title:t.title, wsFileId:t.wsFileId||null, snapshot:snap };
+      }),
       activeTabId: S.activeTabId,
       _tabIdCounter: S._tabIdCounter||S.modeTabs.length+1
     };
@@ -827,9 +841,10 @@ function _loadModeTabs(){
     if(!raw) return false;
     const data=JSON.parse(raw);
     if(!data.tabs || !Array.isArray(data.tabs) || data.tabs.length===0) return false;
-    // Filter out only truly invalid tabs (newtab mode).
-    // Blank slide/doc/sheet tabs are intentional — user opened them, so preserve them.
-    // The UI handles null deck/doc/sheet gracefully (shows empty state).
+    // Keep all real mode tabs. Only discard newtab placeholders.
+    // Blank tabs (null deck/doc/sheet) are preserved — the UI shows empty state gracefully.
+    // Previously we filtered blank tabs, but that caused an infinite cycle:
+    //   blank tab filtered out → fallback creates new blank tab → saved → filtered → repeat.
     const validTabs=data.tabs.filter(t=>{
       if(!t.mode || t.mode==='newtab') return false;
       return true;
@@ -1785,12 +1800,25 @@ function checkWelcomeScreen() {
       try{ _restoreActiveTab(); }finally{ _isPopState=false; }
     } else if(sessionStorage.getItem('sloth_active')) {
       // Fallback: restore single mode (legacy behavior, no saved tabs)
+      // IMPORTANT: Use fresh=false so _modeEnterInternal tries localStorage fallback
+      // for each mode (e.g. sloth_space_deck for slides). Using fresh=true would blank
+      // the slide even though autoSave saved the deck (because _saveModeTabs may have
+      // failed due to localStorage quota overflow from the autoSave data).
       const savedMode=sessionStorage.getItem('sloth_mode')||'slide';
       history.replaceState({mode:savedMode},'','#'+savedMode);
       _isPopState=true;
       try{
-        if(savedMode==='workspace'){ window.enterWorkspaceMode(); }
-        else { pickMode(savedMode); }
+        if(!window.isConfigured || !window.isConfigured()){
+          showLanding(); return;
+        }
+        // Create a tab but enter with fresh=false to recover from localStorage
+        const id=_nextTabId();
+        const tab={id, mode:savedMode, title:savedMode.charAt(0).toUpperCase()+savedMode.slice(1), snapshot:null};
+        S.modeTabs.push(tab);
+        S.activeTabId=id;
+        _renderTabBar();
+        _modeEnterInternal(savedMode, false);
+        _saveModeTabs();
       }finally{ _isPopState=false; }
     } else {
       // No saved tabs, no active session — show landing
