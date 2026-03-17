@@ -660,20 +660,7 @@ export function initAuth(){
   try{
     S.supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-    // Handle OAuth PKCE callback — if URL has ?code=, exchange it for a session
-    const params=new URLSearchParams(window.location.search);
-    if(params.has('code')){
-      S.supabaseClient.auth.exchangeCodeForSession(params.get('code')).then(({data,error})=>{
-        if(error){
-          console.warn('OAuth code exchange failed:',error.message);
-          window.addMessage&&window.addMessage('Login failed: '+error.message,'system');
-        }
-        // Clean URL — remove ?code=... so it doesn't re-trigger on refresh
-        window.history.replaceState({},'',window.location.pathname+window.location.hash);
-      });
-    }
-
-    // Check for existing session
+    // Check for existing session (also handles OAuth callback automatically)
     S.supabaseClient.auth.getSession().then(({data:{session}})=>{
       if(session){
         setAuthUser(session.user);
@@ -793,33 +780,22 @@ export function clearAuthUser(){
 }
 
 export async function doLogin(){
-  console.log('[Auth] doLogin called, supabaseClient:', !!S.supabaseClient);
   if(!S.supabaseClient){
-    console.warn('[Auth] No supabaseClient — opening settings');
     window.openSettings();
     return;
   }
-  // Directly use GitHub — no picker needed
   try{
-    // Build redirect URL — must be http(s), not file://
     let redirect=window.location.href.split('#')[0].split('?')[0];
-    console.log('[Auth] redirect URL:', redirect);
     if(redirect.startsWith('file:')){
       window.addMessage('OAuth login requires http/https. Deploy to GitHub Pages or run a local server first.','system');
       return;
     }
-    console.log('[Auth] Calling signInWithOAuth...');
-    const{data,error}=await S.supabaseClient.auth.signInWithOAuth({
+    const{error}=await S.supabaseClient.auth.signInWithOAuth({
       provider:'github',
-      options:{redirectTo:redirect, skipBrowserRedirect:true}
+      options:{redirectTo:redirect}
     });
-    console.log('[Auth] signInWithOAuth result:', {data, error});
     if(error){
-      console.error('[Auth] OAuth error:', error);
       window.addMessage('Login error: '+error.message,'system');
-    } else if(data?.url){
-      // Manually redirect — Supabase auto-redirect can fail after sign-out
-      window.location.href=data.url;
     }
   }catch(e){
     console.error('[Auth] doLogin exception:', e);
