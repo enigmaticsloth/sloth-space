@@ -2352,6 +2352,21 @@ function _mpFindCard(mode) {
  * The main sendMessage() handles all multi-step AI operations with visual animations.
  */
 function mpSendPrompt(text) {
+  // Gate: require API key before processing any prompt on landing page
+  if(!window.isConfigured || !window.isConfigured()){
+    mpAddMsg(text, 'user');
+    mpAddMsg('⚠️ Please set up your AI provider first. Open the "AI Provider" section on the left and enter your API key.', 'ai');
+    // Open the API section if collapsed
+    const apiSection=document.getElementById('llApiToggle');
+    if(apiSection){
+      if(!_landingApiOpen) toggleLandingApi();
+      apiSection.style.transition='background 0.3s';
+      apiSection.style.background='rgba(232,145,58,0.25)';
+      setTimeout(()=>{ apiSection.style.background=''; },1500);
+    }
+    return;
+  }
+
   // Show user message in mode picker chat
   mpAddMsg(text, 'user');
 
