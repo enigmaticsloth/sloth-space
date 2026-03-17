@@ -1622,7 +1622,16 @@ ${ABOUT_TEXTS.sheet}
     }
 
     // ── UNIFIED LLM ROUTER — classify intent (no hardcoded regex) ──
-    const routerMsgs=S.chatHistory.slice(-6);
+    // Trim messages for router: only last 4, and truncate long AI responses (e.g. JSON decks)
+    const routerMsgs=S.chatHistory.slice(-4).map(m=>{
+      if(m.role==='assistant'&&m.content.length>300){
+        return {role:m.role, content:m.content.substring(0,300)+'...[truncated]'};
+      }
+      if(m.role==='user'&&m.content.length>500){
+        return {role:m.role, content:m.content.substring(0,500)+'...[truncated]'};
+      }
+      return m;
+    });
     // Add context so router can make informed decisions
     const ctx=[];
     ctx.push(`Current mode: ${S.currentMode}.`);
@@ -1684,7 +1693,12 @@ ${ABOUT_TEXTS.sheet}
     if(recentActions.length>0){
       ctx.push('Recent AI actions: '+recentActions.map(m=>m.content).join(' | ')+'.');
     }
-    if(ctx.length>0) routerMsgs.push({role:'system',content:'[Context: '+ctx.join(' ')+']'});
+    if(ctx.length>0){
+      let ctxStr=ctx.join(' ');
+      // Cap router context to avoid exceeding small-model TPM limits
+      if(ctxStr.length>1200) ctxStr=ctxStr.substring(0,1200)+'...[trimmed]';
+      routerMsgs.push({role:'system',content:'[Context: '+ctxStr+']'});
+    }
 
     statusDiv.textContent='Routing...';
     const routerRaw=await callLLM(ROUTER_PROMPT,routerMsgs,{useRouter:true,temperature:0,max_tokens:512,json:true});
@@ -2501,11 +2515,20 @@ async function doGenerate(statusDiv,wsContext){
   const templatePreset=isTemplate?S.currentDeck.preset:null;
 
   let editContext='';
-  if(S.currentDeck&&!isTemplate){
-    editContext=`\n\n## EDITING MODE — CRITICAL\nThe user ALREADY has this deck. They want to MODIFY it, not regenerate from scratch.\nYou MUST keep ALL existing content, slides, and settings UNCHANGED except for what the user specifically asks to change.\nOutput the COMPLETE deck JSON with only the requested changes applied.\n\n[CURRENT DECK]\n${JSON.stringify(S.currentDeck)}`;
-  }
   // Inject workspace file data if user referenced any docs/sheets
   const wsExtra=wsContext||'';
+  const hasBenchData=wsExtra.includes('## BENCH CONTEXT');
+  if(S.currentDeck&&!isTemplate){
+    // Check if user wants full regeneration (keywords) or has bench reference data
+    const lastUserMsg=(S.chatHistory.filter(m=>m.role==='user').pop()?.content||'').toLowerCase();
+    const wantsRegen=/重新生成|重做|從頭|regenerat|recreat|redo|from scratch|start over|用.*(?:pdf|bench|檔案|文件).*生成/.test(lastUserMsg);
+    if(wantsRegen && hasBenchData){
+      // User wants to regenerate using bench/reference data — don't force keeping old content
+      editContext=`\n\n## REGENERATION MODE\nThe user wants to REGENERATE this deck using the reference data provided below. Create NEW slides based on the reference data. You may completely replace all existing content. Use the BENCH CONTEXT data as the primary source of truth.\n\n[PREVIOUS DECK for layout/style reference only]\nPreset: ${S.currentDeck.preset||'clean-white'}, ${S.currentDeck.slides.length} slides`;
+    } else {
+      editContext=`\n\n## EDITING MODE — CRITICAL\nThe user ALREADY has this deck. They want to MODIFY it, not regenerate from scratch.\nYou MUST keep ALL existing content, slides, and settings UNCHANGED except for what the user specifically asks to change.\nOutput the COMPLETE deck JSON with only the requested changes applied.\n\n[CURRENT DECK]\n${JSON.stringify(S.currentDeck)}`;
+    }
+  }
   // Only send last 6 messages to generation model to avoid token overflow
   const genHistory=S.chatHistory.slice(-6);
   const raw=await callLLM(GEN_PROMPT+editContext+wsExtra,genHistory,{json:true,max_tokens:8192});
