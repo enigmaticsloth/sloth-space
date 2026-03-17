@@ -432,7 +432,12 @@
   .chat-onboarding { padding:12px 10px; gap:8px; }
 
   /* --- Contextual AI menu: bottom sheet on mobile --- */
-  .ctx-ai-menu { position:fixed !important; left:0 !important; right:0 !important; bottom:0 !important; top:auto !important; max-width:100% !important; width:100% !important; border-radius:14px 14px 0 0 !important; max-height:60vh; overflow-y:auto; animation:ctx-slide-up 0.2s ease !important; }
+  .ctx-ai-menu { position:fixed !important; left:0 !important; right:0 !important; bottom:0 !important; top:auto !important; max-width:100% !important; width:100% !important; border-radius:10px 10px 0 0 !important; max-height:55vh; overflow-y:auto; animation:ctx-slide-up 0.18s ease !important; }
+  .ctx-ai-menu .ctx-ai-btn { padding:10px 12px; font-size:13px; }
+  .ctx-ai-menu .ctx-ai-btn .ctx-btn-icon { font-size:15px; }
+  .ctx-ai-menu .ctx-ai-input input { padding:8px 10px; font-size:13px; }
+  .ctx-ai-menu .ctx-ai-input button { padding:8px 14px; font-size:12px; }
+  .ctx-ai-menu .ctx-ai-header .ctx-region-name { font-size:12px; }
   @keyframes ctx-slide-up { from{transform:translateY(100%);} to{transform:translateY(0);} }
   .text-sel-tooltip button { font-size:13px; padding:8px 14px; }
   .text-sel-tooltip { border-radius:10px; padding:4px; gap:1px; }
