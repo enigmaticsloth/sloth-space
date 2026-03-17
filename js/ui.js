@@ -1628,7 +1628,9 @@ function checkWelcomeScreen() {
   }
 
   // Try to restore saved tabs (survives refresh AND OAuth redirects via localStorage)
-  if (hasConfig && window.isConfigured()) {
+  // But NOT if the user was on the landing page (picker) before refresh
+  const wasOnPicker=sessionStorage.getItem('sloth_on_picker')==='1';
+  if (hasConfig && window.isConfigured() && !wasOnPicker) {
     // First priority: restore saved tab state from localStorage
     const hadTabs=_loadModeTabs();
     if(hadTabs){

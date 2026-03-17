@@ -54,11 +54,11 @@
 .ll-save-btn:hover { transform:translateY(-1px); }
 
 /* ═══ Demo showcase — mini Sloth UI with animated cursor ═══ */
-.ll-demo { flex:1; display:flex; flex-direction:column; margin-top:16px; min-height:0; }
+.ll-demo { flex:1; display:flex; flex-direction:column; margin-top:16px; min-height:220px; }
 .ll-demo-label { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; font-weight:600; }
 .ll-demo-desc { font-size:11px; color:#9BA8C4; margin-bottom:8px; min-height:16px; transition:opacity 0.2s; }
-.ll-demo-stage { display:flex; align-items:center; gap:6px; flex:1; min-height:0; }
-.ll-demo-stage .mu { flex:1; min-width:0; }
+.ll-demo-stage { display:flex; align-items:center; gap:6px; flex:1; min-height:180px; }
+.ll-demo-stage .mu { flex:1; min-width:0; min-height:160px; }
 .ll-demo-arrow { background:none; border:1px solid rgba(120,134,165,0.15); color:#555; width:22px; height:28px; border-radius:6px; cursor:pointer; font-size:18px; font-family:Arial; display:flex; align-items:center; justify-content:center; transition:all 0.15s; flex-shrink:0; padding:0; line-height:1; }
 .ll-demo-arrow:hover { color:#9BA8C4; border-color:rgba(120,134,165,0.4); background:rgba(120,134,165,0.08); }
 
