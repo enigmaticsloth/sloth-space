@@ -153,14 +153,18 @@
     overflow:hidden;
     box-shadow:none !important;
   }
-  /* Chat messages area: compact ~3 lines height with smooth collapse */
+  /* Chat messages: 3-stage — default=half(4 lines), .chat-full=8 lines, .collapsed=closed */
   .chat-panel .chat-messages {
     flex:0 1 auto !important;
-    max-height:72px; /* ~3 lines of messages visible */
+    max-height:72px; /* half: ~4 lines */
     overflow-y:auto;
     transition:max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
   }
-  /* Collapsed: messages slide DOWN to 0 height */
+  /* Full: 8 lines */
+  .chat-panel.chat-full .chat-messages {
+    max-height:144px;
+  }
+  /* Closed: 0 height */
   .chat-panel.collapsed .chat-messages {
     max-height:0 !important;
     padding-top:0 !important;
@@ -239,11 +243,12 @@
   .mtb-bench-btn {
     display:flex !important; align-items:center; gap:4px;
     margin-left:auto; flex-shrink:0;
-    background:none; border:1px solid rgba(120,134,165,0.2); border-radius:8px;
-    color:#888; padding:4px 8px; cursor:pointer; font-size:10px; font-family:Arial;
+    background:rgba(155,168,196,0.12); border:1px solid rgba(155,168,196,0.25); border-radius:8px;
+    color:#9BA8C4; padding:4px 8px; cursor:pointer; font-size:10px; font-family:Arial;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
   }
-  .mtb-bench-btn:active { background:rgba(120,134,165,0.15); }
-  .mtb-bench-label { font-size:10px; color:#999; font-family:Arial; font-weight:500; }
+  .mtb-bench-btn:active { background:rgba(155,168,196,0.22); }
+  .mtb-bench-label { font-size:10px; color:#9BA8C4; font-family:Arial; font-weight:500; }
   .mtb-bench-count { font-size:9px; color:#7886A5; font-weight:600; }
 
   /* --- Bench overlay (mobile) --- */

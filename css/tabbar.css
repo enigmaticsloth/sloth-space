@@ -14,16 +14,17 @@
 .mtb-row2 { height:24px; border-top:1px solid rgba(255,255,255,0.04); }
 .mtb-tabs { display:flex; align-items:stretch; min-width:0; overflow-x:auto; gap:0; height:100%; flex-shrink:1; }
 .mtb-tabs::-webkit-scrollbar { display:none; }
-.mtb-tab { display:flex; align-items:center; gap:4px; padding:0 9px; height:100%; cursor:pointer; font-size:11px; font-family:Arial; color:var(--text2); white-space:nowrap; border-right:1px solid var(--border); position:relative; min-width:0; max-width:160px; transition:background 0.15s; user-select:none; flex-shrink:0; }
-.mtb-tab:hover { background:rgba(255,255,255,0.06); }
+.mtb-tab { display:flex; align-items:center; gap:4px; padding:0 9px; height:100%; cursor:pointer; font-size:11px; font-family:Arial; color:var(--text2); white-space:nowrap; border-right:1px solid var(--border); position:relative; min-width:0; max-width:160px; transition:background 0.15s; user-select:none; flex-shrink:0; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+@media(hover:hover){ .mtb-tab:hover { background:rgba(255,255,255,0.06); } }
 .mtb-tab.active { background:var(--bg); color:var(--text); font-weight:600; }
 .mtb-tab.active::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:var(--accent,#7886A5); }
 .mtb-tab-icon { width:12px; height:12px; opacity:0.6; flex-shrink:0; }
 .mtb-tab.active .mtb-tab-icon { opacity:1; }
 .mtb-tab-title { overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .mtb-tab-close { display:flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:3px; font-size:13px; line-height:1; color:var(--text2); opacity:0; transition:opacity 0.15s, background 0.15s; flex-shrink:0; margin-left:2px; }
-.mtb-tab:hover .mtb-tab-close, .mtb-tab.active .mtb-tab-close { opacity:0.6; }
-.mtb-tab-close:hover { opacity:1 !important; background:rgba(255,80,80,0.2); color:#f55; }
+@media(hover:hover){ .mtb-tab:hover .mtb-tab-close { opacity:0.6; } }
+.mtb-tab.active .mtb-tab-close { opacity:0.6; }
+@media(hover:hover){ .mtb-tab-close:hover { opacity:1 !important; background:rgba(255,80,80,0.2); color:#f55; } }
 .mtb-tab { cursor:grab; }
 .mtb-tab:active { cursor:grabbing; }
 .mtb-tab-dragging { opacity:0.7; background:rgba(200,168,112,0.12) !important; outline:1px dashed rgba(200,168,112,0.4); cursor:grabbing !important; }

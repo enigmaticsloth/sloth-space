@@ -3231,7 +3231,7 @@ async function _aiAnimateBeforeAction(fnName, args) {
       if (btn) return btn;
       // Also search by text content
       const allBtns = document.querySelectorAll('button');
-      for (const b of allBtns) { if (b.textContent.trim().includes('New Project')) return b; }
+      for (const b of allBtns) { if (b.textContent.trim().includes('Project')) return b; }
       return null;
     },
     wsOpenProject: () => {

@@ -1517,8 +1517,28 @@ function modeSaveCloud(){
 function toggleChatPanel(){
   const panel=document.getElementById('chatPanel');
   if(!panel) return;
-  panel.classList.toggle('collapsed');
   const icon=document.getElementById('chatToggleIcon');
+  // 3-stage cycle (mobile): full → half → closed → full
+  if(window.innerWidth<=600){
+    const isFull=panel.classList.contains('chat-full');
+    const isClosed=panel.classList.contains('collapsed');
+    panel.classList.remove('chat-full','collapsed');
+    if(isFull){
+      // full → half (default)
+      if(icon) icon.textContent='▼';
+    }else if(!isClosed){
+      // half → closed
+      panel.classList.add('collapsed');
+      if(icon) icon.textContent='▲';
+    }else{
+      // closed → full
+      panel.classList.add('chat-full');
+      if(icon) icon.textContent='⬇';
+    }
+    return;
+  }
+  // Desktop: simple toggle
+  panel.classList.toggle('collapsed');
   if(icon) icon.textContent=panel.classList.contains('collapsed')?'▲':'▼';
 }
 
