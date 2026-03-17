@@ -2721,7 +2721,7 @@ function mpSendPrompt(text) {
   mpAddMsg(text, 'user');
 
   // ── Quick check: identity/about questions should NOT enter any mode ──
-  const isAboutQuestion = /who are (you|u)|what are (you|u)|你是(什麼|誰|啥|哪|甚)|自我介紹|介紹一下|introduce yourself|what('s| is) your name|你叫(什麼|啥)|什麼(東西|鬼)/i.test(text);
+  const isAboutQuestion = /who are (you|u)|what are (you|u)|introduce yourself|what('s| is) your name/i.test(text);
   if (isAboutQuestion) {
     const thinkEl = mpShowThinking();
     (async () => {

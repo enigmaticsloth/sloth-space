@@ -352,7 +352,7 @@ function _fallbackSheetTable(content) {
 
 /**
  * Detect workspace file references in user message.
- * Patterns: "用[文件名/doc名]", "從[sheet名]抓", "reference [title]", "@doc名", etc.
+ * Patterns: "use [doc name]", "from [sheet name]", "reference [title]", "@docName", etc.
  */
 export function wsDetectReferences(text) {
   const files = wsLoad();

@@ -1134,7 +1134,8 @@ export function shEvalFormula(formula, sh, _visited) {
   try {
     // Normalize: strip whitespace, uppercase, convert full-width parens/operators
     let expr = formula.slice(1).trim().toUpperCase();
-    expr = expr.replace(/（/g, '(').replace(/）/g, ')').replace(/，/g, ',').replace(/：/g, ':');
+    // Normalize full-width punctuation to ASCII (common when typing with CJK input method)
+    expr = expr.replace(/\uff08/g, '(').replace(/\uff09/g, ')').replace(/\uff0c/g, ',').replace(/\uff1a/g, ':');
 
     // Match function calls: SUM(A1:A10), AVG(B2:B5), etc.
     const funcMatch = expr.match(/^(SUM|AVG|AVERAGE|COUNT|MIN|MAX|STDEV|MEDIAN)\((.+)\)$/);

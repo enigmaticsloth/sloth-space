@@ -298,18 +298,18 @@ INTENTS:
   WORKSPACE MODE: If the user is in workspace mode and asks about a specific project by name (e.g. "what is project X about", "summarize project Y"), this is "describe" — NOT "about" or "chat".
   EXCEPTION: If the user asks to CREATE/MAKE/WRITE a document or file (e.g. "make a document explaining project X", "write a report about project Y content"), this is ALWAYS "generate" NOT "describe".
 
-"about" — user is asking ABOUT Sloth (the AI) or Sloth Space THE APP itself: who are you, what is it, features, how to use it, a specific mode or feature. Also triggers on: "你是誰", "自我介紹", "introduce yourself", "who are you", "what's your name".
+"about" — user is asking ABOUT Sloth (the AI) or Sloth Space THE APP itself: who are you, what is it, features, how to use it, a specific mode or feature. Also triggers on: "introduce yourself", "who are you", "what's your name".
   Output: {"intent":"about","topic":"general|slides|doc|sheet|workspace|generation|context_injection|conversion|ui_ops"}
   topic guide:
-    "general" — asking about Sloth or Sloth Space overall: "who are you", "你是誰", "自我介紹", "what is Sloth Space", "what is this app", "tell me about it"
+    "general" — asking about Sloth or Sloth Space overall: "who are you", "what is Sloth Space", "what is this app", "tell me about it"
     "slides" — asking about slide/presentation mode: "how do I use slide mode", "how do slides work"
     "doc" — asking about document mode: "what is document mode", "how does doc mode work"
     "sheet" — asking about sheet/data mode: "how do I use sheets", "how do sheets work"
     "workspace" — asking about workspace/file management: "what is workspace", "how does workspace work", "how to manage projects"
-    "generation" — asking about content generation: "how does generation work", "how do you create content", "內容生成", "怎麼生成"
-    "context_injection" — asking about AI Context Injection: "what is context injection", "how does project context work", "什麼是AI Context Injection", "專案怎麼讀取檔案"
-    "conversion" — asking about format conversion: "how do I convert formats", "how to turn doc into slides", "怎麼轉換格式"
-    "ui_ops" — asking about UI operations: "what can you operate", "how do you control the interface", "介面操作", "你能操作什麼"
+    "generation" — asking about content generation: "how does generation work", "how do you create content"
+    "context_injection" — asking about AI Context Injection: "what is context injection", "how does project context work"
+    "conversion" — asking about format conversion: "how do I convert formats", "how to turn doc into slides"
+    "ui_ops" — asking about UI operations: "what can you operate", "how do you control the interface"
   CRITICAL DISTINCTIONS for "about":
     - "about" is ONLY for meta-questions about the app's features/usage/identity.
     - If user mentions specific files, items, or data INSIDE workspace (e.g. "files in workspace", "can you see my file", "do I have a document", "open that file"), this is NOT about — it is "chat" or "generate" depending on context.
@@ -358,8 +358,8 @@ INTENTS:
   - "create a project called Q2 Planning" → {"intent":"ui_action","actions":[{"fn":"wsCreateProject","args":["Q2 Planning",""]}],"message":"Created project Q2 Planning"}
   - "go to projects tab" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["workspace"]},{"fn":"wsSetView","args":["projects"]}],"message":"Switching to Projects"}
   - "put the budget file into Q2 project" → {"intent":"ui_action","actions":[{"fn":"wsLinkFile","args":["budget","Q2 Planning"]}],"message":"Linked budget to Q2 Planning"}
-  - "歸類到sloth space專案" / "link this to project X" / "put this in project X" → {"intent":"ui_action","actions":[{"fn":"wsLinkFile","args":["current","sloth space"]}],"message":"Linked to Sloth Space project"}
-  IMPORTANT: "歸類/歸在/放在/加入 + 專案/project" = wsLinkFile, NOT wsOpenProject. Use "current" as file arg to link the currently viewed file.
+  - "link this to project X" / "put this in project X" / "file this under project X" → {"intent":"ui_action","actions":[{"fn":"wsLinkFile","args":["current","X"]}],"message":"Linked to project X"}
+  IMPORTANT: "link to / put in / add to / file under + project" = wsLinkFile, NOT wsOpenProject. Use "current" as file arg to link the currently viewed file.
   - "open settings" → {"intent":"ui_action","actions":[{"fn":"openSettings","args":[]}],"message":"Opening settings"}
   - "switch to doc mode" → {"intent":"ui_action","actions":[{"fn":"modeEnter","args":["doc"]}],"message":"Switching to Doc mode"}
 
@@ -391,9 +391,9 @@ INTENTS:
   - modeSave() — save current file to localStorage (quick save)
   - modeSaveCloud() — save current file to cloud storage
   - modeNew() — add a new blank slide (slide mode only)
-  - "save" / "存檔" → {"intent":"ui_action","actions":[{"fn":"modeSave","args":[]}],"message":"Saving file"}
-  - "save to cloud" / "存到雲端" → {"intent":"ui_action","actions":[{"fn":"modeSaveCloud","args":[]}],"message":"Saving to cloud"}
-  - "add a new slide" / "新增空白投影片" → {"intent":"ui_action","actions":[{"fn":"modeNew","args":[]}],"message":"Adding new blank slide"}
+  - "save" → {"intent":"ui_action","actions":[{"fn":"modeSave","args":[]}],"message":"Saving file"}
+  - "save to cloud" → {"intent":"ui_action","actions":[{"fn":"modeSaveCloud","args":[]}],"message":"Saving to cloud"}
+  - "add a new slide" → {"intent":"ui_action","actions":[{"fn":"modeNew","args":[]}],"message":"Adding new blank slide"}
 
   CRITICAL DISTINCTION — "create project" vs "create document":
   - "create a PROJECT" → ui_action (wsCreateProject). A project is an organizational container, NOT content.
@@ -432,7 +432,7 @@ INTENTS:
 PRIORITY RULES (follow in order):
 1. Undo words (undo/redo etc.) → ALWAYS "undo", no exceptions.
 2. Delete words (delete/remove) → "content_edit" with delete:true.
-3. **MULTI-STEP CHECK**: If the message asks to CREATE A NEW PROJECT AND also create content for it → "multi_step". But if the user just wants to create content and file/link it to an EXISTING project (歸在/歸類/放在/加入/put in/link to + existing project name), → "generate" (NOT multi_step). The system auto-links to the mentioned project.
+3. **MULTI-STEP CHECK**: If the message asks to CREATE A NEW PROJECT AND also create content for it → "multi_step". But if the user just wants to create content and file/link it to an EXISTING project (put in/link to/file under/add to + existing project name), → "generate" (NOT multi_step). The system auto-links to the mentioned project.
 4. **APP MANAGEMENT OVERRIDE**: If the message asks to CREATE/DELETE/MANAGE a PROJECT, or OPEN/SWITCH/NAVIGATE to a mode/file/project, or LINK/UNLINK files → ALWAYS "ui_action". Keywords: project, open, switch, navigate, link, unlink, sort, search, settings. "create a project" / "open settings" / "switch to workspace" → ui_action, NOT generate.
 5. **CONTENT CREATION OVERRIDE**: If the message asks to CREATE/MAKE/WRITE a document, file, report, article, slides, or presentation (CONTENT, not a project) → ALWAYS "generate", even if the message ALSO asks about content.
 6. Asking what the current content says/summarize (WITHOUT any creation request) → "describe".
@@ -483,7 +483,7 @@ INTENTS:
 "ui_action" — navigate, switch modes, open files, manage projects, save.
   {"intent":"ui_action","actions":[{"fn":"name","args":[...]}],"message":"..."}
   Functions: modeEnter(mode), openWorkspaceItem(name), wsCreateProject(name,desc), wsOpenProject(name), wsLinkFile(fileOrCurrent,project) — use "current" for currently viewed file, wsDeleteFile(id), wsDeleteProject(id), openSettings(), modeTabSwitch(tabId), modeTabClose(tabId), modeTabNew()+ntpPickMode(mode), modeSave(), modeSaveCloud(), modeNew(), benchRemove(id), benchClear(), applyPreset(name), wsSetView(view), wsSetSearch(q), wsSetSort(by)
-  CRITICAL: "歸類/歸在/放在/加入/link to + 專案/project" → wsLinkFile("current","projectName"), NOT wsOpenProject.
+  CRITICAL: "link to / put in / add to / file under + project" → wsLinkFile("current","projectName"), NOT wsOpenProject.
 "multi_step" — BOTH ui_action AND content creation in one request. {"intent":"multi_step","steps":[...],"project":"projectName"}
   If user mentions a project to link to, ALWAYS include "project" at top level. System auto-creates if needed.
 "chat" — ONLY pure greetings with no topic. If ANY topic exists → "generate" instead.
@@ -491,7 +491,7 @@ INTENTS:
 PRIORITY: undo > delete(content_edit) > multi_step > ui_action(projects/navigation) > generate(content creation) > describe > about > style/image > chat.
 CRITICAL: "create/write content + link/file/categorize to a project" → generate with "project":"name" (NOT multi_step). Only use multi_step when CREATING a new project AND content together.
 Examples: "write a doc and put it in X project" → {"intent":"generate","target":"doc","project":"X"}
-"建立文件 歸類到Y專案" → {"intent":"generate","target":"doc","project":"Y"}
+"create a doc and file it under project Y" → {"intent":"generate","target":"doc","project":"Y"}
 When in doubt between chat and generate → always choose generate.
 Cross-mode conversion ("turn slides into doc") → generate with appropriate target.
 Bench files are reference data already injected as context. "use bench/PDF data to generate" → generate.
@@ -1487,14 +1487,14 @@ async function sendMessage(){
   }
 
   // ── Pending UI action confirmation ──
-  if(S._pendingUIActions && /^(DELETE|刪除)$/.test(trimText)){
+  if(S._pendingUIActions && /^(DELETE|YES|CONFIRM)$/i.test(trimText)){
     const { actions, message } = S._pendingUIActions;
     S._pendingUIActions = null;
     executeUIActions(actions, `✓ Confirmed: ${message}`);
     S.chatHistory.push({role:'assistant',content:`[Confirmed UI action: ${message}]`});
     return;
   }
-  if(S._pendingUIActions && /^(no|cancel|n|不|取消|算了)$/i.test(trimText)){
+  if(S._pendingUIActions && /^(no|cancel|n|nope|never\s*mind)$/i.test(trimText)){
     S._pendingUIActions = null;
     addMessage('Action cancelled.','system');
     return;
@@ -1578,9 +1578,9 @@ async function sendMessage(){
   }
 
   // 2b) Fallback: if no project matched by name but user explicitly mentions a project keyword,
-  //     try to extract the project name from patterns like "歸在X專案" / "put in X project"
+  //     try to extract the project name from patterns like "put in X project" / "link to X"
   if(!_resolvedProjectId && window.wsListProjects){
-    const projectKwMatch=text.match(/(?:歸在|歸到|放在|放到|加入|加到|link(?:ed)?\s*to|(?:put|add|file)\s*(?:in|to|under))\s*(.+?)(?:專案|project|$)/i);
+    const projectKwMatch=text.match(/(?:link(?:ed)?\s*to|(?:put|add|file)\s*(?:in|to|under))\s*(.+?)(?:project|$)/i);
     if(projectKwMatch){
       const extractedName=projectKwMatch[1].trim();
       if(extractedName){
@@ -1745,7 +1745,7 @@ ${ABOUT_TEXTS.sheet}
       if(selCtx) ctx.push(selCtx);
       ctx.push('Available functions: SUM, AVERAGE, COUNT, MIN, MAX, STDEV, MEDIAN. Formulas start with =.');
     }
-    if(S.currentMode==='slide'&&S.currentDeck) ctx.push(`User is in Slide mode viewing "${S.currentDeck.title||'Untitled'}" with ${S.currentDeck.slides.length} slides. "這份文件/this file/this deck" refers to THIS deck.`);
+    if(S.currentMode==='slide'&&S.currentDeck) ctx.push(`User is in Slide mode viewing "${S.currentDeck.title||'Untitled'}" with ${S.currentDeck.slides.length} slides. "this file/this deck" refers to THIS deck.`);
     if(S.currentMode==='slide'&&hasImageOnCurrentSlide()) ctx.push('Current slide has floating images.');
     if(S.selectedRegion) ctx.push(`User has selected region "${S.selectedRegion.regionId}" (${S.selectedRegion.role}) on slide ${S.selectedRegion.slideIdx+1}.`);
     if(wsRefs.length>0) ctx.push('User referenced workspace files: '+wsRefs.map(f=>f.title).join(', ')+'.');
@@ -1816,9 +1816,9 @@ ${ABOUT_TEXTS.sheet}
     }
 
     // ── Smart fallback: ANY intent → chat when user just wants a filename/title suggestion ──
-    // "給這個簡報生成一個檔名" → chat (not generate). Let the LLM suggest a name in chat.
-    const isMetaRequest=/filename|file\s*name|檔名|標題|取名|命名|rename|title/i.test(text)
-      && !/create|write|make|draft|build|建立|新增|寫/i.test(text.replace(/生成.*檔名|generate.*name|取.*名|命.*名/gi,''));
+    // "suggest a filename for this" → chat (not generate). Let the LLM suggest a name in chat.
+    const isMetaRequest=/filename|file\s*name|rename|title|name\s*this/i.test(text)
+      && !/create|write|make|draft|build/i.test(text.replace(/generate.*name|suggest.*name/gi,''));
     if(isMetaRequest && intent!=='chat' && intent!=='describe'){
       console.log(`Smart fallback: ${intent} → chat (user wants filename/title suggestion, not content creation)`);
       intent='chat';
@@ -1828,7 +1828,7 @@ ${ABOUT_TEXTS.sheet}
     // If still "chat" and message has substance → generate
     if(intent==='chat' && !isMetaRequest){
       const hasSubject=text.length>4&&!/^(hi|hello|hey|what|how|why|who|when|where|help|sup|yo)$/i.test(text.trim());
-      const hasGenerateHint=/create|make|write|about|build|draft|pitch|deck|report|article|content|generate|轉成|轉換|convert|turn.*into|extract/i.test(text);
+      const hasGenerateHint=/create|make|write|about|build|draft|pitch|deck|report|article|content|generate|convert|turn.*into|extract/i.test(text);
       const noDeckOrDoc=(S.currentMode==='slide'&&!S.currentDeck)||(S.currentMode==='doc'&&(!S.currentDoc||S.currentDoc.blocks.length<=2))||(S.currentMode==='workspace');
       if(hasSubject&&(hasGenerateHint||noDeckOrDoc)){
         console.log('Smart fallback: chat → generate (message has topic substance)');
@@ -1839,9 +1839,9 @@ ${ABOUT_TEXTS.sheet}
     // ── Smart fallback: cross-mode conversion target detection ──
     // If the router returned "generate" but missed the target, detect conversion keywords
     if(intent==='generate' && !routerData.target){
-      const wantsSheet=/試算表|表格|spreadsheet|轉成sheet|轉換成sheet|extract.*data|轉成表/i.test(text);
-      const wantsDoc=/轉成文件|轉成doc|轉換成文件|轉成文檔|make.*doc|convert.*doc|turn.*into.*doc/i.test(text);
-      const wantsSlide=/轉成簡報|轉成slide|轉換成簡報|make.*slide|make.*presentation|convert.*slide|turn.*into.*slide|turn.*into.*presentation/i.test(text);
+      const wantsSheet=/spreadsheet|sheet|extract.*data|convert.*sheet/i.test(text);
+      const wantsDoc=/make.*doc|convert.*doc|turn.*into.*doc/i.test(text);
+      const wantsSlide=/make.*slide|make.*presentation|convert.*slide|turn.*into.*slide|turn.*into.*presentation/i.test(text);
       if(wantsSheet){
         routerData.target='sheet';
         console.log('Smart fallback: generate → target:sheet (detected conversion keywords)');
@@ -1855,10 +1855,10 @@ ${ABOUT_TEXTS.sheet}
     }
 
     // ── Smart fallback: ANY intent → describe when user just wants a summary (not a file) ──
-    // "總結這個專案" / "summarize this" → should show summary in chat, not generate a doc
+    // "summarize this" → should show summary in chat, not generate a doc
     // The router often misclassifies summarize requests as "generate", "chat", etc.
-    const isSummarizeOnly=/^(summarize|summary|sum up|overview|recap|總結|摘要|概述|整理|歸納)/i.test(text.trim())
-      && !/file|document|doc|report|slide|presentation|sheet|檔案|文件|文檔|簡報|報告|投影片|試算表/i.test(text);
+    const isSummarizeOnly=/^(summarize|summary|sum up|overview|recap)/i.test(text.trim())
+      && !/file|document|doc|report|slide|presentation|sheet/i.test(text);
     if(isSummarizeOnly && intent!=='describe'){
       console.log(`Smart fallback: ${intent} → describe (user wants summary, not file creation)`);
       intent='describe';
@@ -1866,7 +1866,7 @@ ${ABOUT_TEXTS.sheet}
 
     // ── Smart fallback: describe → generate when user asks to CREATE a file ──
     // This catches cases where the router picks "describe" but the user actually
-    // wants to create a document/report/slides (e.g. "做份文件解釋" / "make a doc explaining")
+    // wants to create a document/report/slides (e.g. "make a doc explaining")
     if(intent==='describe' && !isSummarizeOnly){
       // Check if router detected a target (doc/slide) — means it saw creation intent
       if(routerData.target){
@@ -1884,18 +1884,17 @@ ${ABOUT_TEXTS.sheet}
 
     // ── Smart fallback: generate → ui_action when user wants to create a PROJECT (not content) ──
     if(intent==='generate'){
-      const wantsProject=/project|專案|proj/i.test(text)
-        && /create|make|build|new|建立|建|新增|開/i.test(text)
-        && !/document|doc|report|article|file|slide|presentation|deck|文件|文檔|簡報|報告/i.test(text);
+      const wantsProject=/project|proj/i.test(text)
+        && /create|make|build|new/i.test(text)
+        && !/document|doc|report|article|file|slide|presentation|deck/i.test(text);
       if(wantsProject){
         console.log('Smart fallback: generate → ui_action (user wants to CREATE a project, not content)');
-        // Extract project name: look for "叫X" / "called X" / "named X" patterns
+        // Extract project name: look for "called X" / "named X" patterns
         let projName='';
-        const cnMatch=text.match(/叫\s*[「「"']?(.+?)[」」"']?\s*(?:的|$)/);
         const enMatch=text.match(/(?:called|named)\s+[""']?(.+?)[""']?\s*$/i);
         const rawMatch=text.match(/project\s+[""']?(.+?)[""']?\s*$/i);
-        projName=(cnMatch&&cnMatch[1])||(enMatch&&enMatch[1])||(rawMatch&&rawMatch[1])||'';
-        projName=projName.trim().replace(/[。，！？.,!?]+$/,'');
+        projName=(enMatch&&enMatch[1])||(rawMatch&&rawMatch[1])||'';
+        projName=projName.trim().replace(/[.,!?]+$/,'');
         if(projName){
           intent='ui_action';
           routerData.actions=[
@@ -2060,11 +2059,8 @@ ${ABOUT_TEXTS.sheet}
           S.chatHistory.push({role:'assistant',content:summary});
 
           // Offer to generate a file from the summary
-          const isZh=/[\u4e00-\u9fff]/.test(text);
           const followUp=addMessage('','system');
-          followUp.innerHTML=isZh
-            ? '<div style="margin-bottom:6px">需要產生檔案嗎？</div><div class="ai-action-btns"><span class="ai-action-btn" data-gen="doc">📄 文件</span><span class="ai-action-btn" data-gen="slide">📊 投影片</span><span class="ai-action-btn" data-gen="sheet">📋 試算表</span></div>'
-            : '<div style="margin-bottom:6px">Generate a file?</div><div class="ai-action-btns"><span class="ai-action-btn" data-gen="doc">📄 Doc</span><span class="ai-action-btn" data-gen="slide">📊 Slides</span><span class="ai-action-btn" data-gen="sheet">📋 Sheet</span></div>';
+          followUp.innerHTML='<div style="margin-bottom:6px">Generate a file?</div><div class="ai-action-btns"><span class="ai-action-btn" data-gen="doc">📄 Doc</span><span class="ai-action-btn" data-gen="slide">📊 Slides</span><span class="ai-action-btn" data-gen="sheet">📋 Sheet</span></div>';
           followUp.querySelectorAll('.ai-action-btn').forEach(btn=>{
             btn.style.cssText='cursor:pointer;padding:8px 14px;border-radius:8px;background:var(--chat-surface,#f0f0f0);border:1px solid var(--chat-border,#e0e0e0);display:block;width:100%;font-size:0.9em;transition:all 0.15s;text-align:left';
             btn.onmouseenter=()=>{btn.style.background='rgba(120,134,165,0.1)';btn.style.borderColor='#3A4258';};
@@ -2072,9 +2068,7 @@ ${ABOUT_TEXTS.sheet}
             btn.onclick=()=>{
               followUp.remove();
               const target=btn.dataset.gen;
-              const genPrompt=isZh
-                ? `根據上面的總結，產生一份${target==='doc'?'文件':target==='slide'?'投影片':'試算表'}`
-                : `Based on the summary above, generate a ${target==='doc'?'document':target==='slide'?'presentation':'spreadsheet'}`;
+              const genPrompt=`Based on the summary above, generate a ${target==='doc'?'document':target==='slide'?'presentation':'spreadsheet'}`;
               window.sendMessage(genPrompt);
             };
           });
@@ -2440,7 +2434,7 @@ ${sourceContent}`;
       const steps = routerData.steps || [];
       const message = routerData.message || 'Executing multi-step operation...';
       const hasGenerate = steps.some(s => s.type === 'generate');
-      const userWantsContent = /建立|create|write|make|生成|產生|寫|做|draft|generate/i.test(text) && /文件|doc|簡報|slide|presentation|報告|report|article|文章|試算|sheet/i.test(text);
+      const userWantsContent = /create|write|make|draft|generate/i.test(text) && /doc|slide|presentation|report|article|sheet/i.test(text);
 
       // Safety: if multi_step has no generate step but user clearly wants content, fall back to generate
       if (!hasGenerate && userWantsContent) {
@@ -2450,8 +2444,8 @@ ${sourceContent}`;
           await executeMultiStep(steps, message, text, wsContext, _resolvedProjectId);
         }
         // Then generate the content
-        const target = /簡報|slide|presentation|pitch|deck|ppt/i.test(text) ? 'slide' :
-                       /試算|sheet|spreadsheet|excel|csv/i.test(text) ? 'sheet' : 'doc';
+        const target = /slide|presentation|pitch|deck|ppt/i.test(text) ? 'slide' :
+                       /sheet|spreadsheet|excel|csv/i.test(text) ? 'sheet' : 'doc';
         if (target === 'slide') {
           await _aiEnsureModeForGenerate('slide');
           await doGenerate(statusDiv, wsContext);
@@ -2795,7 +2789,7 @@ async function doGenerate(statusDiv,wsContext){
   if(S.currentDeck&&!isTemplate){
     // Check if user wants full regeneration (keywords) or has bench reference data
     const lastUserMsg=(S.chatHistory.filter(m=>m.role==='user').pop()?.content||'').toLowerCase();
-    const wantsRegen=/重新生成|重做|從頭|regenerat|recreat|redo|from scratch|start over|用.*(?:pdf|bench|檔案|文件).*生成/.test(lastUserMsg);
+    const wantsRegen=/regenerat|recreat|redo|from scratch|start over|use.*(?:pdf|bench|file|data).*generat/.test(lastUserMsg);
     if(wantsRegen && hasBenchData){
       // User wants to regenerate using bench/reference data — don't force keeping old content
       editContext=`\n\n## REGENERATION MODE\nThe user wants to REGENERATE this deck using the reference data provided below. Create NEW slides based on the reference data. You may completely replace all existing content. Use the BENCH CONTEXT data as the primary source of truth.\n\n[PREVIOUS DECK for layout/style reference only]\nPreset: ${S.currentDeck.preset||'clean-white'}, ${S.currentDeck.slides.length} slides`;

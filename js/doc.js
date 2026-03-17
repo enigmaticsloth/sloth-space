@@ -1072,7 +1072,7 @@ export function docShowContextMenu(blockId, x, y){
     <div class="doc-ctx-item" onclick="docCtxAction('duplicate')"><span class="dci-icon">📋</span>Duplicate block</div>
     <div class="doc-ctx-item" onclick="docCtxAction('moveUp')"><span class="dci-icon">↑</span>Move up</div>
     <div class="doc-ctx-item" onclick="docCtxAction('moveDown')"><span class="dci-icon">↓</span>Move down</div>
-    <div class="doc-ctx-item" onclick="docCtxAction('insertBelow')"><span class="dci-icon">＋</span>Insert block below</div>
+    <div class="doc-ctx-item" onclick="docCtxAction('insertBelow')"><span class="dci-icon">+</span>Insert block below</div>
     <div class="doc-ctx-sep"></div>
     <div class="doc-ctx-section">✦ AI</div>
     ${isText?`

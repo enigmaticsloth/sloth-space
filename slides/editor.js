@@ -119,17 +119,17 @@ export function applyStyleOverrides(styleObj) {
     }
   });
 
-  if (styleObj.background) msgs.push(`背景 → ${styleObj.background}`);
-  if (styleObj.heading_color) msgs.push(`全部文字 → ${styleObj.heading_color}`);
-  if (styleObj.font) msgs.push(`字型 → ${styleObj.font}`);
-  if (regionId && styleObj.region_color) msgs.push(`${regionId} 文字 → ${styleObj.region_color}`);
-  if (regionId && styleObj.region_font) msgs.push(`${regionId} 字型 → ${styleObj.region_font}`);
-  if (styleObj.font_size) msgs.push(`全部字體 → ${styleObj.font_size}px`);
-  if (regionId && styleObj.region_font_size) msgs.push(`${regionId} 字體 → ${styleObj.region_font_size}px`);
-  if (styleObj.underline === true) msgs.push(`${regionId || '全部'} +底線`);
-  if (styleObj.underline === false) msgs.push(`${regionId || '全部'} -底線`);
-  if (styleObj.bold === true) msgs.push(`${regionId || '全部'} +粗體`);
-  if (styleObj.italic === true) msgs.push(`${regionId || '全部'} +斜體`);
+  if (styleObj.background) msgs.push(`Background → ${styleObj.background}`);
+  if (styleObj.heading_color) msgs.push(`All text → ${styleObj.heading_color}`);
+  if (styleObj.font) msgs.push(`Font → ${styleObj.font}`);
+  if (regionId && styleObj.region_color) msgs.push(`${regionId} text → ${styleObj.region_color}`);
+  if (regionId && styleObj.region_font) msgs.push(`${regionId} font → ${styleObj.region_font}`);
+  if (styleObj.font_size) msgs.push(`All font size → ${styleObj.font_size}px`);
+  if (regionId && styleObj.region_font_size) msgs.push(`${regionId} font size → ${styleObj.region_font_size}px`);
+  if (styleObj.underline === true) msgs.push(`${regionId || 'All'} +underline`);
+  if (styleObj.underline === false) msgs.push(`${regionId || 'All'} -underline`);
+  if (styleObj.bold === true) msgs.push(`${regionId || 'All'} +bold`);
+  if (styleObj.italic === true) msgs.push(`${regionId || 'All'} +italic`);
   return msgs;
 }
 
@@ -249,33 +249,33 @@ export async function sendMessage() {
 
   // ── PASS -1: Local UI commands (no LLM needed) ──
   const trimText = text.trim();
-  if (/^(復原|undo|撤[銷回]|還原|上一步|回去)$/i.test(trimText)) {
+  if (/^(undo)$/i.test(trimText)) {
     window.undo(); return;
   }
-  if (/^(重做|redo|取消復原|下一步)$/i.test(trimText)) {
+  if (/^(redo)$/i.test(trimText)) {
     window.redo(); return;
   }
-  if (/^(儲存|存檔|save|保存|存sloth|save\s*sloth)$/i.test(trimText)) {
+  if (/^(save|save\s*sloth)$/i.test(trimText)) {
     window.saveSloth(); return;
   }
-  if (/^(開新|新檔|新建|new|開新檔案|新增檔案)$/i.test(trimText)) {
+  if (/^(new)$/i.test(trimText)) {
     window.newDeck(); return;
   }
-  if (/^(載入|讀取|load|開啟|開檔|載入檔案|讀取檔案|open)$/i.test(trimText)) {
+  if (/^(load|open)$/i.test(trimText)) {
     window.loadDeck(); return;
   }
-  if (/^(匯出|export|export\s*json|json)$/i.test(trimText)) {
+  if (/^(export|export\s*json|json)$/i.test(trimText)) {
     window.exportJSON(); addMessage('✓ Exported JSON', 'system'); return;
   }
-  if (/^(匯出\s*ppt|export\s*ppt|pptx?|匯出簡報|下載簡報|export\s*slides)$/i.test(trimText)) {
+  if (/^(export\s*ppt|pptx?|export\s*slides)$/i.test(trimText)) {
     window.exportPPTX(); return;
   }
-  if (/^(設定|settings?|設置|config)$/i.test(trimText)) {
+  if (/^(settings?|config)$/i.test(trimText)) {
     window.openSettings(); return;
   }
 
   // Workspace quick-create: "/doc Title\nContent..." or "/sheet Title\nCSV..."
-  const docMatch = trimText.match(/^\/(doc|文件)\s+(.+)/is);
+  const docMatch = trimText.match(/^\/(doc)\s+(.+)/is);
   if (docMatch) {
     const lines = docMatch[2].split('\n');
     const title = lines[0].trim();
@@ -284,7 +284,7 @@ export async function sendMessage() {
     addMessage(`✓ Created doc "${doc.title}" (${doc.content.blocks.length} blocks). Reference it by name when making slides!`, 'system');
     return;
   }
-  const sheetMatch = trimText.match(/^\/(sheet|表格|數據)\s+(.+)/is);
+  const sheetMatch = trimText.match(/^\/(sheet)\s+(.+)/is);
   if (sheetMatch) {
     const lines = sheetMatch[2].split('\n');
     const title = lines[0].trim();
@@ -503,8 +503,8 @@ export async function sendMessage() {
       } else {
         // No region found — ask user
         statusDiv.remove();
-        addMessage('請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。', 'ai');
-        state.chatHistory.push({ role: 'assistant', content: '請點擊投影片上你想修改的區域，或告訴我第幾頁的哪個部分要改。' });
+        addMessage('Please click the region on the slide you want to edit, or tell me which part on which page to change.', 'ai');
+        state.chatHistory.push({ role: 'assistant', content: 'Please click the region on the slide you want to edit, or tell me which part on which page to change.' });
       }
 
     } else if (intent === 'generate') {
