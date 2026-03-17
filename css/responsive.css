@@ -121,14 +121,27 @@
   body.mode-doc .doc-canvas::-webkit-scrollbar,
   body.mode-workspace .workspace-canvas::-webkit-scrollbar,
   body.mode-sheet .sheet-canvas::-webkit-scrollbar { display:none; /* Chrome/Safari */ }
-  /* Ensure doc blocks allow native text selection on iOS */
+  /* ── iOS native text selection: comprehensive enablement ── */
+  /* Doc page + all children: full native touch for long-press select */
+  body.mode-doc .doc-canvas #docPage,
+  body.mode-doc .doc-canvas #docPage *,
   body.mode-doc .doc-canvas .doc-block,
   body.mode-doc .doc-canvas [contenteditable] {
     -webkit-user-select:auto !important; user-select:auto !important;
     touch-action:auto !important;
+    -webkit-touch-callout:default !important;
+  }
+  /* Slide inline editing: enable native text selection on canvas */
+  body.slide-inline-editing .slide-panel,
+  body.slide-inline-editing #slideCanvas,
+  body.slide-inline-editing #slideCanvas *,
+  body.slide-inline-editing .slide-frame {
+    touch-action:auto !important;
+    -webkit-user-select:text !important; user-select:text !important;
+    -webkit-touch-callout:default !important;
   }
   /* Drag handle: always visible on mobile (no hover), and allow touch drag */
-  body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; }
+  body.mode-doc .doc-block-handle { opacity:0.6 !important; touch-action:none !important; -webkit-touch-callout:none !important; }
   .deck-name-bar { padding:2px 8px 0; gap:4px; }
   .deck-name-input { font-size:12px; }
   .deck-actions { display:none; }

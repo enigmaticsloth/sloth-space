@@ -827,27 +827,11 @@ function _loadModeTabs(){
     if(!raw) return false;
     const data=JSON.parse(raw);
     if(!data.tabs || !Array.isArray(data.tabs) || data.tabs.length===0) return false;
-    // Filter out newtab tabs and blank tabs (no content worth restoring)
+    // Filter out only truly invalid tabs (newtab mode).
+    // Blank slide/doc/sheet tabs are intentional — user opened them, so preserve them.
+    // The UI handles null deck/doc/sheet gracefully (shows empty state).
     const validTabs=data.tabs.filter(t=>{
       if(!t.mode || t.mode==='newtab') return false;
-      // Skip tabs with no actual content (blank files)
-      if(!t.snapshot) return false;
-      if(t.mode==='slide'){
-        if(!t.snapshot.deck || !t.snapshot.deck.slides || t.snapshot.deck.slides.length===0) return false;
-        // Also filter out decks where ALL slides have empty content
-        const hasContent=t.snapshot.deck.slides.some(s=>{
-          if(!s.content || typeof s.content!=='object') return false;
-          return Object.values(s.content).some(v=>{
-            if(!v) return false;
-            if(typeof v==='string') return v.trim().length>0;
-            if(typeof v==='object' && v.type) return true; // table/list/image = real content
-            return false;
-          });
-        });
-        if(!hasContent && !t.snapshot.deck.title) return false; // no content AND no title = blank
-      }
-      if(t.mode==='doc' && (!t.snapshot.doc || !t.snapshot.doc.blocks || t.snapshot.doc.blocks.length===0)) return false;
-      if(t.mode==='sheet' && (!t.snapshot.sheet || !t.snapshot.sheet.rows || t.snapshot.sheet.rows.length===0)) return false;
       return true;
     });
     if(validTabs.length===0) return false;
@@ -1131,21 +1115,7 @@ function _isTabBlank(tab){
   if(tab.mode==='newtab') return true;
   // Check snapshot first
   if(tab.snapshot){
-    if(tab.mode==='slide'){
-      if(!tab.snapshot.deck) return true;
-      if(!tab.snapshot.deck.slides || tab.snapshot.deck.slides.length===0) return true;
-      // Check if all slides have empty content AND no title
-      const hasContent=tab.snapshot.deck.slides.some(s=>{
-        if(!s.content || typeof s.content!=='object') return false;
-        return Object.values(s.content).some(v=>{
-          if(!v) return false;
-          if(typeof v==='string') return v.trim().length>0;
-          if(typeof v==='object' && v.type) return true;
-          return false;
-        });
-      });
-      if(!hasContent && !tab.snapshot.deck.title) return true;
-    }
+    if(tab.mode==='slide' && !tab.snapshot.deck) return true;
     if(tab.mode==='doc' && !tab.snapshot.doc) return true;
     if(tab.mode==='sheet' && !tab.snapshot.sheet) return true;
     return false;
