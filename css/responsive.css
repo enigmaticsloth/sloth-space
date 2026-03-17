@@ -92,14 +92,22 @@
     min-height:120px; /* minimum on tiny screens */
   }
   /* Doc canvas: full native touch (text selection, scroll, etc.) */
+  /* CRITICAL: Do NOT use -webkit-overflow-scrolling:touch here!
+     That deprecated property creates a separate compositing layer on iOS
+     that breaks contenteditable long-press text selection. iOS 13+ doesn't
+     need it for momentum scrolling anyway. */
   body.mode-doc .doc-canvas {
     flex:1 1 0 !important; min-height:0;
     overflow-y:auto !important; overflow-x:hidden;
-    -webkit-overflow-scrolling:touch;
     touch-action:auto !important;
-    -webkit-user-select:auto !important; user-select:auto !important;
+    -webkit-user-select:text !important; user-select:text !important;
+    -webkit-touch-callout:default !important;
     padding:16px 8px;
     scrollbar-width:none; /* Firefox */
+  }
+  /* Doc page wrapper: allow iOS selection handles to extend beyond bounds */
+  body.mode-doc .doc-page {
+    overflow:visible !important;
   }
   /* Workspace canvas: vertical scroll only */
   body.mode-workspace .workspace-canvas {
@@ -122,14 +130,21 @@
   body.mode-workspace .workspace-canvas::-webkit-scrollbar,
   body.mode-sheet .sheet-canvas::-webkit-scrollbar { display:none; /* Chrome/Safari */ }
   /* ── iOS native text selection: comprehensive enablement ── */
-  /* Doc page + all children: full native touch for long-press select */
+  /* Doc page + all children: full native touch for long-press select.
+     Use -webkit-user-select:text (NOT auto) — 'auto' can inherit 'none'
+     from parent chain on some iOS versions, 'text' explicitly enables. */
   body.mode-doc .doc-canvas #docPage,
   body.mode-doc .doc-canvas #docPage *,
   body.mode-doc .doc-canvas .doc-block,
   body.mode-doc .doc-canvas [contenteditable] {
-    -webkit-user-select:auto !important; user-select:auto !important;
+    -webkit-user-select:text !important; user-select:text !important;
     touch-action:auto !important;
     -webkit-touch-callout:default !important;
+  }
+  /* Ensure #docPage itself is selectable and not clipped */
+  body.mode-doc #docPage {
+    position:relative !important;
+    -webkit-user-select:text !important; user-select:text !important;
   }
   /* Slide inline editing: enable native text selection on canvas */
   body.slide-inline-editing .slide-panel,

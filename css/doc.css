@@ -8,9 +8,9 @@
  * For commercial, closed-source licensing exceptions, contact the author.
  */
 /* ─── Doc Canvas ─── */
-.doc-canvas { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#141414; padding:40px 20px; touch-action:auto; -webkit-user-select:auto; user-select:auto; -webkit-touch-callout:default; }
+.doc-canvas { flex:1; overflow-y:auto; background:#141414; padding:40px 20px; touch-action:auto; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
 .doc-page { max-width:720px; margin:0 auto; min-height:60vh; padding-bottom:40vh; overflow:hidden; }
-#docPage { outline:none; padding:0; -webkit-user-select:auto; user-select:auto; -webkit-touch-callout:default; }
+#docPage { outline:none; padding:0; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
 #docPage:focus-within { outline:none; }
 .doc-empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:50vh; text-align:center; }
 

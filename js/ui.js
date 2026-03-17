@@ -822,16 +822,52 @@ function _saveModeTabs(){
     if(S.activeTabId) _snapshotCurrentTab();
     // Strip undo/redo stacks from saved data — they're large (each entry = full deck/doc copy)
     // and can cause localStorage quota overflow, silently losing ALL tab data on next refresh.
+    // Also strip inline image data from slide deck snapshots — images are already saved
+    // in the legacy sloth_space_deck key via autoSave(), no need to duplicate.
     const data={
       tabs: S.modeTabs.map(t=>{
         const snap=t.snapshot ? JSON.parse(JSON.stringify(t.snapshot)) : null;
-        if(snap){ delete snap.undoStack; delete snap.redoStack; }
+        if(snap){
+          delete snap.undoStack; delete snap.redoStack;
+          // Strip large image data from slide elements (base64 strings)
+          if(snap.deck && snap.deck.slides){
+            for(const sl of snap.deck.slides){
+              if(sl.elements){
+                for(const el of sl.elements){
+                  if(el.type==='image' && el.src && el.src.length>1000){
+                    el.src='__stripped__'; // marker; full data in sloth_space_deck
+                  }
+                }
+              }
+            }
+          }
+        }
         return { id:t.id, mode:t.mode, title:t.title, wsFileId:t.wsFileId||null, snapshot:snap };
       }),
       activeTabId: S.activeTabId,
       _tabIdCounter: S._tabIdCounter||S.modeTabs.length+1
     };
-    localStorage.setItem(_MODE_TABS_KEY, JSON.stringify(data));
+    const json=JSON.stringify(data);
+    try{
+      localStorage.setItem(_MODE_TABS_KEY, json);
+    }catch(quotaErr){
+      // Quota exceeded — clear non-essential data and retry
+      console.warn('[Tabs] quota exceeded, clearing saves to make room...');
+      try{ localStorage.removeItem('sloth_space_saves'); }catch(e){}
+      try{
+        localStorage.setItem(_MODE_TABS_KEY, json);
+      }catch(e2){
+        // Still failing — strip ALL snapshots and save minimal tab metadata
+        // (modes/titles preserved; actual content recovered from per-mode localStorage keys)
+        console.warn('[Tabs] still over quota, saving minimal tab data');
+        const minimal={
+          tabs: S.modeTabs.map(t=>({id:t.id, mode:t.mode, title:t.title, wsFileId:t.wsFileId||null, snapshot:null})),
+          activeTabId: S.activeTabId,
+          _tabIdCounter: S._tabIdCounter||S.modeTabs.length+1
+        };
+        try{ localStorage.setItem(_MODE_TABS_KEY, JSON.stringify(minimal)); }catch(e3){}
+      }
+    }
   }catch(e){ console.warn('[Tabs] save failed:', e.message); }
 }
 
@@ -926,6 +962,22 @@ function _restoreTabSnapshot(tab){
     S.currentSlide=tab.snapshot.currentSlide||0;
     S.undoStack=tab.snapshot.undoStack ? JSON.parse(JSON.stringify(tab.snapshot.undoStack)) : [];
     S.redoStack=tab.snapshot.redoStack ? JSON.parse(JSON.stringify(tab.snapshot.redoStack)) : [];
+    // If snapshot had stripped images, restore full deck from autoSave data
+    if(S.currentDeck && S.currentDeck.slides){
+      let hasStripped=false;
+      for(const sl of S.currentDeck.slides){
+        if(sl.elements) for(const el of sl.elements){ if(el.src==='__stripped__') hasStripped=true; }
+      }
+      if(hasStripped){
+        try{
+          const saved=localStorage.getItem('sloth_space_deck');
+          if(saved){
+            const p=JSON.parse(saved);
+            if(p&&p.deck&&p.deck.slides) S.currentDeck=p.deck;
+          }
+        }catch(e){}
+      }
+    }
   } else if(tab.mode==='doc'){
     S.currentDoc=tab.snapshot.doc ? JSON.parse(JSON.stringify(tab.snapshot.doc)) : null;
     S.docUndoStack=tab.snapshot.undoStack ? JSON.parse(JSON.stringify(tab.snapshot.undoStack)) : [];
