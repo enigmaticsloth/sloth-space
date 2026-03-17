@@ -327,6 +327,7 @@ INTENTS:
   IMPORTANT: If the user wants to CREATE/GENERATE/WRITE content about ANY topic (including Sloth Space), this is "generate" NOT "about".
   WORKSPACE MODE: If the user asks to CREATE/WRITE/GENERATE a document, report, article, presentation, or slide deck based on project data, this is ALWAYS "generate" NOT "describe". The key distinction: "summarize project X" → describe, but "write a document about project X" / "make a report for project X" / "create slides for project X" → generate.
   Output {"intent":"generate","target":"doc"} for document/report/article requests, or {"intent":"generate","target":"slide"} for presentation/slide requests.
+  If the user also mentions linking/filing to a project, add "project":"projectName" to the output. Example: "write a report and put it in Q2 project" → {"intent":"generate","target":"doc","project":"Q2"}
 
 "ui_action" — user wants to NAVIGATE, SWITCH MODES, OPEN FILES, MANAGE PROJECTS, or CONTROL THE APP UI.
   This is for app-level operations, NOT content creation.
@@ -475,8 +476,9 @@ INTENTS:
 "sheet_fill" — AI fills/computes cell values in sheet mode. {"intent":"sheet_fill","instruction":"...","targetCol":"col"}
 "describe" — ask about current content: summarize, analyze, explain. {"intent":"describe"}
 "about" — ask about Sloth Space the app or Sloth the AI. {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
-"generate" — create NEW content or regenerate. Any topic, any mode. {"intent":"generate","target":"doc"|"slide"|"sheet"}
+"generate" — create NEW content or regenerate. Any topic, any mode. {"intent":"generate","target":"doc"|"slide"|"sheet","project":"name"}
   target: "slide" for presentations, "doc" for documents/reports, "sheet" for spreadsheets. Omit if same as current mode.
+  project: if user mentions linking/filing to a project, include its name. System will auto-create if needed.
   Confirmations (yes/ok/sure/go) after AI suggests → generate.
 "ui_action" — navigate, switch modes, open files, manage projects, save.
   {"intent":"ui_action","actions":[{"fn":"name","args":[...]}],"message":"..."}
@@ -1903,6 +1905,27 @@ ${ABOUT_TEXTS.sheet}
       }
     }
 
+    // ── Resolve project from router output (LLM-driven, no hardcoded language patterns) ──
+    if (!_resolvedProjectId && routerData.project && window.wsListProjects) {
+      const rpName = routerData.project.toLowerCase();
+      const allProjects = window.wsListProjects();
+      const exact = allProjects.find(p => p.name && p.name.toLowerCase() === rpName);
+      const fuzzy = !exact && allProjects.find(p => p.name && (
+        p.name.toLowerCase().includes(rpName) || rpName.includes(p.name.toLowerCase())
+      ));
+      if (exact) {
+        _resolvedProjectId = exact.id;
+      } else if (fuzzy) {
+        _resolvedProjectId = fuzzy.id;
+      } else if (window.wsCreateProject) {
+        // Project doesn't exist — auto-create
+        const newProj = window.wsCreateProject(routerData.project);
+        _resolvedProjectId = newProj.id;
+        addMessage(`📁 Created new project "${routerData.project}"`, 'system');
+        if (window.renderWorkspace) window.renderWorkspace();
+      }
+    }
+
     // ── Dispatch based on router intent ──
 
     if(intent==='about'){
@@ -2538,10 +2561,32 @@ async function executeMultiStep(steps, message, userText, wsContext, resolvedPro
         }
         tempStatus.remove();
         // Auto-link: prefer newly created project, then resolved project from user text
-        if (lastCreatedProjectId) {
-          _autoLinkToProject(lastCreatedProjectId);
-        } else if (resolvedProjectId) {
-          _autoLinkToProject(resolvedProjectId);
+        // If neither exists, look ahead in steps for a project name and auto-create
+        let linkProjectId = lastCreatedProjectId || resolvedProjectId;
+        if (!linkProjectId) {
+          // Look ahead in remaining steps for project name hints
+          for (let j = i + 1; j < steps.length; j++) {
+            const futureStep = steps[j];
+            const pName = futureStep.project ||
+              (futureStep.actions || []).find(a => a.fn === 'wsLinkFile')?.args?.[1];
+            if (pName && typeof pName === 'string') {
+              const projects = window.wsListProjects ? window.wsListProjects() : [];
+              const p = projects.find(p => (p.name || '').toLowerCase().includes(pName.toLowerCase()));
+              if (p) {
+                linkProjectId = p.id;
+              } else if (window.wsCreateProject) {
+                const newProj = window.wsCreateProject(pName);
+                linkProjectId = newProj.id;
+                lastCreatedProjectId = newProj.id;
+                addMessage(`📁 Created new project "${pName}"`, 'system');
+                if (window.renderWorkspace) window.renderWorkspace();
+              }
+              break;
+            }
+          }
+        }
+        if (linkProjectId) {
+          _autoLinkToProject(linkProjectId);
         }
 
       } else if (step.type === 'link_last') {
@@ -2550,7 +2595,15 @@ async function executeMultiStep(steps, message, userText, wsContext, resolvedPro
         if (!projectId && projectName) {
           const projects = window.wsListProjects ? window.wsListProjects() : [];
           const p = projects.find(p => (p.name || '').toLowerCase().includes(projectName.toLowerCase()));
-          if (p) projectId = p.id;
+          if (p) {
+            projectId = p.id;
+          } else if (window.wsCreateProject) {
+            // Project doesn't exist — auto-create it
+            const newProj = window.wsCreateProject(projectName);
+            projectId = newProj.id;
+            addMessage(`📁 Created new project "${projectName}"`, 'system');
+            if (window.renderWorkspace) window.renderWorkspace();
+          }
         }
         // Fallback: use resolved project from user text
         if (!projectId && resolvedProjectId) projectId = resolvedProjectId;
@@ -2566,6 +2619,29 @@ async function executeMultiStep(steps, message, userText, wsContext, resolvedPro
 
   // Mark all steps done
   _aiShowStepProgress(steps.length, steps.length);
+
+  // Catch-all: if no project was linked during execution, scan all steps for project names
+  if (!lastCreatedProjectId && !resolvedProjectId && S._wsCurrentFileId) {
+    for (const step of steps) {
+      const pName = step.project ||
+        (step.actions || []).find(a => a.fn === 'wsLinkFile')?.args?.[1] ||
+        (step.actions || []).find(a => a.fn === 'wsCreateProject')?.args?.[0];
+      if (pName && typeof pName === 'string') {
+        const projects = window.wsListProjects ? window.wsListProjects() : [];
+        let p = projects.find(p => (p.name || '').toLowerCase().includes(pName.toLowerCase()));
+        if (!p && window.wsCreateProject) {
+          p = window.wsCreateProject(pName);
+          addMessage(`📁 Created new project "${pName}"`, 'system');
+          if (window.renderWorkspace) window.renderWorkspace();
+        }
+        if (p) {
+          lastCreatedProjectId = p.id;
+          _autoLinkToProject(p.id);
+        }
+        break;
+      }
+    }
+  }
 
   // Final: navigate to workspace projects to show result
   if (lastCreatedProjectId) {
