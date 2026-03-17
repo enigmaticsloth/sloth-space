@@ -544,6 +544,34 @@ function enterSlides(){
   enterSlideMode();
 }
 
+/** Mobile landing: reveal config sections + mode cards on "Get Started" */
+function mobileGetStarted(){
+  const left=document.querySelector('.landing-left');
+  if(!left) return;
+  // Show all hidden ll-section elements
+  left.querySelectorAll('.ll-section').forEach(s=>s.classList.add('mobile-show'));
+  // Show landing-right (mode cards)
+  const right=document.querySelector('.landing-right');
+  if(right) right.classList.add('mobile-show');
+  // Hide get started button
+  const btn=document.getElementById('llGetStarted');
+  if(btn) btn.style.display='none';
+  // Scroll to config
+  const firstSection=left.querySelector('.ll-section');
+  if(firstSection) firstSection.scrollIntoView({behavior:'smooth'});
+}
+
+/** Mobile landing: skip setup and enter default mode directly */
+function mobileSkipSetup(){
+  // If already configured, enter slide mode
+  if(window.isConfigured && window.isConfigured()){
+    pickMode('slide');
+    return;
+  }
+  // Otherwise, show config sections and flash API toggle
+  mobileGetStarted();
+}
+
 // ═══════════════════════════════════════════
 // MODE MANAGEMENT
 // ═══════════════════════════════════════════
@@ -2591,6 +2619,8 @@ export {
   mpSendPrompt,
   mpSendFromInput,
   mpSendFromMobile,
+  mobileGetStarted,
+  mobileSkipSetup,
   mpToggleSidebar,
   mpDetectMode,
   mpAddMsg,

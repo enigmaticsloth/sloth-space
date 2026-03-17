@@ -3,7 +3,7 @@
 // Used by slide, doc, and sheet modes
 // ═══════════════════════════════════════════
 
-import { S } from './state.js?v=20260317c30';
+import { S } from './state.js?v=20260317c31';
 
 // ── Position helper ──
 function _positionTooltip(rect){

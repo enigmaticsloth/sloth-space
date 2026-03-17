@@ -216,11 +216,32 @@
   /* --- Overlay panels: full-width --- */
   .file-nav { width:85vw; max-width:320px; }
   .settings-panel { width:92vw; padding:20px 18px; }
-  /* Landing page phone */
-  .landing-overlay { flex-direction:column; }
-  .landing-left { width:100%; padding:16px; border-right:none; border-bottom:1px solid rgba(255,255,255,0.06); max-height:none; overflow-y:visible; }
-  .ll-logo { font-size:22px; }
-  .landing-right { flex-direction:column; padding:16px; }
+  /* Landing page phone — demo-first hero layout */
+  .landing-overlay { flex-direction:column; overflow-y:auto; }
+  .landing-left { width:100%; padding:20px 16px; border-right:none; border-bottom:none; max-height:none; overflow-y:visible; display:flex; flex-direction:column; align-items:center; min-height:100vh; min-height:100dvh; }
+  .ll-logo { font-size:26px; order:1; }
+  .ll-tagline { order:2; margin-bottom:16px; }
+  /* Demo is the hero — order 3, prominent */
+  .ll-demo { order:3; width:100%; flex:none; margin-top:8px; }
+  .ll-demo-stage { min-height:200px; }
+  .mu { min-height:180px; }
+  .mu-status { font-size:10px; }
+  .ll-demo-label { font-size:9px; }
+  .ll-demo-desc { font-size:10px; }
+  /* Get Started button */
+  .ll-get-started { order:4; display:block; width:100%; margin-top:16px; }
+  /* Footer after Get Started */
+  .ll-footer { order:6; margin-top:12px; padding-top:8px; }
+  /* Hide config sections initially on mobile — revealed by Get Started */
+  .ll-section { order:10; display:none; }
+  .ll-section.mobile-show { display:block; width:100%; }
+  .ll-get-started-btn { width:100%; padding:14px; background:linear-gradient(135deg,#7886A5,#9BA8C4); color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; font-family:Arial; transition:transform 0.15s; letter-spacing:0.3px; }
+  .ll-get-started-btn:active { transform:scale(0.98); }
+  .ll-skip { text-align:center; font-size:11px; color:#666; margin-top:8px; cursor:pointer; }
+  .ll-skip:hover { color:#9BA8C4; }
+  /* Hide landing-right on mobile (mode cards shown after Get Started) */
+  .landing-right { display:none; }
+  .landing-right.mobile-show { display:flex; flex-direction:column; padding:16px; width:100%; }
   .landing-modes { width:100%; }
   .ws-modal { width:95%; }
 
@@ -240,10 +261,9 @@
   .slide-drag-handle svg { width:16px; height:16px; }
   /* Landing + mode cards phone */
   .mp-chat-panel { display:none; }
-  .mp-mobile-prompt { display:flex; align-items:flex-end; gap:8px; position:fixed; bottom:0; left:0; right:0; padding:12px 16px; background:rgba(18,18,18,0.95); border-top:1px solid rgba(255,255,255,0.08); z-index:600; backdrop-filter:blur(12px); }
-  .mp-mobile-prompt textarea { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:#e0e0e0; font-size:14px; font-family:Arial; padding:10px 12px; resize:none; outline:none; max-height:80px; line-height:1.4; }
-  .mp-mobile-prompt textarea::placeholder { color:#666; }
-  .mp-mobile-prompt textarea:focus { border-color:rgba(168,153,196,0.4); }
+  /* Mobile prompt: floating bottom bar inside landing overlay */
+  .mp-mobile-prompt { display:none; }
+  /* On mobile landing page, show Get Started instead of floating prompt */
   .mode-cards { flex-direction:column; align-items:center; gap:12px; overflow-y:auto; max-height:calc(100vh - 160px); padding-bottom:12px; }
   .mode-card { max-width:100%; width:100%; flex-direction:row; display:flex; border-radius:12px; }
   .mode-card-demo { height:auto; width:110px; min-height:100px; flex-shrink:0; border-bottom:none; border-right:1px solid rgba(255,255,255,0.06); border-radius:12px 0 0 12px; }

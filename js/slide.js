@@ -537,7 +537,7 @@ export { showTextSelTooltip, hideTextSelTooltip, updateSelTooltipForMode,
          selToolbarShowAI, selToolbarBack, selToolbarCut, selToolbarPaste,
          selToolbarAiAction, selToolbarAskAI,
          showSheetRangeToolbar, shRangeCopy, shRangePaste, shRangeDelete
-       } from './sel-toolbar.js?v=20260317c30';
+       } from './sel-toolbar.js?v=20260317c31';
 
 export function editFromSelection(){
   hideTextSelTooltip();

@@ -190,6 +190,9 @@
 .ll-demo-dot:hover { background:#555; border-color:rgba(120,134,165,0.3); }
 .ll-demo-dot.active { background:#7886A5; border-color:rgba(120,134,165,0.6); box-shadow:0 0 6px rgba(120,134,165,0.3); }
 
+/* Get Started (mobile only — hidden on desktop) */
+.ll-get-started { display:none; }
+
 .ll-footer { margin-top:auto; padding-top:12px; text-align:center; }
 .ll-tos { font-size:12px; color:#777; cursor:pointer; text-align:center; }
 .ll-tos:hover { color:#9BA8C4; }
