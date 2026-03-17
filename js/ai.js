@@ -2334,7 +2334,7 @@ ${sourceContent}`;
           setTimeout(_hideAIActionOverlay,1200);
           addMessage(`✓ Converted to sheet "${sheetData.title}" (${rows.length} rows × ${cols.length} cols)`,'ai');
           S.chatHistory.push({role:'assistant',content:`[Converted to sheet: "${sheetData.title}" (${rows.length} rows)]`});
-          _autoLinkToProject(_resolvedProjectId);
+          await _autoLinkToProject(_resolvedProjectId);
         }catch(e){
           statusDiv.remove();
           _hideAIActionOverlay();
@@ -2362,7 +2362,7 @@ ${sourceContent}`;
       }
       await _aiEnsureModeForGenerate('doc');
       await doDocGenerate(statusDiv,text,docWsContext);
-      _autoLinkToProject(_resolvedProjectId);
+      await _autoLinkToProject(_resolvedProjectId);
 
     }else if(intent==='generate'){
       // ── GENERATE: create/modify slides (catch-all) ──
@@ -2384,7 +2384,7 @@ ${sourceContent}`;
       }
       await _aiEnsureModeForGenerate('slide');
       await doGenerate(statusDiv,slideWsContext);
-      _autoLinkToProject(_resolvedProjectId);
+      await _autoLinkToProject(_resolvedProjectId);
 
     }else if(S.currentMode==='doc'&&(intent==='content_edit'||intent==='deck_edit')){
       // ── DOC EDIT ──
@@ -2405,7 +2405,7 @@ ${sourceContent}`;
         }
       } else {
         await doDocGenerate(statusDiv,text,wsContext);
-        _autoLinkToProject(_resolvedProjectId);
+        await _autoLinkToProject(_resolvedProjectId);
       }
 
     }else if(intent==='ui_action'){
@@ -2463,7 +2463,7 @@ ${sourceContent}`;
           await _aiEnsureModeForGenerate('doc');
           await doDocGenerate(statusDiv, text, wsContext);
         }
-        _autoLinkToProject(_resolvedProjectId);
+        await _autoLinkToProject(_resolvedProjectId);
         S.chatHistory.push({role:'assistant',content:`[Multi-step + generate: ${message}]`});
       } else if(steps.length === 0){
         statusDiv.remove();
@@ -2603,7 +2603,7 @@ async function executeMultiStep(steps, message, userText, wsContext, resolvedPro
           }
         }
         if (linkProjectId) {
-          _autoLinkToProject(linkProjectId);
+          await _autoLinkToProject(linkProjectId);
         }
 
       } else if (step.type === 'link_last') {
@@ -2625,7 +2625,7 @@ async function executeMultiStep(steps, message, userText, wsContext, resolvedPro
         // Fallback: use resolved project from user text
         if (!projectId && resolvedProjectId) projectId = resolvedProjectId;
         if (projectId) {
-          _autoLinkToProject(projectId);
+          await _autoLinkToProject(projectId);
         }
       }
     } catch (e) {
@@ -2653,7 +2653,7 @@ async function executeMultiStep(steps, message, userText, wsContext, resolvedPro
         }
         if (p) {
           lastCreatedProjectId = p.id;
-          _autoLinkToProject(p.id);
+          await _autoLinkToProject(p.id);
         }
         break;
       }
@@ -2689,7 +2689,7 @@ function _isDocTarget(routerData, currentMode){
 }
 
 // ── Auto-save generated content to workspace & link to source project ──
-function _autoLinkToProject(projectId){
+async function _autoLinkToProject(projectId){
   if(!projectId) return;
   if(!window.wsLoad || !window.wsSave || !window.wsLinkFile) return;
   const files=window.wsLoad();
@@ -2738,13 +2738,43 @@ function _autoLinkToProject(projectId){
     }
   }
 
-  // Link to project (wsLinkFile auto-dedupes)
+  // Link to project with AI animated action
   if(fileId){
+    // Step 1: Animate AI clicking the Link button in topbar
+    const linkBtn=document.querySelector('.topbar-project-link-btn');
+    if(linkBtn){
+      _showAIActionOverlay('AI ▸ Linking to project...');
+      await _aiSimulateClick(linkBtn);
+      await new Promise(r=>setTimeout(r,300));
+    }
+
+    // Step 2: Execute the link
     window.wsLinkFile(fileId, projectId);
     const proj=window.wsGetProject ? window.wsGetProject(projectId) : null;
     if(proj) addMessage(`📁 Linked to project "${proj.name}"`,'system');
-    // Refresh sidebar file list so new file appears immediately
+
+    // Step 3: Refresh UI — sidebar file list + topbar project badge
     if(window.refreshFileList) window.refreshFileList();
+    _refreshTopbarProjectBadge();
+
+    // Step 4: Briefly highlight the new project badge
+    await new Promise(r=>setTimeout(r,200));
+    const newBadge=document.querySelector('.topbar-project-badge');
+    if(newBadge) await _aiHighlight(newBadge, 1000);
+
+    if(linkBtn) {
+      _updateAIActionOverlay(`AI ▸ Linked to ${proj?proj.name:'project'} ✓`);
+      setTimeout(_hideAIActionOverlay, 1200);
+    }
+  }
+}
+
+// ── Refresh the topbar project badge (shared by doc/slide/sheet) ──
+function _refreshTopbarProjectBadge(){
+  const mtbProj=document.getElementById('mtbProjectArea');
+  if(mtbProj && S.currentMode!=='workspace' && window.wsRenderTopbarProjectInfo){
+    mtbProj.style.display='flex';
+    mtbProj.innerHTML=window.wsRenderTopbarProjectInfo();
   }
 }
 
@@ -3649,7 +3679,7 @@ function resolveActionRefs(actions) {
               if(window.renderWorkspace) window.renderWorkspace();
             }
             if (p) {
-              _autoLinkToProject(p.id);
+              _autoLinkToProject(p.id); // fire-and-forget (resolveActionRefs is sync)
               return null; // handled — skip normal execution
             }
           }
