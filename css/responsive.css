@@ -55,6 +55,11 @@
   /* Workspace button: compact icon-only on mobile */
   .topbar-ws-btn { display:inline-flex !important; margin-left:0; padding:6px 10px; font-size:11px; border-radius:8px; gap:4px; box-shadow:none; }
   .topbar-ws-btn svg { width:14px; height:14px; }
+  /* Project edit menu: popup downward on mobile instead of to the right */
+  .ws-project-edit-menu {
+    left:auto !important; right:0; top:100% !important;
+    margin-left:0 !important; margin-top:4px;
+  }
   .auth-bar { margin-left:auto; }
   .auth-account-btn { padding:4px 8px 4px 6px; gap:6px; }
   .auth-avatar { width:28px; height:28px; font-size:11px; }

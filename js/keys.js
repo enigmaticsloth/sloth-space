@@ -322,13 +322,19 @@ export function initKeys(){
   slidePanel.addEventListener('touchstart',function(e){
     S.touchStartX=e.touches[0].clientX;
     S.touchStartY=e.touches[0].clientY;
+    // Allow native touch in doc/sheet/workspace modes and inline editing
+    if(S.currentMode!=='slide' || (window.isInlineEditing && window.isInlineEditing())) return;
     // Only preventDefault if multi-touch (pinch zoom) — single finger preserved for tap
     if(e.touches.length>1) e.preventDefault();
   },{passive:false});
   slidePanel.addEventListener('touchmove',function(e){
-    e.preventDefault(); // block zoom/scroll during any drag
+    // Allow native touch gestures in doc/sheet/workspace modes and during inline editing
+    if(S.currentMode!=='slide' || (window.isInlineEditing && window.isInlineEditing())) return;
+    e.preventDefault(); // block zoom/scroll during slide drag only
   },{passive:false});
   slidePanel.addEventListener('touchend',function(e){
+    // Skip swipe nav for non-slide modes and inline editing
+    if(S.currentMode!=='slide' || (window.isInlineEditing && window.isInlineEditing())) return;
     const endX=e.changedTouches[0].clientX;
     const endY=e.changedTouches[0].clientY;
     const dx=endX-S.touchStartX;
