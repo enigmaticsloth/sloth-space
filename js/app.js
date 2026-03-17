@@ -5,16 +5,17 @@
 // and runs the initialization sequence.
 
 // ─── Import all modules ───
-import { S } from './state.js?v=20260317c27';
-import * as slide from './slide.js?v=20260317c27';
-import * as doc from './doc.js?v=20260317c27';
-import * as workspace from './workspace.js?v=20260317c27';
-import * as ai from './ai.js?v=20260317c27';
-import * as ui from './ui.js?v=20260317c27';
-import * as storage from './storage.js?v=20260317c27';
-import * as keys from './keys.js?v=20260317c27';
-import * as sheet from './sheet.js?v=20260317c27';
-import * as bench from './bench.js?v=20260317c27';
+import { S } from './state.js?v=20260317c28';
+import * as slide from './slide.js?v=20260317c28';
+import * as doc from './doc.js?v=20260317c28';
+import * as workspace from './workspace.js?v=20260317c28';
+import * as ai from './ai.js?v=20260317c28';
+import * as ui from './ui.js?v=20260317c28';
+import * as storage from './storage.js?v=20260317c28';
+import * as keys from './keys.js?v=20260317c28';
+import * as sheet from './sheet.js?v=20260317c28';
+import * as bench from './bench.js?v=20260317c28';
+import * as selToolbar from './sel-toolbar.js?v=20260317c28';
 
 // ─── Expose ALL module functions to window for HTML onclick handlers ───
 // This allows <button onclick="functionName()"> attributes in the HTML to work
@@ -28,6 +29,7 @@ const allExports = {
   ...storage,
   ...keys,
   ...bench,
+  ...selToolbar,
 };
 
 for (const [name, fn] of Object.entries(allExports)) {

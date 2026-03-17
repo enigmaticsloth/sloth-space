@@ -436,6 +436,10 @@ function _onDragEnd(e) {
   document.removeEventListener('selectstart', _blockSelect);
   if (_dragState && _dragState.moved) {
     _dragState.justFinished = true; // suppress the click event that follows mouseup
+    // Show range toolbar after drag-select completes
+    if(S.sheet.selectedRange && window.showSheetRangeToolbar){
+      setTimeout(()=>window.showSheetRangeToolbar(),0);
+    }
   }
   if (_dragState) _dragState.active = false;
 }
@@ -550,6 +554,7 @@ function _onFillEnd(e) {
 export function shSelectCell(rowId, colId) {
   S.sheet.selectedCell = { rowId, colId };
   S.sheet.selectedRange = null;
+  if(window.hideTextSelTooltip) window.hideTextSelTooltip();
   renderSheetMode();
 }
 
@@ -557,6 +562,8 @@ export function shSelectRange(start, end) {
   S.sheet.selectedCell = start;
   S.sheet.selectedRange = { start, end };
   renderSheetMode();
+  // Show range toolbar after render so DOM positions are ready
+  setTimeout(()=>{ if(window.showSheetRangeToolbar) window.showSheetRangeToolbar(); },0);
 }
 
 export function shClearSelection() {

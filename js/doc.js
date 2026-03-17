@@ -270,18 +270,7 @@ export function execDocCaptionCustom(blockId){
   docCaptionAI('custom', inp.value.trim(), blockId);
 }
 
-// Listen for text selection changes
-document.addEventListener('selectionchange',function(){
-  clearTimeout(window.textSelTimeout);
-  window.textSelTimeout=setTimeout(window.showTextSelTooltip,300);
-});
-
-// Hide tooltip on scroll or click outside
-document.addEventListener('mousedown',function(e){
-  if(e.target.closest('.text-sel-tooltip'))return;
-  // Small delay so selectionchange fires first
-  setTimeout(window.hideTextSelTooltip,50);
-});
+// Text selection listeners moved to sel-toolbar.js (shared module)
 
 // ── Doc: New Document ──
 export function docNewDocument(){

@@ -530,141 +530,14 @@ function fcMoveCancelKey(e){
 }
 
 // ═══════════════════════════════════════════
-// TEXT SELECTION TOOLTIP — Quick actions on highlighted text
+// TEXT SELECTION TOOLTIP — moved to sel-toolbar.js (shared module)
+// Re-export for backward compat with existing onclick handlers
 // ═══════════════════════════════════════════
-
-export function showTextSelTooltip(){
-  const sel=window.getSelection();
-  if(!sel||sel.isCollapsed||!sel.toString().trim())return hideTextSelTooltip();
-  // Check if selection is inside a region-box (slide) OR doc-block (doc)
-  const anchor=sel.anchorNode;
-  const regionEl=anchor?.parentElement?.closest?.('.region-box')||anchor?.closest?.('.region-box');
-  const docBlockEl=anchor?.parentElement?.closest?.('.doc-block')||anchor?.closest?.('.doc-block');
-  if(!regionEl&&!docBlockEl)return hideTextSelTooltip();
-
-  const tooltip=document.getElementById('textSelTooltip');
-  // Update tooltip buttons based on mode
-  updateSelTooltipForMode(!!docBlockEl);
-  const range=sel.getRangeAt(0);
-  const rect=range.getBoundingClientRect();
-  tooltip.style.display='flex';
-  let x=rect.left+rect.width/2-tooltip.offsetWidth/2;
-  let y=rect.top-tooltip.offsetHeight-6;
-  // Keep within viewport
-  if(x<8)x=8;
-  if(x+tooltip.offsetWidth>window.innerWidth-8)x=window.innerWidth-tooltip.offsetWidth-8;
-  if(y<8){ y=rect.bottom+6; } // flip below if no room above
-  tooltip.style.left=x+'px';
-  tooltip.style.top=y+'px';
-}
-
-export function updateSelTooltipForMode(isDoc){
-  const tooltip=document.getElementById('textSelTooltip');
-  if(!tooltip) return;
-  tooltip.className='text-sel-tooltip'; // reset to main mode
-  tooltip.innerHTML=
-    `<button onclick="selToolbarCut()">Cut</button>`+
-    `<button onclick="copySelectionToClipboard()">Copy</button>`+
-    `<button onclick="selToolbarPaste()">Paste</button>`+
-    `<span class="sel-divider"></span>`+
-    `<button class="sel-ai-btn" onclick="selToolbarShowAI(event)">AI Edit ▸</button>`;
-}
-
-/** Switch tooltip to AI sub-menu */
-export function selToolbarShowAI(e){
-  if(e) e.stopPropagation();
-  const tooltip=document.getElementById('textSelTooltip');
-  if(!tooltip) return;
-  tooltip.className='text-sel-tooltip ai-mode';
-  const isDoc=S.currentMode==='doc';
-  tooltip.innerHTML=
-    `<button onclick="selToolbarAiAction('expand')">Write More</button>`+
-    `<button onclick="selToolbarAiAction('shorten')">Write Less</button>`+
-    `<span class="sel-divider"></span>`+
-    `<button class="sel-ai-ask" onclick="selToolbarAskAI()">Ask AI</button>`+
-    `<button class="sel-back-btn" onclick="selToolbarBack()">◂</button>`;
-}
-
-/** Go back to main toolbar from AI sub-menu */
-export function selToolbarBack(){
-  updateSelTooltipForMode(S.currentMode==='doc');
-  // Reposition (tooltip may have changed width)
-  const sel=window.getSelection();
-  if(sel&&sel.rangeCount>0){
-    const range=sel.getRangeAt(0);
-    const rect=range.getBoundingClientRect();
-    _positionTooltip(rect);
-  }
-}
-
-function _positionTooltip(rect){
-  const tooltip=document.getElementById('textSelTooltip');
-  if(!tooltip) return;
-  let x=rect.left+rect.width/2-tooltip.offsetWidth/2;
-  let y=rect.top-tooltip.offsetHeight-6;
-  if(x<8)x=8;
-  if(x+tooltip.offsetWidth>window.innerWidth-8)x=window.innerWidth-tooltip.offsetWidth-8;
-  if(y<8){ y=rect.bottom+6; }
-  tooltip.style.left=x+'px';
-  tooltip.style.top=y+'px';
-}
-
-/** Cut selected text */
-export function selToolbarCut(){
-  const sel=window.getSelection();
-  const text=sel?.toString();
-  if(!text) return;
-  navigator.clipboard.writeText(text).catch(()=>{});
-  // Delete selected text
-  document.execCommand('delete');
-  hideTextSelTooltip();
-  window.addMessage(`✂ Cut: "${text.slice(0,40)}${text.length>40?'...':''}"`, 'system');
-}
-
-/** Paste from clipboard */
-export function selToolbarPaste(){
-  navigator.clipboard.readText().then(text=>{
-    if(!text) return;
-    document.execCommand('insertText',false,text);
-    hideTextSelTooltip();
-  }).catch(()=>{
-    hideTextSelTooltip();
-    window.addMessage('Paste failed — browser requires permission.','system');
-  });
-}
-
-/** AI action on selected text (expand/shorten) */
-export function selToolbarAiAction(action){
-  const sel=window.getSelection();
-  const text=sel?.toString()?.trim();
-  if(!text) return;
-  hideTextSelTooltip();
-  const input=document.getElementById('chatInput');
-  const instruction=action==='expand'
-    ? `Expand and add more detail to: "${text}"`
-    : `Make this shorter and more concise: "${text}"`;
-  input.value=instruction;
-  input.focus();
-  window.sendMessage();
-}
-
-/** Open Ask AI with selected text */
-export function selToolbarAskAI(){
-  const sel=window.getSelection();
-  const text=sel?.toString()?.trim();
-  if(!text) return;
-  hideTextSelTooltip();
-  const input=document.getElementById('chatInput');
-  input.value=`"${text}" ← `;
-  input.focus();
-  input.selectionStart=input.selectionEnd=input.value.length;
-  sel.removeAllRanges();
-}
-
-export function hideTextSelTooltip(){
-  const tooltip=document.getElementById('textSelTooltip');
-  if(tooltip) tooltip.style.display='none';
-}
+export { showTextSelTooltip, hideTextSelTooltip, updateSelTooltipForMode,
+         selToolbarShowAI, selToolbarBack, selToolbarCut, selToolbarPaste,
+         selToolbarAiAction, selToolbarAskAI,
+         showSheetRangeToolbar, shRangeCopy, shRangePaste, shRangeDelete
+       } from './sel-toolbar.js?v=20260317c28';
 
 export function editFromSelection(){
   hideTextSelTooltip();
