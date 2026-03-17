@@ -147,20 +147,54 @@ async function _extractXlsxText(file) {
   } catch (e) { return `[XLSX parse error: ${e.message}]`; }
 }
 
-// Extract text from PDF via pdf.js (Mozilla)
-async function _extractPdfText(file) {
-  if (typeof window.pdfjsLib === 'undefined') {
-    // pdf.js not loaded yet — try waiting briefly
-    await new Promise(r => setTimeout(r, 1500));
-    if (typeof window.pdfjsLib === 'undefined') {
-      return `[PDF file: ${file.name} — ${_sizeStr(file.size)}. PDF.js library not loaded. Please refresh and try again.]`;
+// Extract text from PDF via pdf.js (Mozilla) — loaded on-demand via dynamic import
+let _pdfjsLib = null;
+async function _loadPdfJs() {
+  if (_pdfjsLib) return _pdfjsLib;
+  // Try window.pdfjsLib first (from <script> tag in index.html)
+  if (window.pdfjsLib) {
+    _pdfjsLib = window.pdfjsLib;
+    // Ensure worker is configured (index.html script may have set it, but double-check)
+    if (!_pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      _pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
+    console.log('[PDF.js] Using window.pdfjsLib, worker:', _pdfjsLib.GlobalWorkerOptions.workerSrc);
+    return _pdfjsLib;
+  }
+  // Dynamic import as fallback — try multiple CDN sources
+  const cdns = [
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.mjs',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.mjs',
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs',
+  ];
+  for (const url of cdns) {
+    try {
+      console.log('[PDF.js] Trying dynamic import:', url);
+      const mod = await import(url);
+      _pdfjsLib = mod;
+      // Set worker
+      const workerUrl = url.replace('pdf.min.mjs', 'pdf.worker.min.mjs');
+      _pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+      console.log('[PDF.js] Loaded successfully from:', url);
+      window.pdfjsLib = _pdfjsLib; // cache globally
+      return _pdfjsLib;
+    } catch (e) {
+      console.warn('[PDF.js] Failed to load from', url, ':', e.message);
+    }
+  }
+  return null;
+}
+
+async function _extractPdfText(file) {
+  const lib = await _loadPdfJs();
+  if (!lib) {
+    return `[PDF file: ${file.name} — ${_sizeStr(file.size)}. PDF.js library failed to load from all CDN sources. Check network/console.]`;
   }
   try {
     const arrayBuf = await file.arrayBuffer();
-    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuf }).promise;
+    const pdf = await lib.getDocument({ data: arrayBuf }).promise;
     const pages = [];
-    const maxPages = Math.min(pdf.numPages, 50); // cap at 50 pages
+    const maxPages = Math.min(pdf.numPages, 50);
     for (let i = 1; i <= maxPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
@@ -169,8 +203,9 @@ async function _extractPdfText(file) {
     }
     const result = pages.join('\n\n');
     if (!result) return `[PDF: ${file.name} — no extractable text (may be scanned/image-only)]`;
-    return result.slice(0, 16000); // generous limit for PDF content
+    return result.slice(0, 16000);
   } catch (e) {
+    console.error('[PDF] Extraction error:', e);
     return `[PDF parse error: ${e.message}. File: ${file.name}]`;
   }
 }
@@ -208,7 +243,7 @@ function _benchLoad() {
       // Purge stale PDF entries that were cached before PDF extraction was implemented
       let purged = false;
       data.items.forEach(b => {
-        if (b.type === 'pdf' && b.extractedText && /PDF text extraction pending|PDF\.js library not loaded/.test(b.extractedText)) {
+        if (b.type === 'pdf' && b.extractedText && /PDF text extraction pending|PDF\.js library not loaded|PDF\.js library failed to load|cached without text extraction|PDF parse error/.test(b.extractedText)) {
           b.extractedText = `[PDF: ${b.name} — cached without text extraction. Please remove and re-add this file to extract text.]`;
           purged = true;
         }
@@ -240,6 +275,16 @@ async function benchAddFile(file) {
   }
 
   const extractedText = await _extractText(file, type);
+  // Diagnostic: show what was extracted so user can verify
+  console.log(`[Bench] Extracted from "${file.name}" (${type}): ${extractedText.substring(0,300)}...`);
+  if(type==='pdf' && window.addMessage){
+    const preview=extractedText.substring(0,200).replace(/\n/g,' ');
+    if(/\[PDF.*pending|not loaded|parse error/i.test(extractedText)){
+      window.addMessage(`⚠️ PDF extraction failed: ${preview}`, 'system');
+    } else {
+      window.addMessage(`✓ PDF text extracted (${extractedText.length} chars): "${preview}..."`, 'system');
+    }
+  }
 
   // For images, create data URL thumbnail (resized to save space)
   let dataUrl = null;
