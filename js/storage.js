@@ -654,20 +654,32 @@ export function loadSlothFile(file){
 // ═══════════════════════════════════════════
 
 export function initAuth(){
+  console.log('[Auth] initAuth called, URL=', window.location.href);
+  console.log('[Auth] URL has ?code=', window.location.search.includes('code='));
   if(!SUPABASE_URL||!SUPABASE_ANON_KEY){
+    console.warn('[Auth] No SUPABASE_URL or ANON_KEY, skipping');
+    return;
+  }
+  if(!window.supabase){
+    console.error('[Auth] window.supabase not loaded!');
     return;
   }
   try{
     S.supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+    console.log('[Auth] Supabase client created');
 
     // Check for existing session (also handles OAuth callback automatically)
-    S.supabaseClient.auth.getSession().then(({data:{session}})=>{
+    S.supabaseClient.auth.getSession().then(({data:{session},error})=>{
+      console.log('[Auth] getSession result:', session?'HAS SESSION ('+session.user.email+')':'NO SESSION', error||'');
       if(session){
         setAuthUser(session.user);
       }
+    }).catch(e=>{
+      console.error('[Auth] getSession FAILED:', e);
     });
     // Listen for auth changes (fires after code exchange completes too)
     S.supabaseClient.auth.onAuthStateChange((event,session)=>{
+      console.log('[Auth] onAuthStateChange:', event, session?'user='+session.user.email:'no session');
       if(session){
         setAuthUser(session.user);
       }else{
@@ -675,15 +687,16 @@ export function initAuth(){
       }
     });
   }catch(e){
-    console.warn('Auth init failed:',e);
+    console.error('[Auth] initAuth EXCEPTION:', e);
   }
 }
 
 export function setAuthUser(user){
+  console.log('[Auth] setAuthUser called:', user?.email, 'authBar exists:', !!document.getElementById('authBar'));
   try{
     S.currentUser=user;
     const bar=document.getElementById('authBar');
-    if(!bar) return;
+    if(!bar){ console.warn('[Auth] authBar element NOT FOUND!'); return; }
     const name=user.user_metadata?.full_name||user.email?.split('@')[0]||'User';
     const email=user.email||'';
     const initial=name.charAt(0).toUpperCase();
@@ -780,12 +793,14 @@ export function clearAuthUser(){
 }
 
 export async function doLogin(){
+  console.log('[Auth] doLogin called, supabaseClient exists:', !!S.supabaseClient);
   if(!S.supabaseClient){
     window.openSettings();
     return;
   }
   try{
     let redirect=window.location.href.split('#')[0].split('?')[0];
+    console.log('[Auth] doLogin redirectTo:', redirect);
     if(redirect.startsWith('file:')){
       window.addMessage('OAuth login requires http/https. Deploy to GitHub Pages or run a local server first.','system');
       return;
