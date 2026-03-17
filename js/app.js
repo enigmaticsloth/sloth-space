@@ -2,6 +2,7 @@
  * ╔══════════════════════════════════════════════════════════════════╗
  * ║  Goodbye Google. You will never mess with me or scam money      ║
  * ║  from me again. Fuck you.                                       ║
+ * ║  https://www.reddit.com/r/googlecloud/comments/1qmmt5j/comment/o3me4b2/ ║
  * ║                                              — EnigmaticSloth   ║
  * ╚══════════════════════════════════════════════════════════════════╝
  *
