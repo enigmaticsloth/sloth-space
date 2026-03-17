@@ -862,7 +862,7 @@ function rc(content,role,p,region,colorOv,fontSizeOv){
     let h=`<table style="width:100%;border-collapse:collapse;font-family:Arial;font-size:${tf}px;"><thead><tr>`;
     content.headers.forEach(x=>{h+=`<th style="background:${hBg};color:${hT};padding:12px 16px;text-align:left;font-weight:700;font-size:${tf*0.9}px;border-bottom:2px solid ${bc};">${x}</th>`;});
     h+='</tr></thead><tbody>';
-    content.rows.forEach((r,i)=>{h+=`<tr style="background:${i%2===1?alt:'transparent'};">`;r.forEach((c,j)=>{h+=`<td style="padding:10px 16px;border-bottom:1px solid ${bc};color:${tc};font-weight:${j===0?500:400};">${c}</td>`;});h+='</tr>';});
+    content.rows.forEach((r,i)=>{h+=`<tr style="background:${i%2===1?alt:'transparent'};">`;const cells=Array.isArray(r)?r:(typeof r==='object'&&r?Object.values(r):[String(r)]);cells.forEach((c,j)=>{h+=`<td style="padding:10px 16px;border-bottom:1px solid ${bc};color:${tc};font-weight:${j===0?500:400};">${c}</td>`;});h+='</tr>';});
     return h+'</tbody></table>';
   }
 
