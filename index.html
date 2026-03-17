@@ -7,6 +7,17 @@
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+<script>
+// pdf.js global loader — expose pdfjsLib for bench.js PDF extraction
+(async function(){
+  try{
+    const m=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
+    window.pdfjsLib=m;
+    m.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+  }catch(e){ console.warn('[PDF.js] Failed to load:',e); }
+})();
+</script>
 <link rel="stylesheet" href="css/styles.css?v=20260317c11">
 </head>
 <body>
@@ -695,6 +706,6 @@ if(location.protocol==='file:'){
   document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
 }
 </script>
-<script type="module" src="js/app.js?v=20260317c16"></script>
+<script type="module" src="js/app.js?v=20260317c17"></script>
 </body>
 </html>

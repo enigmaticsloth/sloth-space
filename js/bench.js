@@ -62,7 +62,7 @@ async function _extractText(file, type) {
     if (type === 'docx') return await _extractDocxText(file);
     if (type === 'pptx') return await _extractPptxText(file);
     if (type === 'xlsx') return await _extractXlsxText(file);
-    if (type === 'pdf') return `[PDF file: ${file.name} — ${_sizeStr(file.size)}. PDF text extraction pending. File is available as context reference.]`;
+    if (type === 'pdf') return await _extractPdfText(file);
     if (type === 'image') return `[Image: ${file.name}, ${_sizeStr(file.size)}]`;
     return await file.text().then(t => t.slice(0, 8000));
   } catch (e) {
@@ -145,6 +145,34 @@ async function _extractXlsxText(file) {
     });
     return rows.join('\n').slice(0, 12000) || `[XLSX with ${strings.length} strings]`;
   } catch (e) { return `[XLSX parse error: ${e.message}]`; }
+}
+
+// Extract text from PDF via pdf.js (Mozilla)
+async function _extractPdfText(file) {
+  if (typeof window.pdfjsLib === 'undefined') {
+    // pdf.js not loaded yet — try waiting briefly
+    await new Promise(r => setTimeout(r, 1500));
+    if (typeof window.pdfjsLib === 'undefined') {
+      return `[PDF file: ${file.name} — ${_sizeStr(file.size)}. PDF.js library not loaded. Please refresh and try again.]`;
+    }
+  }
+  try {
+    const arrayBuf = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuf }).promise;
+    const pages = [];
+    const maxPages = Math.min(pdf.numPages, 50); // cap at 50 pages
+    for (let i = 1; i <= maxPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(item => item.str).join(' ');
+      if (pageText.trim()) pages.push(`[Page ${i}]\n${pageText.trim()}`);
+    }
+    const result = pages.join('\n\n');
+    if (!result) return `[PDF: ${file.name} — no extractable text (may be scanned/image-only)]`;
+    return result.slice(0, 16000); // generous limit for PDF content
+  } catch (e) {
+    return `[PDF parse error: ${e.message}. File: ${file.name}]`;
+  }
 }
 
 // ── Size limits ──
