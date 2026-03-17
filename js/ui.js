@@ -1238,6 +1238,21 @@ function modeEnter(mode){
 }
 
 function pickMode(mode){
+  // Gate: require API key before entering any mode
+  if(!window.isConfigured || !window.isConfigured()){
+    // Highlight the API config section on the landing page
+    const apiSection=document.getElementById('llApiToggle');
+    if(apiSection){
+      // Open the API section if collapsed
+      if(!_landingApiOpen) toggleLandingApi();
+      // Flash the section to draw attention
+      apiSection.style.transition='background 0.3s';
+      apiSection.style.background='rgba(232,145,58,0.25)';
+      setTimeout(()=>{ apiSection.style.background=''; },1500);
+    }
+    window.addMessage&&window.addMessage('⚠️ Please set up your API key first before entering a mode.','system');
+    return;
+  }
   modeEnter(mode);
 }
 
@@ -1798,7 +1813,12 @@ let fileSelectedIds=new Set();
 let _allFilesCached=[];
 const CLOUD_BUCKET='decks'; // Supabase Storage bucket name
 
-function getStoragePref(){ return localStorage.getItem('sloth_storage_pref')||'cloud'; }
+function getStoragePref(){
+  const saved=localStorage.getItem('sloth_storage_pref');
+  if(saved) return saved;
+  // Default: 'local' if not logged in, 'cloud' if logged in
+  return S.currentUser ? 'cloud' : 'local';
+}
 function setStoragePref(pref){
   localStorage.setItem('sloth_storage_pref',pref);
   document.getElementById('prefCloud')?.classList.toggle('active',pref==='cloud');

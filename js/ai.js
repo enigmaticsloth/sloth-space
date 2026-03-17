@@ -1375,6 +1375,14 @@ async function sendMessage(){
   const hasImages=S.stagedImages.length>0;
   // Allow empty text if images are staged (Auto-Designer: skip LLM)
   if(!text&&!hasImages)return;
+
+  // Gate: require API key before sending messages
+  if(!isConfigured()){
+    addMessage('⚠️ Please set up your API key first. Click the ⚙️ Settings button or go to the home page to configure your AI provider.','system');
+    window.openSettings&&window.openSettings();
+    return;
+  }
+
   input.value='';
   if(text){ addMessage(text,'user'); S.chatHistory.push({role:'user',content:text}); }
 

@@ -766,6 +766,11 @@ export function clearAuthUser(){
   S._authSyncDone=false;
   const bar=document.getElementById('authBar');
   bar.innerHTML='<button class="auth-login-btn" onclick="doLogin()" id="authLoginBtn">Sign In</button>';
+  // Also reset landing page auth section so GitHub button is visible
+  const lStatus=document.getElementById('landingAuthStatus');
+  const lLoggedIn=document.getElementById('landingAuthLoggedIn');
+  if(lStatus)lStatus.style.display='block';
+  if(lLoggedIn)lLoggedIn.style.display='none';
 }
 
 export async function doLogin(){
@@ -787,12 +792,15 @@ export async function doLogin(){
     console.log('[Auth] Calling signInWithOAuth...');
     const{data,error}=await S.supabaseClient.auth.signInWithOAuth({
       provider:'github',
-      options:{redirectTo:redirect}
+      options:{redirectTo:redirect, skipBrowserRedirect:true}
     });
     console.log('[Auth] signInWithOAuth result:', {data, error});
     if(error){
       console.error('[Auth] OAuth error:', error);
       window.addMessage('Login error: '+error.message,'system');
+    } else if(data?.url){
+      // Manually redirect — Supabase auto-redirect can fail after sign-out
+      window.location.href=data.url;
     }
   }catch(e){
     console.error('[Auth] doLogin exception:', e);
