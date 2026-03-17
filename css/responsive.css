@@ -233,6 +233,11 @@
   .ctx-ai-menu { position:fixed !important; left:0 !important; right:0 !important; bottom:0 !important; top:auto !important; max-width:100% !important; width:100% !important; border-radius:14px 14px 0 0 !important; max-height:60vh; overflow-y:auto; animation:ctx-slide-up 0.2s ease !important; }
   @keyframes ctx-slide-up { from{transform:translateY(100%);} to{transform:translateY(0);} }
   .text-sel-tooltip button { font-size:13px; padding:8px 14px; }
+  .text-sel-tooltip { border-radius:10px; padding:4px; gap:1px; }
+  .sel-divider { height:18px; }
+  /* Slide drag handle: bigger on mobile for touch */
+  .slide-drag-handle { width:34px; height:34px; top:-8px; left:-8px; border-radius:9px; }
+  .slide-drag-handle svg { width:16px; height:16px; }
   /* Landing + mode cards phone */
   .mp-chat-panel { display:none; }
   .mp-mobile-prompt { display:flex; align-items:flex-end; gap:8px; position:fixed; bottom:0; left:0; right:0; padding:12px 16px; background:rgba(18,18,18,0.95); border-top:1px solid rgba(255,255,255,0.08); z-index:600; backdrop-filter:blur(12px); }

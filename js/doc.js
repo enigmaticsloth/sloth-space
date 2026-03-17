@@ -22,13 +22,29 @@ export function docEditFromSelection(){
   input.selectionStart=input.selectionEnd=input.value.length;
 }
 
-// ── Doc block click → AI action tooltip ──
+// ── Doc block click → direct inline edit (text) or AI menu (image/table) ──
 export function docBlockClickAction(blockId, e){
-  // Don't show if user is selecting text
+  // Don't interfere if user is selecting text
   const sel=window.getSelection();
   if(sel&&!sel.isCollapsed) return;
   if(e.target.closest('.doc-block-handle')) return;
-  showDocCtxAiMenu(blockId, e);
+  // If already editing this block, don't re-trigger
+  if(S.docEditingBlockId===blockId) return;
+  const block=docGetBlock(blockId);
+  if(!block) return;
+  const isTextBlock=['paragraph','heading1','heading2','heading3','quote','code','bullet','numbered'].includes(block.type);
+  if(isTextBlock){
+    // Single click → enter contenteditable directly (no AI menu)
+    const el=document.querySelector(`[data-block-id="${blockId}"]`);
+    if(el){
+      S.docEditingBlockId=blockId;
+      el.contentEditable='true';
+      setTimeout(()=>el.focus(),0);
+    }
+  } else {
+    // Non-text blocks (image, table, divider) → show AI context menu
+    showDocCtxAiMenu(blockId, e);
+  }
 }
 
 // ── Doc context AI menu (reuses ctxAiMenu popup, like slide mode) ──

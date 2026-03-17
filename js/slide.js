@@ -145,42 +145,103 @@ document.addEventListener('keydown',function(e){
 // ═══════════════════════════════════════════
 
 export function handleRegionClick(slideIdx,regionId,role,label,event){
-  // If inline editing is active, don't interfere
-  if(isInlineEditing())return;
-  // If user selected text, don't trigger region selection — let them copy
+  // If inline editing is active on THIS region, don't interfere
+  if(isInlineEditing()&&S.inlineEdit.regionId===regionId)return;
+  // If user selected text, don't trigger — let selection tooltip handle it
   const sel=window.getSelection();
-  if(sel&&sel.toString().trim().length>0){
-    // Text was highlighted — don't interfere
+  if(sel&&sel.toString().trim().length>0) return;
+  // If in move mode and we already have this region selected, ignore
+  if(S.fcMoveMode&&S.selectedRegion&&S.selectedRegion.regionId===regionId) return;
+  // Single click → select region + enter inline edit directly (no AI menu popup)
+  if(role==='image'){
+    selectRegion(slideIdx,regionId,role,label,event);
     return;
   }
-  // If in move mode and we already have this region selected, ignore (drag handles it)
-  if(S.fcMoveMode&&S.selectedRegion&&S.selectedRegion.regionId===regionId){
-    return;
-  }
-  selectRegion(slideIdx,regionId,role,label,event);
+  selectRegionQuiet(slideIdx,regionId,role,label);
+  enterInlineEdit(slideIdx,regionId);
+  showSlideDragHandle(true);
 }
 
 export function handleRegionDblClick(slideIdx,regionId,role){
-  // Double-click → enter inline editing mode
-  if(isInlineEditing()&&S.inlineEdit.regionId===regionId)return; // already editing
-  if(role==='image')return; // can't inline-edit images
-  enterInlineEdit(slideIdx,regionId);
+  // Double-click: select word (browser default), no extra action needed
+  // since single-click already enters edit mode
 }
 
 export function selectRegion(slideIdx,regionId,role,label,clickEvent){
   S.selectedRegion={slideIdx,regionId,role,label};
   document.getElementById('selectionBar').style.display='flex';
   document.getElementById('selectionTag').textContent=`Slide ${slideIdx+1} → ${label} (${regionId})`;
-  // Re-render to show highlight
   window.renderApp();
   updateFontSizeIndicator();
-  // Show contextual AI menu near the click (not when dragging via fc)
-  if(clickEvent&&!S.fcDrag&&!S.fcJustDragged) showCtxAiMenu(slideIdx,regionId,role,label,clickEvent);
+  // AI menu only for images (no inline edit for images)
+  if(clickEvent&&!S.fcDrag&&!S.fcJustDragged&&role==='image') showCtxAiMenu(slideIdx,regionId,role,label,clickEvent);
+}
+
+/** Select region without re-render or AI menu (for inline edit entry) */
+function selectRegionQuiet(slideIdx,regionId,role,label){
+  S.selectedRegion={slideIdx,regionId,role,label};
+  const selBar=document.getElementById('selectionBar');
+  if(selBar){ selBar.style.display='flex'; }
+  const selTag=document.getElementById('selectionTag');
+  if(selTag) selTag.textContent=`Slide ${slideIdx+1} → ${label} (${regionId})`;
+}
+
+/** Show/hide drag handle at top-left of slide frame */
+export function showSlideDragHandle(show){
+  let handle=document.getElementById('slideDragHandle');
+  if(show){
+    const frame=document.getElementById('slideCanvas');
+    if(!frame) return;
+    if(!handle){
+      handle=document.createElement('div');
+      handle.id='slideDragHandle';
+      handle.className='slide-drag-handle';
+      handle.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>';
+      handle.title='Drag to move slide position';
+      frame.parentElement.style.position='relative';
+      frame.parentElement.insertBefore(handle,frame);
+      // Drag logic
+      let startX,startY,origLeft,origTop;
+      const onMove=e=>{
+        const cx=e.touches?e.touches[0].clientX:e.clientX;
+        const cy=e.touches?e.touches[0].clientY:e.clientY;
+        frame.style.position='relative';
+        frame.style.left=(origLeft+cx-startX)+'px';
+        frame.style.top=(origTop+cy-startY)+'px';
+      };
+      const onUp=()=>{
+        document.removeEventListener('mousemove',onMove);
+        document.removeEventListener('mouseup',onUp);
+        document.removeEventListener('touchmove',onMove);
+        document.removeEventListener('touchend',onUp);
+      };
+      handle.addEventListener('mousedown',e=>{
+        e.preventDefault();
+        startX=e.clientX; startY=e.clientY;
+        origLeft=parseInt(frame.style.left)||0;
+        origTop=parseInt(frame.style.top)||0;
+        document.addEventListener('mousemove',onMove);
+        document.addEventListener('mouseup',onUp);
+      });
+      handle.addEventListener('touchstart',e=>{
+        const t=e.touches[0];
+        startX=t.clientX; startY=t.clientY;
+        origLeft=parseInt(frame.style.left)||0;
+        origTop=parseInt(frame.style.top)||0;
+        document.addEventListener('touchmove',onMove,{passive:false});
+        document.addEventListener('touchend',onUp);
+      },{passive:false});
+    }
+    handle.style.display='flex';
+  } else {
+    if(handle) handle.style.display='none';
+  }
 }
 
 export function clearSelection(){
   if(isInlineEditing()) commitInlineEdit();
   S.selectedRegion=null;
+  showSlideDragHandle(false);
   // Doc selection
   window.docSelectedBlockId=null;
   window.docSelectedCaptionBlockId=null;
@@ -500,9 +561,104 @@ export function showTextSelTooltip(){
 export function updateSelTooltipForMode(isDoc){
   const tooltip=document.getElementById('textSelTooltip');
   if(!tooltip) return;
-  tooltip.innerHTML=isDoc
-    ? '<button onclick="docEditFromSelection()">✏️ AI Edit</button><button onclick="copySelectionToChat()">✦ Ask AI</button><button onclick="copySelectionToClipboard()">📋 Copy</button>'
-    : '<button onclick="editFromSelection()">✏️ Edit</button><button onclick="copySelectionToChat()">✦ Ask AI</button><button onclick="copySelectionToClipboard()">📋 Copy</button>';
+  tooltip.className='text-sel-tooltip'; // reset to main mode
+  tooltip.innerHTML=
+    `<button onclick="selToolbarCut()">Cut</button>`+
+    `<button onclick="copySelectionToClipboard()">Copy</button>`+
+    `<button onclick="selToolbarPaste()">Paste</button>`+
+    `<span class="sel-divider"></span>`+
+    `<button class="sel-ai-btn" onclick="selToolbarShowAI(event)">AI Edit ▸</button>`;
+}
+
+/** Switch tooltip to AI sub-menu */
+export function selToolbarShowAI(e){
+  if(e) e.stopPropagation();
+  const tooltip=document.getElementById('textSelTooltip');
+  if(!tooltip) return;
+  tooltip.className='text-sel-tooltip ai-mode';
+  const isDoc=S.currentMode==='doc';
+  tooltip.innerHTML=
+    `<button onclick="selToolbarAiAction('expand')">Write More</button>`+
+    `<button onclick="selToolbarAiAction('shorten')">Write Less</button>`+
+    `<span class="sel-divider"></span>`+
+    `<button class="sel-ai-ask" onclick="selToolbarAskAI()">Ask AI</button>`+
+    `<button class="sel-back-btn" onclick="selToolbarBack()">◂</button>`;
+}
+
+/** Go back to main toolbar from AI sub-menu */
+export function selToolbarBack(){
+  updateSelTooltipForMode(S.currentMode==='doc');
+  // Reposition (tooltip may have changed width)
+  const sel=window.getSelection();
+  if(sel&&sel.rangeCount>0){
+    const range=sel.getRangeAt(0);
+    const rect=range.getBoundingClientRect();
+    _positionTooltip(rect);
+  }
+}
+
+function _positionTooltip(rect){
+  const tooltip=document.getElementById('textSelTooltip');
+  if(!tooltip) return;
+  let x=rect.left+rect.width/2-tooltip.offsetWidth/2;
+  let y=rect.top-tooltip.offsetHeight-6;
+  if(x<8)x=8;
+  if(x+tooltip.offsetWidth>window.innerWidth-8)x=window.innerWidth-tooltip.offsetWidth-8;
+  if(y<8){ y=rect.bottom+6; }
+  tooltip.style.left=x+'px';
+  tooltip.style.top=y+'px';
+}
+
+/** Cut selected text */
+export function selToolbarCut(){
+  const sel=window.getSelection();
+  const text=sel?.toString();
+  if(!text) return;
+  navigator.clipboard.writeText(text).catch(()=>{});
+  // Delete selected text
+  document.execCommand('delete');
+  hideTextSelTooltip();
+  window.addMessage(`✂ Cut: "${text.slice(0,40)}${text.length>40?'...':''}"`, 'system');
+}
+
+/** Paste from clipboard */
+export function selToolbarPaste(){
+  navigator.clipboard.readText().then(text=>{
+    if(!text) return;
+    document.execCommand('insertText',false,text);
+    hideTextSelTooltip();
+  }).catch(()=>{
+    hideTextSelTooltip();
+    window.addMessage('Paste failed — browser requires permission.','system');
+  });
+}
+
+/** AI action on selected text (expand/shorten) */
+export function selToolbarAiAction(action){
+  const sel=window.getSelection();
+  const text=sel?.toString()?.trim();
+  if(!text) return;
+  hideTextSelTooltip();
+  const input=document.getElementById('chatInput');
+  const instruction=action==='expand'
+    ? `Expand and add more detail to: "${text}"`
+    : `Make this shorter and more concise: "${text}"`;
+  input.value=instruction;
+  input.focus();
+  window.sendMessage();
+}
+
+/** Open Ask AI with selected text */
+export function selToolbarAskAI(){
+  const sel=window.getSelection();
+  const text=sel?.toString()?.trim();
+  if(!text) return;
+  hideTextSelTooltip();
+  const input=document.getElementById('chatInput');
+  input.value=`"${text}" ← `;
+  input.focus();
+  input.selectionStart=input.selectionEnd=input.value.length;
+  sel.removeAllRanges();
 }
 
 export function hideTextSelTooltip(){
