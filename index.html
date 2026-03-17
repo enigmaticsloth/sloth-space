@@ -28,7 +28,7 @@ if(window.pdfjsLib){
   console.log('[PDF.js] v3 UMD loaded, worker configured');
 }else{ console.warn('[PDF.js] pdfjsLib not loaded from CDN'); }
 </script>
-<link rel="stylesheet" href="css/styles.css?v=20260317c38">
+<link rel="stylesheet" href="css/styles.css?v=20260317c40">
 </head>
 <body>
 
@@ -441,6 +441,11 @@ if(window.pdfjsLib){
 
   <!-- Mobile landing (phone only, replaces left+right on mobile) -->
   <div class="mobile-landing" id="mobileLanding" style="display:none;">
+    <!-- Logo -->
+    <div class="ml-logo-bar">
+      <span class="ml-logo-icon">🦥</span>
+      <span class="ml-logo-text">Sloth Space</span>
+    </div>
     <!-- Demo hero -->
     <div class="ml-demo-wrap">
       <div class="ll-demo-desc" id="mlDemoDesc">AI generates a full slide deck from one prompt</div>
@@ -482,7 +487,7 @@ if(window.pdfjsLib){
 
     <!-- Chat + prompt (1/3 screen) -->
     <div class="ml-chat-area">
-      <div class="ml-chat-box" id="mlChatBox">
+      <div class="ml-chat-box expanded" id="mlChatBox">
         <div class="ml-chat-header" onclick="mlToggleChat()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A899C4" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span>Chat</span>
@@ -588,6 +593,10 @@ if(window.pdfjsLib){
   <div class="mtb-row mtb-row1">
     <div class="mtb-tabs" id="modeTabList"></div>
     <button class="mtb-new" id="mtbNewBtn" onclick="window.modeTabNew()" title="New slide tab" style="display:none">+</button>
+    <button class="mtb-bench-btn" id="mtbBenchBtn" onclick="window.toggleBenchOverlay()" title="Bench — AI context files">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span class="mtb-bench-count" id="mtbBenchCount"></span>
+    </button>
   </div>
   <div class="mtb-row mtb-row2" id="mtbRow2">
     <input type="text" class="mtb-filename" id="mtbFilename" placeholder="Untitled" spellcheck="false">
@@ -786,6 +795,23 @@ if(window.pdfjsLib){
 </div>
 </div><!-- /.main-layout -->
 
+<!-- Bench overlay (mobile — replaces inline bench) -->
+<div class="bench-overlay-bg" id="benchOverlayBg" onclick="window.toggleBenchOverlay()" style="display:none;"></div>
+<div class="bench-overlay" id="benchOverlay" style="display:none;">
+  <div class="bench-overlay-header">
+    <span class="bench-overlay-title">📂 Bench</span>
+    <span class="bench-overlay-hint">Files here are sent as AI context</span>
+    <button class="bench-overlay-close" onclick="window.toggleBenchOverlay()">&times;</button>
+  </div>
+  <div class="bench-overlay-body" id="benchOverlayBody">
+    <!-- Populated dynamically by JS -->
+  </div>
+  <div class="bench-overlay-actions">
+    <button class="bench-overlay-import" onclick="window.benchTriggerFileInput();window.toggleBenchOverlay()">+ Import File</button>
+    <button class="bench-overlay-clear" onclick="window.benchClear();window.toggleBenchOverlay()">Clear All</button>
+  </div>
+</div>
+
 <!-- Drag-drop overlay -->
 <div class="drop-overlay" id="dropOverlay">
   <div class="drop-overlay-inner">
@@ -805,6 +831,6 @@ if(location.protocol==='file:'){
   document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111;color:#ccc;font-family:Arial;"><div style="text-align:center;max-width:480px;padding:40px;"><h2 style="color:#A899C4;">Sloth Space needs a local server</h2><p style="color:#888;line-height:1.6;">ES modules don\'t work with <code style="background:#222;padding:2px 6px;border-radius:3px;">file://</code> protocol.</p><p style="color:#aaa;margin-top:16px;">Run one of these in the <b>sloth-space</b> folder:</p><pre style="background:#1a1a1a;padding:16px;border-radius:8px;text-align:left;color:#8FB89F;font-size:13px;overflow-x:auto;">npx serve .\n# or\npython3 -m http.server 8000</pre><p style="color:#888;margin-top:12px;">Then open <code style="background:#222;padding:2px 6px;border-radius:3px;">http://localhost:8000/index_new.html</code></p><p style="color:#666;margin-top:20px;font-size:11px;">Or use <b>app.html</b> which works without a server (but doesn\'t have the latest workspace features).</p></div></div>';
 }
 </script>
-<script type="module" src="js/app.js?v=20260317c38"></script>
+<script type="module" src="js/app.js?v=20260317c40"></script>
 </body>
 </html>

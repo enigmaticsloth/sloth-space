@@ -827,8 +827,16 @@ function _loadModeTabs(){
     if(!raw) return false;
     const data=JSON.parse(raw);
     if(!data.tabs || !Array.isArray(data.tabs) || data.tabs.length===0) return false;
-    // Filter out newtab tabs (they don't survive refresh)
-    const validTabs=data.tabs.filter(t=>t.mode && t.mode!=='newtab');
+    // Filter out newtab tabs and blank tabs (no content worth restoring)
+    const validTabs=data.tabs.filter(t=>{
+      if(!t.mode || t.mode==='newtab') return false;
+      // Skip tabs with no actual content (blank files)
+      if(!t.snapshot) return false;
+      if(t.mode==='slide' && !t.snapshot.deck) return false;
+      if(t.mode==='doc' && !t.snapshot.doc) return false;
+      if(t.mode==='sheet' && !t.snapshot.sheet) return false;
+      return true;
+    });
     if(validTabs.length===0) return false;
     S.modeTabs=validTabs;
     S._tabIdCounter=data._tabIdCounter||validTabs.length+1;
@@ -1063,6 +1071,20 @@ function modeTabSwitch(tabId){
 function modeTabClose(tabId){
   const idx=S.modeTabs.findIndex(t=>t.id===tabId);
   if(idx===-1) return;
+  const closingTab=S.modeTabs[idx];
+
+  // Check if this tab is blank (no actual content) — skip saving workspace file
+  const isBlank=_isTabBlank(closingTab);
+
+  // If closing the active tab and it's blank, clear the current mode state
+  // so autoSave doesn't persist empty data
+  if(tabId===S.activeTabId && isBlank){
+    if(closingTab.mode==='slide') S.currentDeck=null;
+    if(closingTab.mode==='doc') S.currentDoc=null;
+    if(closingTab.mode==='sheet') S.sheet.current=null;
+    S._wsCurrentFileId=null;
+  }
+
   S.modeTabs.splice(idx,1);
   if(S.modeTabs.length===0){
     // No tabs left → show landing
@@ -1088,6 +1110,26 @@ function modeTabClose(tabId){
     _renderTabBar();
   }
   _saveModeTabs();
+}
+
+/** Check if a tab has no actual content (blank file). */
+function _isTabBlank(tab){
+  if(!tab) return true;
+  if(tab.mode==='newtab') return true;
+  // Check snapshot first
+  if(tab.snapshot){
+    if(tab.mode==='slide' && !tab.snapshot.deck) return true;
+    if(tab.mode==='doc' && !tab.snapshot.doc) return true;
+    if(tab.mode==='sheet' && !tab.snapshot.sheet) return true;
+    return false;
+  }
+  // No snapshot — check live state if this is the active tab
+  if(tab.id===S.activeTabId){
+    if(tab.mode==='slide' && !S.currentDeck) return true;
+    if(tab.mode==='doc' && !S.currentDoc) return true;
+    if(tab.mode==='sheet' && !S.sheet.current) return true;
+  }
+  return !tab.snapshot;
 }
 
 function modeTabNew(){
@@ -2044,7 +2086,8 @@ async function fnDeleteSelected(){
     const f=_allFilesCached.find(x=>x.id===fid);
     if(!f)continue;
     const deleteId=f.wsId||f.key||f.path||'';
-    await window.deleteFileFromNav(f.id,f.source,deleteId);
+    // Call with skipConfirm flag to avoid double confirm
+    await window.deleteFileFromNav(f.id,f.source,deleteId,/*skipConfirm*/true);
   }
   fileSelectedIds.clear();
   toggleFileSelect();

@@ -458,6 +458,8 @@ function renderBench() {
   // Update header
   if (countEl) countEl.textContent = items.length > 0 ? `${items.length} file${items.length > 1 ? 's' : ''}` : '';
   if (clearBtn) clearBtn.style.display = items.length > 0 ? '' : 'none';
+  // Update mobile tab-bar bench count badge
+  _updateMtbBenchCount();
 
   if (items.length === 0) {
     area.innerHTML = `<div class="bench-empty" onclick="window.benchTriggerFileInput()">
@@ -560,6 +562,52 @@ function initBench() {
   renderBench();
 }
 
+// ── Bench overlay (mobile) ──
+function toggleBenchOverlay(){
+  const bg=document.getElementById('benchOverlayBg');
+  const ov=document.getElementById('benchOverlay');
+  if(!bg||!ov) return;
+  const show=bg.style.display==='none';
+  if(show){
+    // Sync overlay body with current bench items
+    _syncBenchOverlay();
+    bg.style.display='block';
+    ov.style.display='flex';
+  } else {
+    bg.style.display='none';
+    ov.style.display='none';
+  }
+}
+
+function _syncBenchOverlay(){
+  const body=document.getElementById('benchOverlayBody');
+  if(!body) return;
+  const items=S.bench||[];
+  if(items.length===0){
+    body.innerHTML=`<div style="text-align:center;padding:20px 0;color:#666;font-size:12px;font-family:Arial;">No files on the Bench.<br>Import files so AI can read them as context.</div>`;
+    return;
+  }
+  body.innerHTML=items.map(item=>{
+    const icon=_BENCH_ICONS[item.type]||'📎';
+    const color=_BENCH_COLORS[item.type]||'#666';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+      <span style="font-size:18px;color:${color};">${icon}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;color:#ccc;font-family:Arial;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_escHtml(item.name)}</div>
+        <div style="font-size:10px;color:#666;font-family:Arial;">${item.type.toUpperCase()} · ${_sizeStr(item.size)}</div>
+      </div>
+      <button onclick="event.stopPropagation();window.benchRemove(${item.id});window._syncBenchOverlay&&window._syncBenchOverlay()" style="background:none;border:none;color:#e06060;font-size:16px;cursor:pointer;padding:4px;">×</button>
+    </div>`;
+  }).join('');
+}
+
+function _updateMtbBenchCount(){
+  const el=document.getElementById('mtbBenchCount');
+  if(!el) return;
+  const n=(S.bench||[]).length;
+  el.textContent=n>0?n:'';
+}
+
 export {
   benchAddFile,
   benchAddFiles,
@@ -574,5 +622,8 @@ export {
   benchHandleFileInput,
   benchHandleDrop,
   initBench,
+  toggleBenchOverlay,
+  _syncBenchOverlay,
+  _updateMtbBenchCount,
   _BENCH_ACCEPT
 };

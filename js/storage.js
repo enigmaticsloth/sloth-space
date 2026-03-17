@@ -968,9 +968,9 @@ export async function saveCurrentToCloud(){
   }catch(e){window.addMessage('Cloud save error: '+e.message,'system');}
 }
 
-export async function deleteFileFromNav(id,source,keyOrPath){
+export async function deleteFileFromNav(id,source,keyOrPath,skipConfirm){
   const name=id.replace('local_','').replace('cloud_','').replace('ws_','').replace(/_\d+$/,'').replace(/_/g,' ');
-  if(!confirm(`Delete "${name}"?`))return;
+  if(!skipConfirm && !confirm(`Delete "${name}"?`))return;
 
   if(source==='workspace'||id.startsWith('ws_')){
     window.wsDeleteFile(keyOrPath);
