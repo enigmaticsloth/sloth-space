@@ -655,36 +655,49 @@ export function loadSlothFile(file){
 
 export function initAuth(){
   console.log('[Auth] initAuth called, URL=', window.location.href);
-  console.log('[Auth] URL has ?code=', window.location.search.includes('code='));
-  if(!SUPABASE_URL||!SUPABASE_ANON_KEY){
-    console.warn('[Auth] No SUPABASE_URL or ANON_KEY, skipping');
-    return;
-  }
-  if(!window.supabase){
-    console.error('[Auth] window.supabase not loaded!');
-    return;
-  }
+  if(!SUPABASE_URL||!SUPABASE_ANON_KEY){ return; }
+  if(!window.supabase){ console.error('[Auth] window.supabase not loaded!'); return; }
   try{
     S.supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-    console.log('[Auth] Supabase client created');
 
-    // Check for existing session (also handles OAuth callback automatically)
-    S.supabaseClient.auth.getSession().then(({data:{session},error})=>{
-      console.log('[Auth] getSession result:', session?'HAS SESSION ('+session.user.email+')':'NO SESSION', error||'');
-      if(session){
-        setAuthUser(session.user);
+    // ── Handle implicit-flow OAuth callback (#access_token=... in hash) ──
+    // Supabase CDN v2 may not auto-detect hash tokens reliably.
+    // We manually parse and call setSession() before anything else can strip the hash.
+    const hash=window.location.hash;
+    if(hash && hash.includes('access_token=')){
+      const params=new URLSearchParams(hash.substring(1));
+      const access_token=params.get('access_token');
+      const refresh_token=params.get('refresh_token');
+      console.log('[Auth] Detected implicit-flow tokens in hash, calling setSession...');
+      if(access_token && refresh_token){
+        S.supabaseClient.auth.setSession({access_token,refresh_token}).then(({data,error})=>{
+          if(error){ console.error('[Auth] setSession error:',error); return; }
+          if(data.session){
+            console.log('[Auth] setSession OK:', data.session.user.email);
+            setAuthUser(data.session.user);
+          }
+          // Clean the hash so tokens don't linger in URL / browser history
+          window.history.replaceState({},'',window.location.pathname+window.location.search+'#home');
+        }).catch(e=>console.error('[Auth] setSession exception:',e));
+        // Still register the listener for future changes (logout etc.)
+        S.supabaseClient.auth.onAuthStateChange((event,session)=>{
+          console.log('[Auth] onAuthStateChange:', event);
+          if(session) setAuthUser(session.user);
+          else clearAuthUser();
+        });
+        return; // skip normal getSession — setSession handles it
       }
-    }).catch(e=>{
-      console.error('[Auth] getSession FAILED:', e);
-    });
-    // Listen for auth changes (fires after code exchange completes too)
+    }
+
+    // ── Normal flow: check stored session ──
+    S.supabaseClient.auth.getSession().then(({data:{session}})=>{
+      if(session) setAuthUser(session.user);
+    }).catch(e=>console.error('[Auth] getSession error:',e));
+
     S.supabaseClient.auth.onAuthStateChange((event,session)=>{
-      console.log('[Auth] onAuthStateChange:', event, session?'user='+session.user.email:'no session');
-      if(session){
-        setAuthUser(session.user);
-      }else{
-        clearAuthUser();
-      }
+      console.log('[Auth] onAuthStateChange:', event);
+      if(session) setAuthUser(session.user);
+      else clearAuthUser();
     });
   }catch(e){
     console.error('[Auth] initAuth EXCEPTION:', e);
