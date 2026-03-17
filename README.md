@@ -49,8 +49,14 @@ The AI doesn't just create content — it operates the entire application. It sw
 **AI Context Injection**
 - Cross-file project context — AI reads all files in a project when generating new content
 - Per-block AI actions — rewrite, expand, translate, simplify, change tone, suggest formula
-- Bench (context staging) — pin files, paste text, or drop images as extra context for generation
 - Cross-file references — mention a doc or sheet by name, AI pulls its data into the prompt
+
+**Bench (Context Staging)**
+- Side panel for curating extra context before generation
+- Pin any file (doc, sheet, slides) from workspace into bench as reference material
+- Paste raw text or drop images — all injected into the LLM prompt alongside user instructions
+- Bench image insertion into slides with auto-generated thumbnails
+- Mobile: converts to button + bottom-sheet overlay to save screen space
 
 **Workspace**
 - Project-based file organization
