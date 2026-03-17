@@ -447,6 +447,34 @@ CONTEXT MEMORY:
 
 Output ONLY the JSON object.`;
 
+// ── Compact router for small models (< 8K context or low TPM) ──
+const ROUTER_COMPACT=`You are an intent classifier for Sloth Space, a content creation app (modes: slide, doc, sheet, workspace).
+Classify the user's message into ONE intent. Output ONLY a JSON object.
+
+INTENTS:
+"undo" — undo/redo/revert. {"intent":"undo"}
+"content_edit" — edit or delete specific content in current file. {"intent":"content_edit","slide":N,"region":"id","delete":bool}
+"style" — visual changes: colors, fonts, background (slide mode only). {"intent":"style"}
+"image" — image operations on slides. {"intent":"image"}
+"deck_edit" — batch edit ALL slides or restructure entire doc. {"intent":"deck_edit"}
+"sheet_fill" — AI fills/computes cell values in sheet mode. {"intent":"sheet_fill","instruction":"...","targetCol":"col"}
+"describe" — ask about current content: summarize, analyze, explain. {"intent":"describe"}
+"about" — ask about Sloth Space the app or Sloth the AI. {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
+"generate" — create NEW content or regenerate. Any topic, any mode. {"intent":"generate","target":"doc"|"slide"|"sheet"}
+  target: "slide" for presentations, "doc" for documents/reports, "sheet" for spreadsheets. Omit if same as current mode.
+  Confirmations (yes/ok/sure/go) after AI suggests → generate.
+"ui_action" — navigate, switch modes, open files, manage projects, save.
+  {"intent":"ui_action","actions":[{"fn":"name","args":[...]}],"message":"..."}
+  Functions: modeEnter(mode), openWorkspaceItem(name), wsCreateProject(name,desc), wsOpenProject(name), wsLinkFile(file,project), wsDeleteFile(id), wsDeleteProject(id), openSettings(), modeTabSwitch(tabId), modeTabClose(tabId), modeTabNew()+ntpPickMode(mode), modeSave(), modeSaveCloud(), modeNew(), benchRemove(id), benchClear(), applyPreset(name), wsSetView(view), wsSetSearch(q), wsSetSort(by)
+"multi_step" — BOTH ui_action AND content creation in one request. {"intent":"multi_step","steps":[...]}
+"chat" — ONLY pure greetings with no topic. If ANY topic exists → "generate" instead.
+
+PRIORITY: undo > delete(content_edit) > multi_step > ui_action(projects/navigation) > generate(content creation) > describe > about > style/image > chat.
+When in doubt between chat and generate → always choose generate.
+Cross-mode conversion ("turn slides into doc") → generate with appropriate target.
+Bench files are reference data already injected as context. "use bench/PDF data to generate" → generate.
+Output ONLY the JSON.`;
+
 // ── Pass 2a: conversation mode ──
 const CHAT_PROMPT=`You are Sloth, the AI assistant inside Sloth Space — an AI-native content creation platform.
 
@@ -1700,25 +1728,34 @@ ${ABOUT_TEXTS.sheet}
       routerMsgs.push({role:'system',content:'[Context: '+ctxStr+']'});
     }
 
+    // ── LLM ROUTER — choose compact or full prompt based on model size ──
+    // Compact prompt (~1500 tokens) for small/free-tier models; full prompt for large models
+    const _isSmallRouter=/8b|mini|lite|flash-lite|instant/i.test(S.llmConfig.router||'');
+    const routerSysPrompt=_isSmallRouter?ROUTER_COMPACT:ROUTER_PROMPT;
     statusDiv.textContent='Routing...';
-    const routerRaw=await callLLM(ROUTER_PROMPT,routerMsgs,{useRouter:true,temperature:0,max_tokens:512,json:true});
     let intent='chat';
     let routerData={};
     try{
-      routerData=JSON.parse(routerRaw);
-      intent=routerData.intent||'chat';
-    }catch(e){
-      // Try extractJSON fallback before giving up
-      const extracted=extractJSON(routerRaw);
-      if(extracted&&extracted.intent){
-        routerData=extracted;
-        intent=extracted.intent;
-        console.warn('Router JSON.parse failed, extractJSON succeeded:',routerRaw);
-      }else{
-        console.warn('Router parse failed completely, defaulting to generate:',e,'raw:',routerRaw);
-        // Default to 'generate' instead of 'chat' — user likely wants content created
-        intent='generate';
+      const routerRaw=await callLLM(routerSysPrompt,routerMsgs,{useRouter:true,temperature:0,max_tokens:512,json:true});
+      try{
+        routerData=JSON.parse(routerRaw);
+        intent=routerData.intent||'chat';
+      }catch(e){
+        const extracted=extractJSON(routerRaw);
+        if(extracted&&extracted.intent){
+          routerData=extracted;
+          intent=extracted.intent;
+        }else{
+          console.warn('Router parse failed, defaulting to generate:',e,'raw:',routerRaw);
+          intent='generate';
+        }
       }
+      if(_isSmallRouter) console.log('[Router] Used compact prompt, result:',intent);
+    }catch(routerErr){
+      // Router LLM failed (e.g. 413/429) — fallback to generate for substantive messages, chat otherwise
+      console.warn('[Router] LLM call failed:',routerErr.message);
+      intent=(text.length>5)?'generate':'chat';
+      routerData={intent};
     }
 
     // ── Smart fallback: ANY intent → chat when user just wants a filename/title suggestion ──
