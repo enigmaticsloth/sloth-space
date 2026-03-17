@@ -403,7 +403,7 @@ INTENTS:
 
 "multi_step" — user wants MULTIPLE THINGS done in sequence that span different intent types.
   Use this ONLY when the message contains BOTH app management AND content creation in ONE request.
-  Output: {"intent":"multi_step","steps":[step1, step2, ...],"message":"description"}
+  Output: {"intent":"multi_step","steps":[step1, step2, ...],"message":"description","project":"projectName if mentioned"}
   Each step is one of:
     {"type":"ui_action","actions":[{"fn":"functionName","args":[...]}]}
     {"type":"generate","target":"doc"|"slide","topic":"what to write about"}
@@ -476,19 +476,22 @@ INTENTS:
 "sheet_fill" — AI fills/computes cell values in sheet mode. {"intent":"sheet_fill","instruction":"...","targetCol":"col"}
 "describe" — ask about current content: summarize, analyze, explain. {"intent":"describe"}
 "about" — ask about Sloth Space the app or Sloth the AI. {"intent":"about","topic":"general|slides|doc|sheet|workspace"}
-"generate" — create NEW content or regenerate. Any topic, any mode. {"intent":"generate","target":"doc"|"slide"|"sheet","project":"name"}
+"generate" — create NEW content or regenerate. Any topic, any mode. {"intent":"generate","target":"doc"|"slide"|"sheet","project":"projectName"}
   target: "slide" for presentations, "doc" for documents/reports, "sheet" for spreadsheets. Omit if same as current mode.
-  project: if user mentions linking/filing to a project, include its name. System will auto-create if needed.
+  project: if user mentions linking/filing/categorizing to a project, ALWAYS include the project name. System auto-creates if needed.
   Confirmations (yes/ok/sure/go) after AI suggests → generate.
 "ui_action" — navigate, switch modes, open files, manage projects, save.
   {"intent":"ui_action","actions":[{"fn":"name","args":[...]}],"message":"..."}
   Functions: modeEnter(mode), openWorkspaceItem(name), wsCreateProject(name,desc), wsOpenProject(name), wsLinkFile(fileOrCurrent,project) — use "current" for currently viewed file, wsDeleteFile(id), wsDeleteProject(id), openSettings(), modeTabSwitch(tabId), modeTabClose(tabId), modeTabNew()+ntpPickMode(mode), modeSave(), modeSaveCloud(), modeNew(), benchRemove(id), benchClear(), applyPreset(name), wsSetView(view), wsSetSearch(q), wsSetSort(by)
   CRITICAL: "歸類/歸在/放在/加入/link to + 專案/project" → wsLinkFile("current","projectName"), NOT wsOpenProject.
-"multi_step" — BOTH ui_action AND content creation in one request. {"intent":"multi_step","steps":[...]}
+"multi_step" — BOTH ui_action AND content creation in one request. {"intent":"multi_step","steps":[...],"project":"projectName"}
+  If user mentions a project to link to, ALWAYS include "project" at top level. System auto-creates if needed.
 "chat" — ONLY pure greetings with no topic. If ANY topic exists → "generate" instead.
 
 PRIORITY: undo > delete(content_edit) > multi_step > ui_action(projects/navigation) > generate(content creation) > describe > about > style/image > chat.
-CRITICAL: "create/write content + put/file/link it in an existing project" → generate (NOT multi_step). The system auto-links to the project. Only use multi_step when CREATING a new project AND content together.
+CRITICAL: "create/write content + link/file/categorize to a project" → generate with "project":"name" (NOT multi_step). Only use multi_step when CREATING a new project AND content together.
+Examples: "write a doc and put it in X project" → {"intent":"generate","target":"doc","project":"X"}
+"建立文件 歸類到Y專案" → {"intent":"generate","target":"doc","project":"Y"}
 When in doubt between chat and generate → always choose generate.
 Cross-mode conversion ("turn slides into doc") → generate with appropriate target.
 Bench files are reference data already injected as context. "use bench/PDF data to generate" → generate.
@@ -1804,7 +1807,7 @@ ${ABOUT_TEXTS.sheet}
           intent='generate';
         }
       }
-      if(_isSmallRouter) console.log('[Router] Used compact prompt, result:',intent);
+      console.log('[Router] result:', JSON.stringify(routerData));
     }catch(routerErr){
       // Router LLM failed (e.g. 413/429) — fallback to generate for substantive messages, chat otherwise
       console.warn('[Router] LLM call failed:',routerErr.message);
@@ -1906,23 +1909,37 @@ ${ABOUT_TEXTS.sheet}
     }
 
     // ── Resolve project from router output (LLM-driven, no hardcoded language patterns) ──
-    if (!_resolvedProjectId && routerData.project && window.wsListProjects) {
-      const rpName = routerData.project.toLowerCase();
-      const allProjects = window.wsListProjects();
-      const exact = allProjects.find(p => p.name && p.name.toLowerCase() === rpName);
-      const fuzzy = !exact && allProjects.find(p => p.name && (
-        p.name.toLowerCase().includes(rpName) || rpName.includes(p.name.toLowerCase())
-      ));
-      if (exact) {
-        _resolvedProjectId = exact.id;
-      } else if (fuzzy) {
-        _resolvedProjectId = fuzzy.id;
-      } else if (window.wsCreateProject) {
-        // Project doesn't exist — auto-create
-        const newProj = window.wsCreateProject(routerData.project);
-        _resolvedProjectId = newProj.id;
-        addMessage(`📁 Created new project "${routerData.project}"`, 'system');
-        if (window.renderWorkspace) window.renderWorkspace();
+    // Extract project name from: routerData.project, or steps[].project, or steps[].actions wsLinkFile/wsCreateProject
+    if (!_resolvedProjectId && window.wsListProjects) {
+      let projectName = routerData.project || null;
+      // Fallback: scan multi_step steps for project name
+      if (!projectName && routerData.steps) {
+        for (const step of routerData.steps) {
+          projectName = step.project ||
+            (step.actions || []).find(a => a.fn === 'wsLinkFile')?.args?.[1] ||
+            (step.actions || []).find(a => a.fn === 'wsCreateProject')?.args?.[0];
+          if (projectName) break;
+        }
+      }
+      if (projectName && typeof projectName === 'string') {
+        const rpName = projectName.toLowerCase();
+        const allProjects = window.wsListProjects();
+        const exact = allProjects.find(p => p.name && p.name.toLowerCase() === rpName);
+        const fuzzy = !exact && allProjects.find(p => p.name && (
+          p.name.toLowerCase().includes(rpName) || rpName.includes(p.name.toLowerCase())
+        ));
+        if (exact) {
+          _resolvedProjectId = exact.id;
+        } else if (fuzzy) {
+          _resolvedProjectId = fuzzy.id;
+        } else if (window.wsCreateProject) {
+          // Project doesn't exist — auto-create before generating content
+          const newProj = window.wsCreateProject(projectName);
+          _resolvedProjectId = newProj.id;
+          addMessage(`📁 Created new project "${projectName}"`, 'system');
+          if (window.renderWorkspace) window.renderWorkspace();
+        }
+        console.log('[Project] Resolved from router output:', projectName, '→', _resolvedProjectId);
       }
     }
 
